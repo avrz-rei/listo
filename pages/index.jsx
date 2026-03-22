@@ -1,40 +1,103 @@
 import { useState, useEffect } from "react";
 
-// ── PostHog analytics ────────────────────────────────────────────────────
+// ── PostHog ───────────────────────────────────────────────────────────────
 const POSTHOG_KEY = "phc_Gbq7s2JDLrsyaRC2X3jP9PmMEBclWGloKzzL29XZRhv";
-const POSTHOG_HOST = "https://us.i.posthog.com";
-
 function track(event, props = {}) {
   if (typeof window === "undefined" || !window.posthog) return;
   try { window.posthog.capture(event, props); } catch (_) {}
 }
 
-// ── Brand tokens ─────────────────────────────────────────────────────────
-const B = {
+// ── Design tokens — from brand preview PDF ────────────────────────────────
+const T = {
   orange:   "#E8620A",
-  orangeD:  "#C4520A",
+  orangeL:  "#FF7A24",
   black:    "#1A1714",
   cream:    "#FAF7F2",
-  lime:     "#C8F135",
   warmGray: "#F0EBE3",
-  gray1:    "#2C2825",
-  gray2:    "#6B6560",
-  gray3:    "#A8A29C",
-  gray4:    "#D4CEC8",
+  lime:     "#C8F135",
+  text:     "#2C2420",
+  muted:    "#8C7B70",
+  border:   "#E2D9D0",
+  green:    "#16A34A",
+  yellow:   "#D97706",
+  red:      "#DC2626",
   white:    "#FFFFFF",
-  // Status colors — muted, professional
-  go:       { bg:"#0A1F0A", border:"#16a34a", text:"#22c55e", badge:"#14532d" },
-  caution:  { bg:"#1A1200", border:"#78716c", text:"#d6d3d1", badge:"#292524" },
-  complex:  { bg:"#1A0808", border:"#b91c1c", text:"#fca5a5", badge:"#3b0e0e" },
-  info:     { bg:"#0A1020", border:"#334155", text:"#94a3b8", badge:"#0f172a" },
 };
 
-// ── Project Types ─────────────────────────────────────────────────────────
-const PROJECT_TYPES = [
+// ── Jurisdiction map — City of LA, Santa Monica, Beverly Hills ────────────
+const JURISDICTIONS = {
+  "city-of-la": {
+    name: "City of Los Angeles", short: "City of LA",
+    agency: "LADBS", agencyUrl: "https://ladbs.org",
+    covered: true, color: T.orange,
+    zips: [
+      "90001","90002","90003","90004","90005","90006","90007","90008","90010","90011",
+      "90012","90013","90014","90015","90016","90017","90018","90019","90020","90021",
+      "90022","90023","90024","90025","90026","90027","90028","90029","90031","90032",
+      "90033","90034","90035","90036","90037","90038","90039","90041","90042","90043",
+      "90044","90045","90046","90047","90048","90049","90056","90057","90058","90059",
+      "90061","90062","90063","90064","90065","90066","90067","90068","90069","90071",
+      "90073","90077","90089","90094","90095","90230","90247","90272","90291","90292",
+      "90293","90402","91040","91042","91303","91304","91306","91307","91311","91316",
+      "91324","91325","91326","91330","91331","91335","91340","91342","91343","91344",
+      "91345","91352","91356","91364","91367","91371","91401","91402","91403","91404",
+      "91405","91406","91411","91423","91436","91601","91602","91604","91605","91606",
+      "91607","91608",
+    ],
+  },
+  "santa-monica": {
+    name: "Santa Monica", short: "Santa Monica",
+    agency: "Santa Monica Building & Safety", agencyUrl: "https://www.santamonica.gov/permits",
+    covered: true, color: "#2563eb",
+    note: "Santa Monica has its own Rent Control Board (stricter than LA RSO) and is fully within the CA Coastal Zone.",
+    zips: ["90401","90402","90403","90404","90405"],
+  },
+  "beverly-hills": {
+    name: "Beverly Hills", short: "Beverly Hills",
+    agency: "Beverly Hills Building & Safety", agencyUrl: "https://www.beverlyhills.org/departments/communitydevelopment/buildingdivision/",
+    covered: true, color: "#7c3aed",
+    note: "Beverly Hills has its own building department and zoning code, separate from City of LA.",
+    zips: ["90210","90211","90212"],
+  },
+};
+
+const NOT_COVERED = {
+  covered: false,
+  nearbyJurisdictions: {
+    "90069": "West Hollywood", "90046": "West Hollywood (partially)",
+    "90230": "Culver City", "90232": "Culver City",
+    "90265": "Malibu", "90266": "Manhattan Beach", "90277": "Redondo Beach",
+    "90278": "Redondo Beach", "90254": "Hermosa Beach",
+    "91011": "La Cañada Flintridge", "91030": "South Pasadena",
+    "91101": "Pasadena", "91103": "Pasadena", "91104": "Pasadena",
+    "91105": "Pasadena", "91106": "Pasadena", "91107": "Pasadena",
+    "90731": "San Pedro/Long Beach", "90732": "San Pedro/Long Beach",
+  },
+};
+
+function detectJurisdiction(zip) {
+  if (!zip) return null;
+  for (const [key, j] of Object.entries(JURISDICTIONS)) {
+    if (j.zips.includes(zip)) return { key, ...j };
+  }
+  const nearby = NOT_COVERED.nearbyJurisdictions[zip];
+  return { key: "not-covered", covered: false, nearbyCity: nearby || null, zip };
+}
+
+// ── Project types ─────────────────────────────────────────────────────────
+const QUICK_TYPES = [
+  { value: "adu", label: "ADU" },
+  { value: "new_construction", label: "New Construction" },
+  { value: "addition", label: "Addition" },
+  { value: "whole_house_remodel", label: "Remodel" },
+  { value: "garage_conversion", label: "Garage Conversion" },
+];
+
+const ALL_TYPES = [
   { group: "ADU & Additions", items: [
-    { value: "adu",         label: "ADU - Accessory Dwelling Unit" },
-    { value: "jadu",        label: "JADU - Junior ADU (max 500 sf, within existing)" },
-    { value: "addition",    label: "Room Addition / Home Expansion" },
+    { value: "adu",              label: "ADU - Accessory Dwelling Unit" },
+    { value: "jadu",             label: "JADU - Junior ADU (within existing)" },
+    { value: "addition",         label: "Room Addition / Home Expansion" },
     { value: "new_construction", label: "New Home Construction" },
   ]},
   { group: "Remodels", items: [
@@ -42,28 +105,26 @@ const PROJECT_TYPES = [
     { value: "kitchen_remodel",     label: "Kitchen Remodel" },
     { value: "bathroom_remodel",    label: "Bathroom Remodel" },
     { value: "interior_remodel",    label: "Interior Remodel (non-structural)" },
-    { value: "garage_conversion",   label: "Garage Conversion / ADU Conversion" },
+    { value: "garage_conversion",   label: "Garage Conversion / ADU" },
   ]},
   { group: "Structural", items: [
-    { value: "structural_modification", label: "Structural Modification / Load-Bearing Wall" },
+    { value: "structural_modification", label: "Structural / Load-Bearing Wall" },
     { value: "seismic_retrofit",        label: "Seismic Retrofit / Soft-Story" },
-    { value: "foundation",              label: "Foundation Work / Repair" },
-    { value: "demolition",              label: "Demolition (full or partial)" },
+    { value: "foundation",              label: "Foundation Work" },
+    { value: "demolition",              label: "Demolition" },
   ]},
   { group: "Exterior & Site", items: [
-    { value: "deck_patio",      label: "Deck / Patio / Pergola" },
-    { value: "pool_spa",        label: "Swimming Pool / Spa" },
-    { value: "fence_wall",      label: "Fence / Garden Wall (up to 6 ft)" },
-    { value: "retaining_wall",  label: "Retaining Wall / Site Wall (over 4 ft)" },
-    { value: "grading",         label: "Grading / Excavation / Slope Work" },
-    { value: "hardscape",       label: "Hardscape / Driveway / Landscaping" },
+    { value: "deck_patio",     label: "Deck / Patio / Pergola" },
+    { value: "pool_spa",       label: "Swimming Pool / Spa" },
+    { value: "retaining_wall", label: "Retaining Wall (over 4 ft)" },
+    { value: "grading",        label: "Grading / Excavation" },
   ]},
   { group: "Systems", items: [
-    { value: "roof",        label: "Roof Replacement / Repair" },
-    { value: "solar",       label: "Solar / Battery Storage Installation" },
-    { value: "electrical",  label: "Electrical Work / Panel Upgrade" },
+    { value: "roof",        label: "Roof Replacement" },
+    { value: "solar",       label: "Solar / Battery Storage" },
+    { value: "electrical",  label: "Electrical / Panel Upgrade" },
     { value: "plumbing",    label: "Plumbing Work" },
-    { value: "hvac",        label: "HVAC / AC Installation" },
+    { value: "hvac",        label: "HVAC / AC" },
     { value: "window_door", label: "Window / Door Replacement" },
   ]},
   { group: "Commercial", items: [
@@ -72,116 +133,256 @@ const PROJECT_TYPES = [
   ]},
 ];
 
-const allTypes = PROJECT_TYPES.flatMap(g => g.items);
-function getLabel(value) { return allTypes.find(p => p.value === value)?.label || value; }
+const allFlat = ALL_TYPES.flatMap(g => g.items);
+function getLabel(v) { return allFlat.find(p => p.value === v)?.label || v; }
 
-// ── Overlay zone detection ────────────────────────────────────────────────
-const OVERLAYS = {
-  coastal:  { zips: ["90291","90292","90293","90272","90265","90266","90254","90277","90278","90731","90732","90245","90710","90740","90803","90802"], label: "Coastal Zone",        color: "#1e40af", bg: "#dbeafe", desc: "CA Coastal Commission permit required. Adds 3-6 months." },
-  hillside: { zips: ["90046","90068","90069","90077","90210","90049","90027","90039","91302","91364","91356"], label: "Hillside Area",        color: "#92400e", bg: "#fef3c7", desc: "Hillside Construction Regulations apply. Grading permit likely required." },
-  historic: { zips: ["90004","90005","90027","90036","90019","90018","90008"], label: "Historic Preservation", color: "#5b21b6", bg: "#ede9fe", desc: "HPOZ area. Design changes require LAHP review." },
-  fire:     { zips: ["90046","90068","90069","90077","90210","90049","91302","91364","91356","90265","90266","90272"], label: "Fire Hazard Zone",     color: "#991b1b", bg: "#fee2e2", desc: "LAFD Fire Hazard Severity Zone. Fire-rated materials required." },
-  hoa:      { zips: ["90049","90077","90272","90210","90024","90064","90025"], label: "High-HOA Area",        color: "#065f46", bg: "#d1fae5", desc: "Active HOAs with design review BEFORE LADBS submittal. Adds 4-8 weeks." },
-};
-function detectOverlays(zip) {
-  if (!zip) return [];
-  return Object.entries(OVERLAYS).filter(([,z]) => z.zips.includes(zip)).map(([key,z]) => ({ key, ...z }));
-}
-
-// ── Address parser (client-side, no API) ─────────────────────────────────
+// ── Address parser ────────────────────────────────────────────────────────
 function parseAddress(raw) {
   const s = raw.trim();
   const zip = (s.match(/\b(\d{5})\b/) || [])[1] || "";
-  const HOODS = ["Playa Del Rey","Playa del Rey","Marina del Rey","Venice","Westchester","Pacific Palisades","Brentwood","Bel Air","Westwood","Mar Vista","Silver Lake","Echo Park","Hancock Park","Los Feliz","Hollywood Hills","Laurel Canyon","North Hollywood","Sherman Oaks","Studio City","Encino","Woodland Hills","Century City","Culver City"];
-  const CITIES = ["Los Angeles","West Hollywood","Santa Monica","Burbank","Glendale","Pasadena","Long Beach","Malibu","Calabasas","Beverly Hills"];
+  const HOODS = ["Pacific Palisades","Playa Del Rey","Playa del Rey","Marina del Rey","Venice",
+    "Westchester","Brentwood","Bel Air","Westwood","Mar Vista","Silver Lake","Echo Park",
+    "Hancock Park","Los Feliz","Hollywood Hills","Laurel Canyon","North Hollywood","Sherman Oaks",
+    "Studio City","Encino","Woodland Hills","Century City","West Hollywood","Santa Monica",
+    "Beverly Hills","Culver City"];
+  const CITIES = ["Los Angeles","Santa Monica","Beverly Hills","West Hollywood","Culver City",
+    "Burbank","Glendale","Pasadena","Long Beach","Malibu","Calabasas","Inglewood"];
   let city = "", neighborhood = "";
-  for (const n of HOODS) { if (s.toLowerCase().includes(n.toLowerCase())) { neighborhood = n; city = "Los Angeles"; break; } }
-  if (!city) { for (const c of CITIES) { if (s.toLowerCase().includes(c.toLowerCase())) { city = c; break; } } }
+  for (const n of HOODS) { if (s.toLowerCase().includes(n.toLowerCase())) { neighborhood = n; break; } }
+  for (const c of CITIES) { if (s.toLowerCase().includes(c.toLowerCase())) { city = c; break; } }
   if (!city) city = "Los Angeles";
   return { displayName: [s.split(",")[0].trim(), neighborhood || city, "CA", zip].filter(Boolean).join(", "), city, zip, neighborhood };
 }
 
-// ── Markdown renderer ─────────────────────────────────────────────────────
-function renderInline(text) {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((p, i) =>
-    p.startsWith("**") && p.endsWith("**") ? <strong key={i}>{p.slice(2,-2)}</strong> : p
+// ── Logo component ────────────────────────────────────────────────────────
+function Logo({ size = 32, light = false }) {
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+      <div style={{ width:size, height:size, background:T.orange, borderRadius:size*0.25,
+        display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+        <svg width={size*0.55} height={size*0.55} viewBox="0 0 20 20" fill="none">
+          <path d="M4 10.5L8.5 15L16 6" stroke={T.cream} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      <span style={{ fontSize:size*0.75, fontWeight:700, letterSpacing:"-0.03em",
+        color: light ? T.cream : T.black, fontFamily:"'Georgia',serif", lineHeight:1 }}>
+        listo<span style={{ color:T.orange }}>.</span>
+      </span>
+    </div>
   );
 }
 
-function Markdown({ text }) {
+// ── Flag component (from brand preview) ──────────────────────────────────
+function Flag({ level, title, meta, children }) {
+  const cfg = {
+    red:    { bg:"#FEF2F2", border:"#FECACA", dot:T.red,    label:"FLAG" },
+    yellow: { bg:"#FFFBEB", border:"#FDE68A", dot:T.yellow, label:"REVIEW" },
+    green:  { bg:"#F0FDF4", border:"#BBF7D0", dot:T.green,  label:"CLEAR" },
+    blue:   { bg:"#EFF6FF", border:"#BFDBFE", dot:"#2563eb",label:"INFO" },
+  }[level] || { bg:"#F9FAFB", border:T.border, dot:T.muted, label:"NOTE" };
+
+  return (
+    <div style={{ background:cfg.bg, border:`1px solid ${cfg.border}`,
+      borderRadius:8, padding:"12px 14px", display:"flex", gap:12, alignItems:"flex-start" }}>
+      <div style={{ width:8, height:8, borderRadius:"50%", background:cfg.dot,
+        marginTop:5, flexShrink:0 }} />
+      <div style={{ flex:1 }}>
+        <div style={{ fontSize:9, color:cfg.dot, fontFamily:"monospace",
+          letterSpacing:"0.1em", marginBottom:3 }}>{cfg.label}</div>
+        {title && <div style={{ fontSize:13, fontWeight:600, color:T.text, marginBottom:3 }}>{title}</div>}
+        <div style={{ fontSize:13, color:T.text, lineHeight:1.6 }}>{children}</div>
+        {meta && <div style={{ fontSize:11, color:T.muted, marginTop:4 }}>{meta}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Score card component (from brand preview) ─────────────────────────────
+function ScoreCard({ label, value, sub, color }) {
+  return (
+    <div style={{ background:T.white, padding:"20px 24px", borderRight:`1px solid ${T.border}` }}>
+      <div style={{ fontSize:9, color:T.muted, fontFamily:"monospace",
+        letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:6 }}>{label}</div>
+      <div style={{ fontSize:22, fontWeight:700, color: color||T.text,
+        fontFamily:"'Georgia',serif", marginBottom:4 }}>{value}</div>
+      <div style={{ fontSize:11, color:T.muted }}>{sub}</div>
+    </div>
+  );
+}
+
+// ── Jurisdiction badge ────────────────────────────────────────────────────
+function JurisdictionBadge({ jurisdiction }) {
+  if (!jurisdiction) return null;
+  if (!jurisdiction.covered) return (
+    <div style={{ display:"inline-flex", alignItems:"center", gap:6,
+      background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:20,
+      padding:"3px 10px", fontSize:11 }}>
+      <div style={{ width:6, height:6, borderRadius:"50%", background:T.red }} />
+      <span style={{ color:T.red, fontWeight:600 }}>
+        {jurisdiction.nearbyCity || "Outside coverage area"}
+      </span>
+    </div>
+  );
+  return (
+    <div style={{ display:"inline-flex", alignItems:"center", gap:6,
+      background: jurisdiction.color + "15",
+      border:`1px solid ${jurisdiction.color}40`,
+      borderRadius:20, padding:"3px 10px", fontSize:11 }}>
+      <div style={{ width:6, height:6, borderRadius:"50%", background:jurisdiction.color }} />
+      <span style={{ color:jurisdiction.color, fontWeight:600 }}>{jurisdiction.short}</span>
+      <span style={{ color:T.muted }}>· {jurisdiction.agency}</span>
+    </div>
+  );
+}
+
+// ── Inline markdown renderer ──────────────────────────────────────────────
+function renderInline(text) {
+  return (text||"").split(/(\*\*[^*]+\*\*)/g).map((p,i) =>
+    p.startsWith("**") && p.endsWith("**")
+      ? <strong key={i} style={{ color:T.text }}>{p.slice(2,-2)}</strong> : p
+  );
+}
+
+// ── Report markdown renderer — light mode ─────────────────────────────────
+function ReportMarkdown({ text, jurisdiction }) {
   const lines = text.split("\n");
   const els = [];
   let i = 0, lk = 0, sec = "";
+  let scoreCards = null;
 
-  const permitBadge = t => {
-    const u = (t||"").toUpperCase();
-    if (u === "OTC") return { label:"OTC", bg:"#0A1F0A", color:"#22c55e", border:"#16a34a" };
-    if (u.includes("SPECIAL")) return { label:"SPECIAL", bg:"#1A0A00", color:"#fb923c", border:"#c2410c" };
-    return { label:"PLAN CHECK", bg:"#0A1020", color:"#60a5fa", border:"#2563eb" };
+  // Extract score cards from Deal Summary for the header
+  const extractScoreCards = (allLines) => {
+    let verdict = "", permits = "", zoning = "";
+    for (const l of allLines) {
+      const t = l.trim();
+      if (t.startsWith("VERDICT:")) verdict = t.slice(8).trim();
+      if (t.startsWith("PERMITS:")) permits = t.slice(8).trim();
+      if (t.startsWith("ZONING:")) zoning = t.slice(7).trim();
+    }
+    const complexityMap = { GO:"Low", CAUTION:"Medium", COMPLEX:"High" };
+    const complexityColor = { GO:T.green, CAUTION:T.yellow, COMPLEX:T.red };
+    const verdictWord = (verdict.split("|")[0]||"").trim();
+    const [fees, timeline] = (permits||"").split("|").map(p=>p.trim());
+    return { verdictWord, fees, timeline, zoning, complexityMap, complexityColor };
   };
 
-  const alertCol = sev => {
-    const s = (sev||"").toUpperCase();
-    if (s === "CRITICAL") return B.complex;
-    if (s === "CAUTION") return { bg:"#0F0E08", border:"#854d0e", text:"#fcd34d", badge:"#292409" };
-    if (s === "CLEAR") return B.go;
-    return B.info;
-  };
+  const sc = extractScoreCards(lines);
+
+  // Render score cards block (rendered once at top of deal summary)
+  const renderScoreCardsBlock = () => (
+    <div key="score-cards" style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr",
+      background:T.border, gap:1, marginBottom:24, borderRadius:8, overflow:"hidden",
+      border:`1px solid ${T.border}` }}>
+      <ScoreCard
+        label="Permit Complexity"
+        value={sc.complexityMap[sc.verdictWord] || "—"}
+        sub={sc.verdictWord === "GO" ? "Standard pathway" : sc.verdictWord === "CAUTION" ? "2–3 review rounds typical" : "Entitlement likely required"}
+        color={sc.complexityColor[sc.verdictWord] || T.text}
+      />
+      <ScoreCard
+        label="Est. Timeline"
+        value={(sc.timeline||"").replace("week critical path","wks").replace("weeks","wks")||"—"}
+        sub="From submittal to approval"
+        color={T.black}
+      />
+      <ScoreCard
+        label="Est. Permit Fees"
+        value={(sc.fees||"").replace("estimated fees","").trim()||"—"}
+        sub={`${jurisdiction?.short||"City of LA"} fee schedule`}
+        color={T.orange}
+      />
+    </div>
+  );
+
+  let scoreCardsRendered = false;
 
   while (i < lines.length) {
     const line = lines[i];
     const t = line.trim();
 
+    // Section headers
     if (t.startsWith("## ")) {
       sec = t.slice(3).toLowerCase();
       const id = "sec-" + sec.replace(/[^a-z0-9]+/g,"-").replace(/-+$/,"");
-      els.push(<div key={"h2"+i} id={id} style={{ marginTop:32, marginBottom:14, scrollMarginTop:80 }}><h2 style={S.h2}>{t.slice(3)}</h2></div>);
+      els.push(
+        <div key={"h2"+i} id={id} style={{ marginTop:28, marginBottom:12, scrollMarginTop:80,
+          paddingBottom:8, borderBottom:`2px solid ${T.orange}30` }}>
+          <h2 style={{ fontFamily:"'Georgia',serif", fontSize:17, fontWeight:700,
+            color:T.black, margin:0, textTransform:"uppercase", letterSpacing:"0.05em" }}>
+            {t.slice(3)}
+          </h2>
+        </div>
+      );
+      // Insert score cards after Deal Summary header
+      if (sec.includes("deal") && !scoreCardsRendered) {
+        scoreCardsRendered = true;
+        i++;
+        // Skip to end of deal summary KPI lines, then render score cards
+        const kpiEls = [];
+        while (i < lines.length && !lines[i].trim().startsWith("## ")) {
+          const kt = lines[i].trim();
+          if (!kt) { i++; continue; }
+          if (kt.startsWith("VERDICT:")) {
+            const pts = kt.slice(8).trim().split("|").map(p=>p.trim());
+            const word = pts[0], desc = pts[1]||"";
+            const col = word==="GO" ? T.green : word==="COMPLEX" ? T.red : T.yellow;
+            kpiEls.push(
+              <div key={"v"+i} style={{ display:"flex", alignItems:"center", gap:10,
+                padding:"10px 14px", background: col+"15", border:`1px solid ${col}40`,
+                borderRadius:8, marginBottom:8 }}>
+                <span style={{ fontSize:11, fontWeight:800, color:T.white,
+                  background:col, borderRadius:4, padding:"2px 10px",
+                  letterSpacing:"0.08em" }}>{word}</span>
+                <span style={{ fontSize:13, color:T.text, lineHeight:1.5 }}>{desc}</span>
+              </div>
+            );
+          } else {
+            const KPI = ["ZONING:","UNITS:","PERMITS:","ALERTS:","DATA:"];
+            const kpi = KPI.find(k => kt.startsWith(k));
+            if (kpi) {
+              const label = kpi.slice(0,-1), val = kt.slice(kpi.length).trim();
+              kpiEls.push(
+                <div key={"k"+i} style={{ display:"flex", gap:10, padding:"7px 0",
+                  borderBottom:`1px solid ${T.border}`, alignItems:"flex-start" }}>
+                  <span style={{ fontSize:10, fontWeight:700, color:label==="ALERTS"?T.red:T.muted,
+                    textTransform:"uppercase", letterSpacing:"0.08em", minWidth:70,
+                    paddingTop:2, flexShrink:0, fontFamily:"monospace" }}>{label}</span>
+                  <span style={{ fontSize:13, color:T.text, lineHeight:1.5, flex:1 }}>{renderInline(val)}</span>
+                </div>
+              );
+            }
+          }
+          i++;
+        }
+        els.push(<div key="kpis">{kpiEls}</div>);
+        els.push(renderScoreCardsBlock());
+        continue;
+      }
       i++; continue;
     }
-    if (t.startsWith("### ")) { els.push(<h3 key={i} style={S.h3}>{renderInline(t.slice(4))}</h3>); i++; continue; }
+
+    if (t.startsWith("### ")) {
+      els.push(<h3 key={i} style={{ fontSize:13, fontWeight:700, color:T.black,
+        margin:"14px 0 8px", background:T.warmGray, padding:"4px 10px", borderRadius:4 }}>
+        {renderInline(t.slice(4))}
+      </h3>);
+      i++; continue;
+    }
     if (!t || t === "---") { els.push(<div key={i} style={{ height:"5px" }} />); i++; continue; }
 
-    // VERDICT badge
-    if (t.startsWith("VERDICT:")) {
-      const pts = t.slice(8).trim().split("|").map(p=>p.trim());
-      const word = pts[0], desc = pts[1]||"";
-      const col = word==="GO" ? B.go : word==="COMPLEX" ? B.complex : B.caution;
-      els.push(<div key={i} style={{ display:"flex",alignItems:"center",gap:12,padding:"13px 16px",background:col.bg,border:`1px solid ${col.border}`,borderRadius:10,marginBottom:10 }}>
-        <span style={{ fontSize:13,fontWeight:900,color:col.text,letterSpacing:"0.1em",background:col.badge,borderRadius:6,padding:"4px 14px",whiteSpace:"nowrap" }}>{word}</span>
-        <span style={{ fontSize:13,color:"#94a3b8",lineHeight:1.5 }}>{desc}</span>
-      </div>);
-      i++; continue;
-    }
-
-    // KPI rows (Deal Summary)
-    if (sec.includes("deal")) {
-      const KPI = ["ZONING:","UNITS:","PERMITS:","ALERTS:","DATA:"];
-      const kpi = KPI.find(k => t.startsWith(k));
-      if (kpi) {
-        const label = kpi.slice(0,-1);
-        const val = t.slice(kpi.length).trim();
-        els.push(<div key={i} style={{ display:"flex",gap:10,padding:"9px 0",borderBottom:`1px solid ${B.gray1}`,alignItems:"flex-start" }}>
-          <span style={{ fontSize:11,fontWeight:700,color:label==="ALERTS"?"#f87171":B.gray2,textTransform:"uppercase",letterSpacing:"0.08em",minWidth:70,paddingTop:2,flexShrink:0 }}>{label}</span>
-          <span style={{ fontSize:13,color:B.cream,lineHeight:1.5,flex:1 }}>{renderInline(val)}</span>
-        </div>);
-        i++; continue;
-      }
-    }
-
-    // Alert rows
+    // Zone Alerts — render as Flag components
     if (sec.includes("alert") && t.includes("|") && t.split("|").length >= 2) {
-      const [sev,name,dollar,time] = t.split("|").map(p=>p.trim());
-      const col = alertCol(sev);
+      const pts = t.split("|").map(p=>p.trim());
+      const [sev, name, dollar, time] = pts;
+      const levelMap = { CRITICAL:"red", CAUTION:"yellow", INFO:"blue", CLEAR:"green" };
+      const level = levelMap[sev] || "blue";
       let desc = "";
-      if (i+1 < lines.length && !lines[i+1].trim().includes("|") && lines[i+1].trim()) { desc = lines[i+1].trim(); i++; }
-      els.push(<div key={i} style={{ background:col.bg,border:`1px solid ${col.border}`,borderLeft:`4px solid ${col.border}`,borderRadius:10,padding:"14px 16px",marginBottom:10 }}>
-        <div style={{ display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:desc?6:0 }}>
-          <span style={{ fontSize:10,fontWeight:800,letterSpacing:"0.1em",background:col.badge,color:col.text,borderRadius:4,padding:"2px 8px" }}>{sev}</span>
-          <span style={{ fontSize:13,fontWeight:600,color:B.cream,flex:1 }}>{name}</span>
-          {dollar && <span style={{ fontSize:12,color:col.text,fontWeight:500 }}>{dollar}</span>}
-          {time && <span style={{ fontSize:12,color:B.gray2 }}>+{time}</span>}
-        </div>
-        {desc && <p style={{ fontSize:13,color:"#94a3b8",lineHeight:1.6,margin:0 }}>{desc}</p>}
+      if (i+1 < lines.length && !lines[i+1].trim().includes("|") && lines[i+1].trim()) {
+        desc = lines[i+1].trim(); i++;
+      }
+      const meta = [dollar, time ? `+${time}` : ""].filter(Boolean).join(" · ");
+      els.push(<div key={i} style={{ marginBottom:8 }}>
+        <Flag level={level} title={name} meta={meta||undefined}>{desc}</Flag>
       </div>);
       i++; continue;
     }
@@ -189,100 +390,165 @@ function Markdown({ text }) {
     // Permit roadmap cards
     if ((sec.includes("roadmap")||sec.includes("permit roadmap")) && t.includes("|") && t.split("|").length >= 3) {
       const [name,type,agency,time,cost] = t.split("|").map(p=>p.trim());
-      const b = permitBadge(type);
-      els.push(<div key={i} style={{ background:B.gray1,border:`1px solid #2C2825`,borderRadius:10,padding:"12px 16px",marginBottom:8 }}>
-        <div style={{ display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6 }}>
-          <span style={{ fontSize:13,fontWeight:600,color:B.cream,flex:1 }}>{name}</span>
-          <span style={{ fontSize:10,fontWeight:700,letterSpacing:"0.08em",background:b.bg,color:b.color,border:`1px solid ${b.border}`,borderRadius:4,padding:"2px 8px" }}>{b.label}</span>
+      const isOTC = (type||"").toUpperCase()==="OTC";
+      const isSpecial = (type||"").toUpperCase().includes("SPECIAL");
+      const badgeStyle = {
+        OTC:    { bg:T.green+"20",  color:T.green,  border:T.green+"40",  label:"OTC" },
+        SPECIAL:{ bg:T.orange+"20", color:T.orange, border:T.orange+"40", label:"SPECIAL" },
+        DEFAULT:{ bg:"#EFF6FF",     color:"#2563eb", border:"#BFDBFE",    label:"PLAN CHECK" },
+      };
+      const b = isOTC ? badgeStyle.OTC : isSpecial ? badgeStyle.SPECIAL : badgeStyle.DEFAULT;
+      els.push(
+        <div key={i} style={{ background:T.white, border:`1px solid ${T.border}`,
+          borderRadius:8, padding:"10px 14px", marginBottom:6, display:"flex",
+          alignItems:"center", gap:10, flexWrap:"wrap" }}>
+          <span style={{ fontSize:13, fontWeight:600, color:T.text, flex:1 }}>{name}</span>
+          <span style={{ fontSize:9, fontWeight:700, letterSpacing:"0.08em",
+            background:b.bg, color:b.color, border:`1px solid ${b.border}`,
+            borderRadius:3, padding:"2px 8px" }}>{b.label}</span>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:12, fontSize:12, color:T.muted }}>
+            {agency && <span>{agency}</span>}
+            {time && <span>{time}</span>}
+            {cost && <span style={{ color:T.orange, fontWeight:600 }}>{cost}</span>}
+          </div>
         </div>
-        <div style={{ display:"flex",flexWrap:"wrap",gap:14 }}>
-          {agency && <span style={{ fontSize:12,color:B.gray2 }}>{agency}</span>}
-          {time && <span style={{ fontSize:12,color:B.gray3 }}>{time}</span>}
-          {cost && <span style={{ fontSize:12,color:B.orange,fontWeight:600 }}>{cost}</span>}
-        </div>
-      </div>);
+      );
       i++; continue;
     }
 
     // Density / zoning metric cards
     if (sec.includes("zoning") && !sec.includes("alert")) {
       if (t.startsWith("DENSITY MATH:")) {
-        els.push(<div key={i} style={{ background:"#0A1F0A",border:`2px solid #16a34a`,borderRadius:10,padding:"14px 18px",marginBottom:10,marginTop:8 }}>
-          <div style={{ fontSize:10,fontWeight:700,color:"#4ade80",letterSpacing:"0.12em",marginBottom:4 }}>DENSITY MATH</div>
-          <div style={{ fontSize:20,fontWeight:700,color:"#22c55e",lineHeight:1.3,fontFamily:"Georgia,serif" }}>{t.slice(13).trim()}</div>
+        els.push(<div key={i} style={{ background:"#F0FDF4", border:`2px solid ${T.green}`,
+          borderRadius:8, padding:"14px 16px", marginBottom:10, marginTop:8 }}>
+          <div style={{ fontSize:9, fontWeight:700, color:T.green, letterSpacing:"0.12em",
+            fontFamily:"monospace", marginBottom:4 }}>DENSITY MATH</div>
+          <div style={{ fontSize:20, fontWeight:700, color:T.green,
+            fontFamily:"'Georgia',serif" }}>{t.slice(13).trim()}</div>
         </div>);
         i++; continue;
       }
       if (t.startsWith("MAX BUILDOUT:")) {
-        els.push(<div key={i} style={{ background:"#1A1200",border:`2px solid ${B.orange}`,borderRadius:10,padding:"14px 18px",marginBottom:10 }}>
-          <div style={{ fontSize:10,fontWeight:700,color:B.orange,letterSpacing:"0.12em",marginBottom:4 }}>MAX BUILDOUT</div>
-          <div style={{ fontSize:20,fontWeight:700,color:B.orange,lineHeight:1.3,fontFamily:"Georgia,serif" }}>{t.slice(13).trim()}</div>
+        els.push(<div key={i} style={{ background:T.orange+"12", border:`2px solid ${T.orange}`,
+          borderRadius:8, padding:"14px 16px", marginBottom:10 }}>
+          <div style={{ fontSize:9, fontWeight:700, color:T.orange, letterSpacing:"0.12em",
+            fontFamily:"monospace", marginBottom:4 }}>MAX BUILDOUT</div>
+          <div style={{ fontSize:20, fontWeight:700, color:T.orange,
+            fontFamily:"'Georgia',serif" }}>{t.slice(13).trim()}</div>
         </div>);
         i++; continue;
       }
       if (t.startsWith("TOC BONUS:")) {
         const val = t.slice(10).trim();
-        const eligible = !/not applicable|not eligible|not located/i.test(val);
-        els.push(<div key={i} style={{ background:eligible?"#0A1020":"#111",border:`1px solid ${eligible?"#2563eb":"#2C2825"}`,borderRadius:8,padding:"10px 14px",marginBottom:8 }}>
-          <span style={{ fontSize:10,fontWeight:700,color:eligible?"#60a5fa":B.gray2,letterSpacing:"0.1em",marginRight:8 }}>TOC BONUS</span>
-          <span style={{ fontSize:13,color:eligible?"#93c5fd":B.gray2 }}>{val}</span>
+        const eligible = !/not applicable|not eligible/i.test(val);
+        els.push(<div key={i} style={{ background:eligible?"#EFF6FF":"#F9FAFB",
+          border:`1px solid ${eligible?"#BFDBFE":T.border}`, borderRadius:6,
+          padding:"8px 12px", marginBottom:6, display:"flex", gap:8, alignItems:"center" }}>
+          <span style={{ fontSize:9, fontWeight:700, color:eligible?"#2563eb":T.muted,
+            letterSpacing:"0.1em", fontFamily:"monospace" }}>TOC</span>
+          <span style={{ fontSize:13, color:eligible?"#1d4ed8":T.muted }}>{val}</span>
         </div>);
         i++; continue;
       }
       if (t.startsWith("ADU:")) {
-        els.push(<div key={i} style={{ background:"#080e18",border:"1px solid #1e3a5f",borderRadius:8,padding:"10px 14px",marginBottom:8 }}>
-          <span style={{ fontSize:10,fontWeight:700,color:"#60a5fa",letterSpacing:"0.1em",marginRight:8 }}>ADU</span>
-          <span style={{ fontSize:13,color:"#94a3b8" }}>{t.slice(4).trim()}</span>
+        els.push(<div key={i} style={{ background:T.warmGray, border:`1px solid ${T.border}`,
+          borderRadius:6, padding:"8px 12px", marginBottom:6, display:"flex", gap:8 }}>
+          <span style={{ fontSize:9, fontWeight:700, color:T.muted, letterSpacing:"0.1em",
+            fontFamily:"monospace" }}>ADU</span>
+          <span style={{ fontSize:13, color:T.text }}>{t.slice(4).trim()}</span>
         </div>);
         i++; continue;
       }
       if (t.startsWith("EXISTING STRUCTURE:")) {
-        els.push(<div key={i} style={{ background:B.gray1,border:`1px solid #2C2825`,borderRadius:8,padding:"10px 14px",marginBottom:8 }}>
-          <span style={{ fontSize:10,fontWeight:700,color:B.gray2,letterSpacing:"0.1em",marginRight:8 }}>EXISTING</span>
-          <span style={{ fontSize:13,color:B.gray3 }}>{t.slice(19).trim()}</span>
+        els.push(<div key={i} style={{ background:T.warmGray, border:`1px solid ${T.border}`,
+          borderRadius:6, padding:"8px 12px", marginBottom:6, display:"flex", gap:8 }}>
+          <span style={{ fontSize:9, fontWeight:700, color:T.muted, letterSpacing:"0.1em",
+            fontFamily:"monospace" }}>EXISTING</span>
+          <span style={{ fontSize:13, color:T.muted }}>{t.slice(19).trim()}</span>
         </div>);
         i++; continue;
       }
     }
 
-    // Doc rows
-    if (sec.includes("document") && t.includes("|")) {
-      const [name,who,stamp] = t.split("|").map(p=>p.trim());
-      const req = stamp && stamp.toUpperCase().includes("YES");
-      els.push(<div key={i} style={{ display:"flex",gap:8,padding:"7px 0",borderBottom:`1px solid #1A1714`,alignItems:"center",flexWrap:"wrap" }}>
-        <span style={{ fontSize:13,color:B.cream,flex:1,minWidth:160 }}>{name}</span>
-        <span style={{ fontSize:12,color:B.gray2,minWidth:130 }}>{who}</span>
-        {stamp && <span style={{ fontSize:10,fontWeight:700,color:req?"#fb923c":"#34d399",background:req?"#1a0a00":"#061a0a",border:`1px solid ${req?"#c2410c":"#16a34a"}`,borderRadius:4,padding:"2px 8px",whiteSpace:"nowrap" }}>STAMP: {req?"REQUIRED":"NOT REQUIRED"}</span>}
-      </div>);
-      i++; continue;
+    // Documents section
+    if (sec.includes("document")) {
+      if (t === "DEMO" || t === "BUILDING" || t.startsWith("TECHNICAL")) {
+        els.push(<div key={i} style={{ fontSize:9, fontWeight:700, color:T.orange,
+          textTransform:"uppercase", letterSpacing:"0.12em", fontFamily:"monospace",
+          marginTop:16, marginBottom:6, paddingTop:10, borderTop:`1px solid ${T.border}` }}>
+          {t}
+        </div>);
+        i++; continue;
+      }
+      if (t.includes("|")) {
+        const [name, who, stamp] = t.split("|").map(p=>p.trim());
+        const req = stamp && stamp.toUpperCase().includes("YES");
+        els.push(<div key={i} style={{ display:"flex", gap:10, padding:"8px 0",
+          borderBottom:`1px solid ${T.border}`, alignItems:"center", flexWrap:"wrap" }}>
+          <div style={{ width:18, height:18, background:T.warmGray, borderRadius:4,
+            display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+            <svg width={9} height={9} viewBox="0 0 20 20" fill="none">
+              <path d="M4 10.5L8.5 15L16 6" stroke={T.orange} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <span style={{ fontSize:13, color:T.text, flex:1 }}>{name}</span>
+          <span style={{ fontSize:11, color:T.muted, minWidth:120 }}>{who}</span>
+          {stamp && <span style={{ fontSize:9, fontWeight:700, letterSpacing:"0.06em",
+            color:req?"#b91c1c":"#16a34a",
+            background:req?"#FEF2F2":"#F0FDF4",
+            border:`1px solid ${req?"#FECACA":"#BBF7D0"}`,
+            borderRadius:3, padding:"2px 7px", whiteSpace:"nowrap",
+            fontFamily:"monospace" }}>STAMP: {req?"REQ":"NOT REQ"}</span>}
+        </div>);
+        i++; continue;
+      }
     }
 
     // Fee rows
     if (sec.includes("fee") && t.includes("|")) {
-      const [name,basis,range] = t.split("|").map(p=>p.trim());
+      const [name, basis, range] = t.split("|").map(p=>p.trim());
       const isTotal = (name||"").toUpperCase().includes("TOTAL");
-      els.push(<div key={i} style={{ display:"flex",gap:8,padding:"7px 0",borderBottom:`1px solid ${isTotal?B.orange+"50":"#1A1714"}`,background:isTotal?"#1A0E00":"transparent",paddingLeft:isTotal?8:0,paddingRight:isTotal?8:0,borderRadius:isTotal?6:0,marginTop:isTotal?4:0 }}>
-        <span style={{ fontSize:13,color:isTotal?B.orange:B.gray3,flex:1,fontWeight:isTotal?700:400 }}>{name}</span>
-        {basis && !isTotal && <span style={{ fontSize:11,color:B.gray1,minWidth:120 }}>{basis}</span>}
-        <span style={{ fontSize:13,color:isTotal?B.orange:B.gray2,fontWeight:isTotal?700:500,whiteSpace:"nowrap" }}>{range}</span>
+      els.push(<div key={i} style={{ display:"flex", gap:8, padding:"7px 0",
+        borderBottom:`1px solid ${isTotal?T.orange+"50":T.border}`,
+        background:isTotal?T.orange+"08":"transparent",
+        paddingLeft:isTotal?8:0, paddingRight:isTotal?8:0,
+        borderRadius:isTotal?6:0, marginTop:isTotal?4:0 }}>
+        <span style={{ fontSize:13, color:isTotal?T.orange:T.muted, flex:1,
+          fontWeight:isTotal?700:400 }}>{name}</span>
+        {basis && !isTotal && <span style={{ fontSize:11, color:T.border, minWidth:120 }}>{basis}</span>}
+        <span style={{ fontSize:13, color:isTotal?T.orange:T.text,
+          fontWeight:isTotal?700:500, whiteSpace:"nowrap" }}>{range}</span>
       </div>);
       i++; continue;
     }
 
-    // Timeline rows
+    // Fee excludes / notes
+    if (sec.includes("fee") && (t.startsWith("EXCLUDES:") || t.startsWith("Note:"))) {
+      els.push(<p key={i} style={{ fontSize:11, color:T.muted, lineHeight:1.6,
+        marginTop:8, fontStyle:"italic" }}>{renderInline(t)}</p>);
+      i++; continue;
+    }
+
+    // Timeline
     if (sec.includes("timeline")) {
       const wm = t.match(/^(Weeks?\s[\d\-–]+)\s*:\s*(.+)$/i);
       if (wm) {
-        els.push(<div key={i} style={{ display:"flex",gap:12,padding:"8px 0",borderBottom:`1px solid ${B.gray1}`,alignItems:"flex-start" }}>
-          <span style={{ fontSize:11,fontWeight:700,color:B.orange,whiteSpace:"nowrap",minWidth:96,paddingTop:2,flexShrink:0 }}>{wm[1]}</span>
-          <span style={{ fontSize:13,color:B.gray2,lineHeight:1.6 }}>{renderInline(wm[2])}</span>
+        els.push(<div key={i} style={{ display:"flex", gap:12, padding:"7px 0",
+          borderBottom:`1px solid ${T.border}`, alignItems:"flex-start" }}>
+          <span style={{ fontSize:11, fontWeight:700, color:T.orange, fontFamily:"monospace",
+            whiteSpace:"nowrap", minWidth:80, paddingTop:2, flexShrink:0 }}>{wm[1]}</span>
+          <span style={{ fontSize:13, color:T.text, lineHeight:1.6 }}>{renderInline(wm[2])}</span>
         </div>);
         i++; continue;
       }
       if (t.startsWith("BEST CASE:") || t.startsWith("WORST CASE:")) {
-        els.push(<div key={i} style={{ display:"flex",gap:8,alignItems:"center",padding:"7px 0" }}>
-          <span style={{ fontSize:11,fontWeight:700,color:B.gray2,letterSpacing:"0.06em",minWidth:90 }}>{t.startsWith("BEST")?"BEST CASE":"WORST CASE"}</span>
-          <span style={{ fontSize:13,color:t.startsWith("BEST")?"#22c55e":"#f87171",fontWeight:700 }}>{t.slice(t.indexOf(":")+1).trim()}</span>
+        const isB = t.startsWith("BEST");
+        els.push(<div key={i} style={{ display:"flex", gap:8, alignItems:"center", padding:"6px 0" }}>
+          <span style={{ fontSize:10, fontWeight:700, color:T.muted, fontFamily:"monospace",
+            letterSpacing:"0.06em", minWidth:90 }}>{isB?"BEST CASE":"WORST CASE"}</span>
+          <span style={{ fontSize:13, color:isB?T.green:T.red, fontWeight:700 }}>
+            {t.slice(t.indexOf(":")+1).trim()}
+          </span>
         </div>);
         i++; continue;
       }
@@ -295,19 +561,35 @@ function Markdown({ text }) {
       const action = pi>0 ? rest.slice(0,pi).trim() : rest;
       const meta = pi>0 ? rest.slice(pi+1).trim() : "";
       const num = (t.match(/^\d+/)||[""])[0];
-      els.push(<div key={i} style={{ display:"flex",gap:12,padding:"10px 0",borderBottom:`1px solid ${B.gray1}`,alignItems:"flex-start" }}>
-        <span style={{ fontSize:11,fontWeight:800,color:B.black,background:B.orange,borderRadius:4,padding:"2px 7px",whiteSpace:"nowrap",flexShrink:0,marginTop:1 }}>{num}</span>
+      els.push(<div key={i} style={{ display:"flex", gap:12, padding:"10px 0",
+        borderBottom:`1px solid ${T.border}`, alignItems:"flex-start" }}>
+        <span style={{ fontSize:10, fontWeight:800, color:T.white, background:T.orange,
+          borderRadius:4, padding:"2px 7px", whiteSpace:"nowrap",
+          flexShrink:0, marginTop:1 }}>{num}</span>
         <div>
-          <p style={{ fontSize:13,color:B.cream,fontWeight:500,margin:0,lineHeight:1.5 }}>{renderInline(action)}</p>
-          {meta && <p style={{ fontSize:12,color:B.gray2,margin:"2px 0 0",lineHeight:1.5 }}>{renderInline(meta)}</p>}
+          <p style={{ fontSize:13, color:T.text, fontWeight:600, margin:0, lineHeight:1.5 }}>
+            {renderInline(action)}
+          </p>
+          {meta && <p style={{ fontSize:12, color:T.muted, margin:"2px 0 0", lineHeight:1.5 }}>
+            {renderInline(meta)}
+          </p>}
         </div>
       </div>);
       i++; continue;
     }
 
-    // Legal notice
-    if (sec.includes("legal")) {
-      els.push(<div key={i} style={{ padding:"14px 16px",background:B.black,border:`1px solid ${B.gray1}`,borderRadius:8,fontSize:12,color:B.gray2,lineHeight:1.75,fontStyle:"italic" }}>{renderInline(t)}</div>);
+    // Legal notice — skip rendering here (rendered separately as Listo Summary style)
+    if (sec.includes("legal")) { i++; continue; }
+
+    // Critical path callout
+    if (t.startsWith("CRITICAL PATH:")) {
+      els.push(<div key={i} style={{ padding:"8px 12px", background:"#EFF6FF",
+        border:"1px solid #BFDBFE", borderRadius:6, marginTop:8,
+        display:"flex", gap:8, alignItems:"center" }}>
+        <span style={{ fontSize:10, fontWeight:700, color:"#2563eb",
+          fontFamily:"monospace", letterSpacing:"0.08em" }}>CRITICAL PATH</span>
+        <span style={{ fontSize:13, color:"#1d4ed8" }}>{t.slice(14).trim()}</span>
+      </div>);
       i++; continue;
     }
 
@@ -319,12 +601,19 @@ function Markdown({ text }) {
       if (data.length >= 2) {
         const hdrs = data[0].split("|").filter((_,ci,a)=>ci>0&&ci<a.length-1).map(c=>c.trim());
         const rows = data.slice(1).filter(l=>/^\|[^-]/.test(l));
-        els.push(<div key={"t"+i} style={{ overflowX:"auto",marginBottom:12 }}>
-          <table style={{ width:"100%",borderCollapse:"collapse",fontSize:13 }}>
-            <thead><tr>{hdrs.map((h,hi)=><th key={hi} style={{ padding:"8px 12px",textAlign:"left",background:B.gray1,color:B.orange,fontWeight:700,fontSize:11,letterSpacing:"0.06em",textTransform:"uppercase",borderBottom:`2px solid ${B.orange}40`,whiteSpace:"nowrap" }}>{h}</th>)}</tr></thead>
+        els.push(<div key={"t"+i} style={{ overflowX:"auto", marginBottom:12 }}>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+            <thead><tr>{hdrs.map((h,hi)=><th key={hi} style={{ padding:"8px 12px",
+              textAlign:"left", background:T.black, color:T.orange, fontWeight:700,
+              fontSize:10, letterSpacing:"0.06em", textTransform:"uppercase",
+              fontFamily:"monospace", borderBottom:`2px solid ${T.orange}40` }}>{h}</th>)}</tr></thead>
             <tbody>{rows.map((row,ri)=>{
               const cells = row.split("|").filter((_,ci,a)=>ci>0&&ci<a.length-1).map(c=>c.trim());
-              return <tr key={ri} style={{ background:ri%2===0?B.black:B.gray1 }}>{cells.map((c,ci)=><td key={ci} style={{ padding:"8px 12px",color:ci===0?B.gray3:B.cream,fontWeight:ci===0?600:400,borderBottom:`1px solid ${B.gray1}`,lineHeight:1.5 }}>{renderInline(c)}</td>)}</tr>;
+              return <tr key={ri} style={{ background:ri%2===0?T.white:T.warmGray }}>
+                {cells.map((c,ci)=><td key={ci} style={{ padding:"8px 12px",
+                  color:ci===0?T.muted:T.text, fontWeight:ci===0?600:400,
+                  borderBottom:`1px solid ${T.border}`, lineHeight:1.5 }}>{renderInline(c)}</td>)}
+              </tr>;
             })}</tbody>
           </table>
         </div>);
@@ -332,67 +621,84 @@ function Markdown({ text }) {
       }
     }
 
-    // Bold line
+    // Bold standalone
     if (t.startsWith("**") && t.endsWith("**") && t.length>4) {
-      els.push(<p key={i} style={{ fontSize:14,fontWeight:700,color:B.cream,marginTop:12,marginBottom:4 }}>{t.slice(2,-2)}</p>);
+      els.push(<p key={i} style={{ fontSize:14, fontWeight:700, color:T.text,
+        marginTop:10, marginBottom:4 }}>{t.slice(2,-2)}</p>);
       i++; continue;
     }
 
-    // Bullet
+    // Bullet list
     if (t.startsWith("- ") || t.startsWith("* ")) {
       lk++;
       const items = [];
       while (i<lines.length && (lines[i].trim().startsWith("- ")||lines[i].trim().startsWith("* "))) {
-        items.push(<li key={i} style={S.li}>{renderInline(lines[i].trim().slice(2))}</li>); i++;
+        items.push(<li key={i} style={{ fontSize:13, color:T.text, lineHeight:1.7,
+          marginBottom:2 }}>{renderInline(lines[i].trim().slice(2))}</li>);
+        i++;
       }
-      els.push(<ul key={"ul"+lk} style={S.ul}>{items}</ul>);
+      els.push(<ul key={"ul"+lk} style={{ paddingLeft:18, marginBottom:8 }}>{items}</ul>);
       continue;
     }
 
     // Numbered list
-    if (/^\d+\.\s/.test(t)) {
+    if (/^\d+\.\s/.test(t) && !sec.includes("next")) {
       lk++;
       const items = [];
       while (i<lines.length && /^\d+\.\s/.test(lines[i].trim())) {
-        items.push(<li key={i} style={S.li}>{renderInline(lines[i].trim().replace(/^\d+\.\s+/,""))}</li>); i++;
+        items.push(<li key={i} style={{ fontSize:13, color:T.text, lineHeight:1.7,
+          marginBottom:2 }}>{renderInline(lines[i].trim().replace(/^\d+\.\s+/,""))}</li>);
+        i++;
       }
-      els.push(<ol key={"ol"+lk} start={1} style={{ ...S.ul,listStyleType:"decimal",paddingLeft:22 }}>{items}</ol>);
+      els.push(<ol key={"ol"+lk} start={1} style={{ paddingLeft:22, marginBottom:8,
+        listStyleType:"decimal" }}>{items}</ol>);
       continue;
     }
 
-    els.push(<p key={i} style={S.p}>{renderInline(t)}</p>);
+    els.push(<p key={i} style={{ fontSize:13, color:T.muted, lineHeight:1.8,
+      marginBottom:3 }}>{renderInline(t)}</p>);
     i++;
   }
+
   return els;
 }
 
-// ── Main app ─────────────────────────────────────────────────────────────
+// ── Main App ──────────────────────────────────────────────────────────────
 export default function Listo() {
   const [address, setAddress]       = useState("");
   const [projectType, setProjectType] = useState("");
   const [details, setDetails]       = useState("");
-  const [stage, setStage]           = useState("input"); // input | confirm | result
+  const [showAllTypes, setShowAllTypes] = useState(false);
+  const [stage, setStage]           = useState("input");
   const [parsed, setParsed]         = useState(null);
   const [editZip, setEditZip]       = useState("");
   const [editStreet, setEditStreet] = useState("");
+  const [jurisdiction, setJurisdiction] = useState(null);
   const [result, setResult]         = useState(null);
   const [parcel, setParcel]         = useState(null);
   const [loading, setLoading]       = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
   const [error, setError]           = useState(null);
-  const [fbState, setFbState]       = useState(null); // null | "up" | "down"
+  const [fbState, setFbState]       = useState(null);
   const [fbComment, setFbComment]   = useState("");
   const [fbDone, setFbDone]         = useState(false);
   const [fbOpen, setFbOpen]         = useState(false);
 
-  // PostHog bootstrap
   useEffect(() => {
     if (typeof window === "undefined") return;
-    (function(c,a,r,g,o,s){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-    s=document.createElement("script");s.async=1;s.src=r;document.head.appendChild(s);
+    (function(c,a,r){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+    const s=document.createElement("script");s.async=1;s.src=r;document.head.appendChild(s);
     })(window,"posthog","https://us-assets.i.posthog.com/static/array.js");
-    window.posthog("init", POSTHOG_KEY, { api_host: POSTHOG_HOST, person_profiles: "identified_only" });
+    window.posthog("init", POSTHOG_KEY, { api_host:"https://us.i.posthog.com", person_profiles:"identified_only" });
     track("page_view");
   }, []);
+
+  // Update jurisdiction when ZIP changes
+  useEffect(() => {
+    const zip = editZip || parsed?.zip || "";
+    if (zip.length === 5) setJurisdiction(detectJurisdiction(zip));
+    else setJurisdiction(null);
+  }, [editZip, parsed?.zip]);
 
   const handleGeocode = () => {
     if (!address.trim() || !projectType) return;
@@ -400,384 +706,665 @@ export default function Listo() {
     setParsed(p);
     setEditZip(p.zip);
     setEditStreet(p.displayName);
-    track("address_submitted", { zip: p.zip });
+    track("address_submitted", { zip:p.zip, project_type:projectType });
     setStage("confirm");
   };
 
+  const LOADING_STEPS = [
+    "Geocoding address...",
+    "Querying ZIMAS parcel database...",
+    "Checking zoning classification...",
+    "Verifying overlay zones...",
+    "Building permit roadmap...",
+  ];
+
   const handleAnalyze = async () => {
+    if (jurisdiction && !jurisdiction.covered) return;
     setStage("result");
     setLoading(true);
+    setLoadingStep(0);
     setError(null);
     setResult(null);
     setFbState(null); setFbDone(false); setFbOpen(false);
-    track("analysis_started", { zip: editZip, project_type: projectType });
+    track("analysis_started", { zip:editZip, project_type:projectType, jurisdiction:jurisdiction?.key });
+
+    const stepInterval = setInterval(() => {
+      setLoadingStep(s => Math.min(s+1, LOADING_STEPS.length-1));
+    }, 1800);
 
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type":"application/json" },
         body: JSON.stringify({
           address: editStreet || parsed?.displayName || address,
           projectType: getLabel(projectType),
           projectDetails: details,
+          jurisdiction: jurisdiction?.key || "city-of-la",
         }),
       });
       const data = await res.json();
       if (!res.ok || data.error) { setError(data.error || "Analysis failed."); return; }
       setResult(data.analysis);
       if (data.parcel) setParcel(data.parcel);
-      track("analysis_completed", { zip: editZip, project_type: projectType, parcel_verified: !!data.parcel });
+      track("analysis_completed", { zip:editZip, project_type:projectType, parcel_verified:!!data.parcel });
     } catch (err) {
       setError("Request failed: " + err.message);
-      track("analysis_error", { error: err.message });
+      track("analysis_error", { error:err.message });
     } finally {
+      clearInterval(stepInterval);
       setLoading(false);
     }
   };
 
-  const submitFeedback = async (vote, comment = "") => {
+  const submitFeedback = async (vote, comment="") => {
     setFbDone(true); setFbOpen(false);
-    track("feedback_submitted", { vote, zip: editZip, project_type: projectType });
+    track("feedback_submitted", { vote, zip:editZip, project_type:projectType });
     try {
       await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
-          address: editStreet || address,
-          projectType: getLabel(projectType),
-          feedback: comment || (vote === "up" ? "Accurate" : "Flagged as inaccurate"),
-          rating: vote === "up" ? 5 : 2,
+          address: editStreet||address, projectType: getLabel(projectType),
+          feedback: comment||(vote==="up"?"Accurate":"Flagged as inaccurate"),
+          rating: vote==="up"?5:2,
         }),
       });
-    } catch (_) {}
+    } catch(_) {}
   };
 
   const handlePrint = () => {
     if (!result) return;
     const label = getLabel(projectType);
-    const date = new Date().toLocaleDateString("en-US", { year:"numeric",month:"long",day:"numeric" });
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Listo — ${editStreet || address}</title>
-<style>
-  body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:40px 32px;color:#1A1714;font-size:14px;line-height:1.7}
-  .header{border-bottom:3px solid #E8620A;padding-bottom:20px;margin-bottom:28px}
-  .brand{font-size:24px;font-weight:700;color:#1A1714;font-family:Georgia,serif}
-  .brand span{color:#E8620A}
-  .address{font-size:16px;font-weight:600;margin:10px 0 4px}
-  .meta{font-size:12px;color:#6B6560}
-  h2{font-size:17px;font-weight:700;color:#1A1714;font-family:Georgia,serif;border-bottom:2px solid #E8620A;padding-bottom:6px;margin:28px 0 12px}
-  h3{font-size:15px;font-weight:600;color:#2C2825;margin:20px 0 8px}
-  p{margin:6px 0;color:#2C2825}
-  ul,ol{padding-left:22px;margin:8px 0}
-  li{margin:4px 0}
-  strong{color:#1A1714}
-  .disclaimer{margin-top:40px;padding:14px 16px;background:#FAF7F2;border:1px solid #F0EBE3;border-radius:8px;font-size:12px;color:#6B6560;line-height:1.65;font-style:italic}
-  .footer{margin-top:24px;font-size:11px;color:#A8A29C;text-align:center;border-top:1px solid #F0EBE3;padding-top:16px}
-  @media print{body{padding:20px}}
-</style>
+    const now = new Date();
+    const date = now.toLocaleDateString("en-US", { year:"numeric",month:"long",day:"numeric" });
+    const dateSlug = now.toISOString().slice(0,10);
+    const addrSlug = (editStreet||address).replace(/[^a-zA-Z0-9]+/g,"-").slice(0,40);
+    const lines = result.split("\n");
+    let bodyHtml = "";
+    for (const raw of lines) {
+      const t = raw.trim();
+      if (!t) { bodyHtml += "<br>"; continue; }
+      if (t.startsWith("## ")) { bodyHtml += `<h2>${t.slice(3)}</h2>`; continue; }
+      if (t.startsWith("### ")) { bodyHtml += `<h3>${t.slice(4)}</h3>`; continue; }
+      if (t.startsWith("VERDICT:")) {
+        const pts = t.slice(8).trim().split("|");
+        const w=(pts[0]||"").trim(), d=(pts[1]||"").trim();
+        const c=w==="GO"?T.green:w==="COMPLEX"?T.red:T.yellow;
+        bodyHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:${c}15;border:2px solid ${c};border-radius:8px;margin:8px 0"><span style="font-size:10px;font-weight:800;color:#fff;background:${c};border-radius:4px;padding:2px 10px">${w}</span><span style="font-size:12px;color:#2C2420">${d}</span></div>`;
+        continue;
+      }
+      if (t.includes("|") && /^(CRITICAL|CAUTION|INFO|CLEAR)\s*\|/.test(t)) {
+        const pts=t.split("|").map(p=>p.trim());
+        const [sev,name2,dollar]=pts;
+        const cs={CRITICAL:["#FEF2F2","#b91c1c"],CAUTION:["#FFFBEB","#d97706"],INFO:["#EFF6FF","#2563eb"],CLEAR:["#F0FDF4","#16a34a"]};
+        const [bg,bc]=cs[sev]||["#F9FAFB","#6B7280"];
+        bodyHtml += `<div style="padding:8px 12px;margin:6px 0;border-radius:6px;border-left:3px solid ${bc};background:${bg}"><span style="font-size:9px;font-weight:800;color:#fff;background:${bc};border-radius:3px;padding:1px 6px;margin-right:8px">${sev}</span><strong>${name2}</strong>${dollar?` <span style="color:#6B7280;font-size:11px">· ${dollar}</span>`:""}</div>`;
+        continue;
+      }
+      if (t.includes("|") && t.split("|").length >= 3) {
+        const pts=t.split("|").map(p=>p.trim());
+        if (pts.length>=4){
+          const [pn,pt2,pa,pti,pc]=pts;
+          const tc=pt2==="OTC"?T.green:T.orange;
+          bodyHtml+=`<div style="padding:7px 12px;margin:3px 0;background:#F9FAFB;border-radius:5px;display:flex;align-items:center;gap:8px;font-size:12px"><span style="font-weight:600;color:#1A1714;flex:1">${pn}</span><span style="font-size:9px;font-weight:700;color:#fff;background:${tc};border-radius:3px;padding:1px 6px">${pt2}</span><span style="color:#8C7B70">${pa||""} ${pti||""}</span>${pc?`<span style="color:${T.orange};font-weight:600">${pc}</span>`:""}</div>`;
+          continue;
+        }
+        const [dn,dw,ds]=pts;
+        const isT=(dn||"").toUpperCase().includes("TOTAL");
+        const req=ds&&ds.toUpperCase().includes("YES");
+        if(ds&&(ds.toUpperCase().includes("YES")||ds.toUpperCase().includes("NO")||ds.toUpperCase().includes("REQ"))){
+          bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="color:#1A1714;flex:1">${dn}</span><span style="color:#8C7B70;min-width:120px">${dw}</span><span style="font-size:9px;font-weight:700;color:#fff;background:${req?"#b91c1c":"#16a34a"};border-radius:3px;padding:1px 6px">STAMP:${req?" REQ":" NOT REQ"}</span></div>`;
+        } else {
+          bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid ${isT?T.orange:"#E2D9D0"};font-size:12px${isT?";font-weight:700;color:"+T.orange:""}"><span style="flex:1">${dn}</span>${dw&&!isT?`<span style="color:#8C7B70;min-width:100px">${dw}</span>`:""}<span>${ds}</span></div>`;
+        }
+        continue;
+      }
+      if (/^Weeks?\s[\d\-–]+:/i.test(t)){const ci=t.indexOf(":");bodyHtml+=`<div style="display:flex;gap:12px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-weight:700;color:${T.orange};min-width:80px;font-size:11px;font-family:monospace">${t.slice(0,ci)}</span><span style="color:#2C2420">${t.slice(ci+1).trim()}</span></div>`;continue;}
+      if (/^\d+\./.test(t)){const rest2=t.replace(/^\d+\.\s*/,"");const pi=rest2.indexOf("|");const act=pi>0?rest2.slice(0,pi).trim():rest2;const me=pi>0?rest2.slice(pi+1).trim():"";const n2=(t.match(/^\d+/)||[""])[0];bodyHtml+=`<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #E2D9D0;align-items:flex-start"><span style="font-size:10px;font-weight:800;color:#fff;background:${T.orange};border-radius:4px;padding:2px 6px;white-space:nowrap;margin-top:1px">${n2}</span><div><strong style="font-size:12px">${act}</strong>${me?`<span style="display:block;font-size:11px;color:#8C7B70;margin-top:2px">${me}</span>`:""}</div></div>`;continue;}
+      if (t.startsWith("- ")||t.startsWith("* ")){bodyHtml+=`<li style="font-size:12px;color:#2C2420;margin:3px 0">${t.slice(2)}</li>`;continue;}
+      if (t==="DEMO"||t==="BUILDING"||t.startsWith("TECHNICAL")){bodyHtml+=`<div style="font-size:9px;font-weight:700;color:${T.orange};text-transform:uppercase;letter-spacing:0.1em;margin-top:12px;margin-bottom:4px;font-family:monospace">${t}</div>`;continue;}
+      bodyHtml+=`<p style="font-size:12px;color:#2C2420;margin:4px 0">${t}</p>`;
+    }
+    const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Listo_${addrSlug}_${dateSlug}</title>
+<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:32px;color:#1A1714;font-size:13px;line-height:1.65}.header{border-bottom:3px solid ${T.orange};padding-bottom:14px;margin-bottom:20px}.brand{font-size:20px;font-weight:700;color:#1A1714;font-family:Georgia,serif}.brand span{color:${T.orange}}.address-bar{background:${T.orange};color:#fff;padding:12px 16px;border-radius:6px;margin:12px 0}.addr-main{font-size:14px;font-weight:600;font-family:Georgia,serif}.addr-sub{font-size:11px;opacity:0.8;margin-top:2px}h2{font-size:14px;font-weight:700;color:${T.orange};font-family:Georgia,serif;border-bottom:1px solid ${T.orange}30;padding-bottom:4px;margin:18px 0 10px;text-transform:uppercase;letter-spacing:0.05em}h3{font-size:12px;font-weight:700;color:#2C2420;margin:12px 0 6px;background:#F0EBE3;padding:3px 8px;border-radius:4px}ul{padding-left:18px;margin:6px 0}.disclaimer{margin-top:20px;padding:10px 12px;background:#FAF7F2;border:1px solid #E2D9D0;border-radius:6px;font-size:11px;color:#8C7B70;line-height:1.6;font-style:italic}.footer{margin-top:16px;font-size:10px;color:#A8A29C;text-align:center;border-top:1px solid #E2D9D0;padding-top:12px}@media print{body{padding:20px}h2{page-break-before:auto}}</style>
 </head><body>
-<div class="header">
-  <div class="brand">listo<span>.</span></div>
-  <div class="address">${editStreet || address}</div>
-  <div class="meta">${label} &nbsp;·&nbsp; ${date}${parcel ? " &nbsp;·&nbsp; " + parcel.source : ""}</div>
-</div>
-${result.replace(/^## (.+)$/gm,"<h2>$1</h2>").replace(/^### (.+)$/gm,"<h3>$1</h3>").replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>").replace(/^- (.+)$/gm,"<li>$1</li>").replace(/\n/g,"<br>")}
-<div class="disclaimer">AI-generated guidance based on publicly available LA permit data. Always verify with your jurisdiction before submitting. This is not legal advice.</div>
-<div class="footer">listo.zone &nbsp;·&nbsp; Not affiliated with the City of Los Angeles or LADBS</div>
+<div class="header"><div class="brand">listo<span>.</span></div></div>
+<div class="address-bar"><div class="addr-main">${editStreet||address}</div><div class="addr-sub">${label} · ${date}${parcel?" · "+parcel.source:" · ZIP estimates"}${jurisdiction?" · "+jurisdiction.short:""}</div></div>
+${bodyHtml}
+<div class="disclaimer">AI-generated guidance based on publicly available LA permit data. Always verify with your jurisdiction before submitting. This is not legal advice. Listo makes no warranties regarding accuracy or completeness.</div>
+<div class="footer">listo.zone · Not affiliated with the City of Los Angeles, Santa Monica, Beverly Hills, or LADBS</div>
 </body></html>`;
-    const win = window.open("","_blank","width=900,height=700");
-    if (!win) { alert("Allow pop-ups to export PDF"); return; }
-    win.document.write(html); win.document.close();
-    setTimeout(() => { win.focus(); win.print(); }, 400);
+    const win=window.open("","_blank","width=900,height=700");
+    if(!win){alert("Allow pop-ups to export PDF");return;}
+    win.document.write(html);win.document.close();
+    setTimeout(()=>{win.focus();win.print();},400);
     track("pdf_exported");
   };
 
   const reset = () => {
     setStage("input"); setResult(null); setAddress(""); setProjectType(""); setDetails("");
     setError(null); setParsed(null); setEditZip(""); setEditStreet(""); setParcel(null);
-    setFbState(null); setFbDone(false); setFbOpen(false);
+    setJurisdiction(null); setFbState(null); setFbDone(false); setFbOpen(false);
+    setShowAllTypes(false);
   };
 
-  const overlays = detectOverlays(editZip || parsed?.zip || "");
   const ready = address.trim().length > 5 && projectType !== "";
+  const coverageText = "City of LA · Santa Monica · Beverly Hills";
 
   return (
-    <div style={S.root}>
+    <div style={{ fontFamily:"'Georgia',serif", background:T.warmGray, minHeight:"100vh" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
-        ::selection{background:${B.orange};color:${B.white}}
-        input:focus,select:focus,textarea:focus{outline:none;border-color:${B.orange}!important}
-        .btn-primary:hover:not(:disabled){background:${B.orangeD}!important;transform:translateY(-1px)}
-        .btn-primary:disabled{opacity:.4;cursor:not-allowed}
-        .btn-ghost:hover{color:${B.orange}!important}
-        input::placeholder,textarea::placeholder{color:${B.gray2}}
-        select option{background:${B.black};color:${B.cream}}
-        select optgroup{background:${B.black};color:${B.gray2};font-style:normal;font-size:11px}
-        @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+        body{font-family:'DM Sans',system-ui,sans-serif}
+        ::selection{background:${T.orange};color:${T.white}}
+        input:focus,select:focus,textarea:focus{outline:none;border-color:${T.orange}!important}
+        .btn-primary{background:${T.orange};color:${T.white};border:none;border-radius:8px;padding:14px 28px;font-size:14px;font-weight:700;cursor:pointer;width:100%;transition:background 0.2s,transform 0.15s;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px}
+        .btn-primary:hover:not(:disabled){background:${T.orangeL};transform:translateY(-1px)}
+        .btn-primary:disabled{opacity:0.4;cursor:not-allowed}
+        .chip{padding:5px 14px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid ${T.border};transition:all 0.15s;font-family:'DM Sans',sans-serif;font-weight:500;white-space:nowrap}
+        .chip:hover{border-color:${T.orange};color:${T.orange}}
+        .chip.active{background:${T.orange};color:${T.white};border-color:${T.orange}}
+        input,select,textarea{font-family:'DM Sans',sans-serif}
+        select option{font-family:'DM Sans',sans-serif}
         @keyframes spin{to{transform:rotate(360deg)}}
-        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-        .fade-up{animation:fadeUp .4s ease forwards}
-        .fade-up-2{animation:fadeUp .4s ease .1s forwards;opacity:0}
-        .fade-up-3{animation:fadeUp .4s ease .22s forwards;opacity:0}
-        .pulse-a{animation:pulse 1.6s ease-in-out infinite}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+        .fade-up{animation:fadeUp 0.35s ease forwards}
+        .pulse{animation:pulse 1.4s ease-in-out infinite}
         @media print{.no-print{display:none!important}}
       `}</style>
 
-      {/* ── Header ─────────────────────────────────────────────────────── */}
-      <header style={S.header} className="no-print">
-        <div style={S.headerInner}>
-          <div style={S.logo} onClick={reset} role="button" tabIndex={0}>
-            <div style={S.logoMark}>
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <rect width="18" height="18" rx="4" fill={B.orange}/>
-                <path d="M4 9.5L7.5 13L14 6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <span style={S.logoText}>listo<span style={{ color:B.orange }}>.</span></span>
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <header style={{ background:T.black, borderBottom:`1px solid #ffffff10`,
+        position:"sticky", top:0, zIndex:100 }} className="no-print">
+        <div style={{ maxWidth:860, margin:"0 auto", padding:"13px 24px",
+          display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <div onClick={reset} style={{ cursor:"pointer" }}>
+            <Logo size={28} light />
           </div>
-          <div style={S.headerRight}>
-            <span style={S.tagline}>Know before you build.</span>
-            <span style={S.badge}>Not Legal Advice</span>
+          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <span style={{ fontSize:11, color:"#ffffff44", fontStyle:"italic",
+              fontFamily:"'DM Sans',sans-serif" }}>Know before you build.</span>
+            <span style={{ fontSize:10, color:"#ffffff33", border:"1px solid #ffffff15",
+              borderRadius:20, padding:"3px 10px", fontFamily:"monospace" }}>
+              {coverageText}
+            </span>
           </div>
         </div>
       </header>
 
-      <main style={S.container}>
+      <main style={{ maxWidth:860, margin:"0 auto", padding:"48px 24px 80px" }}>
 
-        {/* ── INPUT ──────────────────────────────────────────────────────── */}
+        {/* ── INPUT ─────────────────────────────────────────────────────── */}
         {stage === "input" && (
-          <>
-            <div className="fade-up" style={S.hero}>
-              <p style={S.heroEye}>LA Building Permit Guidance</p>
-              <h1 style={S.heroTitle}>Know before<br />you build.</h1>
-              <p style={S.heroSub}>
-                Enter an LA address and project type. Listo pulls real parcel data and tells you
-                what's possible, what permits you need, and what it costs — before you hire anyone.
-              </p>
-              <p style={S.heroBilingual}>
-                <em>Listo significa listo.</em> Ready to build, ready to invest, ready to go.
-              </p>
-            </div>
-
-            <div className="fade-up-2" style={S.card}>
-              <div style={S.formGroup}>
-                <label style={S.label}><span style={S.num}>01</span>Property Address in Los Angeles</label>
-                <input style={S.input} type="text"
-                  placeholder="e.g. 5514 Thornburn St, Los Angeles, CA 90045"
-                  value={address} onChange={e => setAddress(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && ready && handleGeocode()} />
-              </div>
-              <div style={S.formGroup}>
-                <label style={S.label}><span style={S.num}>02</span>What do you want to build?</label>
-                <select style={S.select} value={projectType} onChange={e => setProjectType(e.target.value)}>
-                  <option value="">Select project type...</option>
-                  {PROJECT_TYPES.map(g => (
-                    <optgroup key={g.group} label={"— " + g.group}>
-                      {g.items.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-              <div style={S.formGroup}>
-                <label style={S.label}><span style={S.num}>03</span>Details <span style={S.opt}>— optional, improves accuracy</span></label>
-                <textarea style={S.textarea} rows={2}
-                  placeholder="e.g. demolish existing 4-unit and build ground-up multi-family"
-                  value={details} onChange={e => setDetails(e.target.value)} />
-              </div>
-              <button className="btn-primary" style={{ ...S.btnPrimary, ...(!ready ? { opacity:.4,cursor:"not-allowed" } : {}) }}
-                onClick={handleGeocode} disabled={!ready}>
-                Look Up Address →
-              </button>
-            </div>
-
-            <div className="fade-up-3" style={S.features}>
-              {[
-                { icon:"🏢", t:"Real Parcel Data",       d:"Lot size, zoning, RSO from LA County Assessor" },
-                { icon:"📐", t:"Density Math Shown",     d:"Exact unit count calculation before you hire anyone" },
-                { icon:"📋", t:"Complete Permit Roadmap",d:"Every permit with type, agency, timeline, and fee" },
-                { icon:"⏱",  t:"Week-by-Week Timeline",  d:"Best and worst case from today to Certificate of Occupancy" },
-              ].map((f,i) => (
-                <div key={i} style={S.feat}>
-                  <div style={{ fontSize:20,marginBottom:10 }}>{f.icon}</div>
-                  <div style={S.featT}>{f.t}</div>
-                  <div style={S.featD}>{f.d}</div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* ── CONFIRM ────────────────────────────────────────────────────── */}
-        {stage === "confirm" && (
           <div className="fade-up">
-            <button className="btn-ghost no-print" style={S.backBtn} onClick={reset}>← Edit Address</button>
-            <div style={S.confirmHdr}>
-              <div style={{ fontSize:32,lineHeight:1 }}>📍</div>
-              <div>
-                <div style={S.confirmTitle}>Confirm your address</div>
-                <div style={S.confirmSub}>
-                  The <strong style={{ color:B.orange }}>ZIP code</strong> drives zoning, overlays, and density rules.
-                  Correct it here if needed.
+            {/* Hero — dark */}
+            <div style={{ background:T.black, borderRadius:16, padding:"64px 48px 56px",
+              marginBottom:32, position:"relative", overflow:"hidden" }}>
+              <div style={{ position:"absolute", inset:0,
+                background:"radial-gradient(ellipse at 70% 50%, #E8620A12 0%, transparent 70%)" }} />
+              <div style={{ position:"relative" }}>
+                <div style={{ display:"inline-flex", alignItems:"center", gap:8,
+                  background:"#ffffff08", border:"1px solid #ffffff15", borderRadius:20,
+                  padding:"4px 14px", marginBottom:20 }}>
+                  <div style={{ width:6, height:6, borderRadius:"50%", background:T.lime }} />
+                  <span style={{ fontSize:11, color:"#ffffff66", fontFamily:"monospace" }}>
+                    NOW LIVE · {coverageText}
+                  </span>
                 </div>
+                <h1 style={{ fontSize:"clamp(38px,6vw,62px)", fontFamily:"'Georgia',serif",
+                  color:T.cream, lineHeight:1.1, marginBottom:20, fontWeight:700 }}>
+                  Know before<br />you <span style={{ color:T.orange }}>build.</span>
+                </h1>
+                <p style={{ fontSize:16, color:"#ffffff55", maxWidth:480,
+                  lineHeight:1.8, marginBottom:0, fontFamily:"'DM Sans',sans-serif",
+                  fontWeight:300 }}>
+                  Instant permit intelligence for LA area contractors and investors.
+                  Know what's possible, what's required, and what it costs — before you hire anyone.
+                </p>
               </div>
             </div>
 
-            <div style={S.confirmCard}>
-              <div style={S.formGroup}>
-                <label style={S.confirmLabel}>Street Address</label>
-                <input style={S.input} value={editStreet} onChange={e => setEditStreet(e.target.value)} placeholder="5514 Thornburn St, Los Angeles, CA" />
+            {/* Form card — light */}
+            <div style={{ background:T.white, border:`1px solid ${T.border}`,
+              borderRadius:12, overflow:"hidden", marginBottom:24 }}>
+              {/* Form header */}
+              <div style={{ background:T.black, padding:"14px 24px",
+                display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <Logo size={22} light />
+                <span style={{ fontSize:10, color:"#ffffff33", fontFamily:"monospace" }}>
+                  FREE · AI-POWERED
+                </span>
               </div>
-              <div style={S.formGroup}>
-                <label style={{ ...S.confirmLabel, color:B.orange }}>ZIP Code <span style={{ fontWeight:400,fontSize:11,color:B.gray2 }}>— double-check this</span></label>
-                <div style={{ display:"flex",gap:10,alignItems:"center" }}>
-                  <input style={{ ...S.input,flex:1,fontSize:22,fontWeight:700,color:B.orange,border:`1px solid ${B.orange}60`,letterSpacing:"0.12em" }}
-                    type="text" maxLength={5} value={editZip}
-                    onChange={e => setEditZip(e.target.value.replace(/\D/g,"").slice(0,5))}
-                    placeholder="90045" />
-                  {overlays.length > 0 && (
-                    <div style={{ display:"flex",flexWrap:"wrap",gap:6 }}>
-                      {overlays.map(z => (
-                        <span key={z.key} style={{ fontSize:11,background:z.bg,color:z.color,border:`1px solid ${z.color}60`,borderRadius:20,padding:"3px 10px",fontWeight:600 }}>
-                          {z.label}
-                        </span>
+
+              <div style={{ padding:28 }}>
+                <h2 style={{ fontSize:20, fontFamily:"'Georgia',serif", color:T.black,
+                  marginBottom:6, fontWeight:700 }}>Permit Intelligence Report</h2>
+                <p style={{ fontSize:13, color:T.muted, marginBottom:28,
+                  fontFamily:"'DM Sans',sans-serif" }}>
+                  Enter the project address to get started
+                </p>
+
+                {/* Address */}
+                <div style={{ marginBottom:20 }}>
+                  <label style={{ fontSize:10, color:T.muted, fontFamily:"monospace",
+                    letterSpacing:"0.12em", textTransform:"uppercase",
+                    display:"block", marginBottom:8 }}>Property Address</label>
+                  <div style={{ border:`2px solid ${address.trim().length > 5 ? T.orange : T.border}`,
+                    borderRadius:8, padding:"12px 14px", display:"flex",
+                    alignItems:"center", gap:10, background:T.white,
+                    transition:"border-color 0.2s" }}>
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none"
+                      stroke={T.orange} strokeWidth={2}>
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+                      <circle cx="12" cy="10" r="3"/>
+                    </svg>
+                    <input style={{ flex:1, border:"none", outline:"none",
+                      fontSize:14, color:T.text, background:"transparent",
+                      fontFamily:"'DM Sans',sans-serif" }}
+                      type="text" placeholder="e.g. 5514 Thornburn St, Los Angeles, CA 90045"
+                      value={address} onChange={e=>setAddress(e.target.value)}
+                      onKeyDown={e=>e.key==="Enter"&&ready&&handleGeocode()} />
+                  </div>
+                </div>
+
+                {/* Project type */}
+                <div style={{ marginBottom:20 }}>
+                  <label style={{ fontSize:10, color:T.muted, fontFamily:"monospace",
+                    letterSpacing:"0.12em", textTransform:"uppercase",
+                    display:"block", marginBottom:8 }}>Project Type</label>
+                  {/* Quick chips */}
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:10 }}>
+                    {QUICK_TYPES.map(t => (
+                      <button key={t.value} className={`chip${projectType===t.value?" active":""}`}
+                        onClick={() => setProjectType(t.value)}
+                        style={{ background:projectType===t.value?T.orange:T.white,
+                          color:projectType===t.value?T.white:T.text }}>
+                        {t.label}
+                      </button>
+                    ))}
+                    <button className="chip" onClick={() => setShowAllTypes(!showAllTypes)}
+                      style={{ background:T.white, color:T.muted }}>
+                      {showAllTypes ? "Less ▲" : "More ▼"}
+                    </button>
+                  </div>
+                  {/* Full dropdown */}
+                  {showAllTypes && (
+                    <select style={{ width:"100%", border:`1px solid ${T.border}`,
+                      borderRadius:8, padding:"11px 14px", fontSize:13,
+                      color:projectType?T.text:T.muted, background:T.white,
+                      cursor:"pointer", appearance:"none",
+                      backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238C7B70' d='M5 6L0 0h10z'/%3E%3C/svg%3E")`,
+                      backgroundRepeat:"no-repeat", backgroundPosition:"right 14px center" }}
+                      value={projectType} onChange={e=>setProjectType(e.target.value)}>
+                      <option value="">All project types...</option>
+                      {ALL_TYPES.map(g => (
+                        <optgroup key={g.group} label={"— " + g.group}>
+                          {g.items.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                        </optgroup>
                       ))}
-                    </div>
+                    </select>
                   )}
                 </div>
+
+                {/* Details */}
+                <div style={{ marginBottom:24 }}>
+                  <label style={{ fontSize:10, color:T.muted, fontFamily:"monospace",
+                    letterSpacing:"0.12em", textTransform:"uppercase",
+                    display:"block", marginBottom:8 }}>
+                    Additional Details <span style={{ fontWeight:300, textTransform:"none",
+                      letterSpacing:0 }}>— optional</span>
+                  </label>
+                  <textarea style={{ width:"100%", border:`1px solid ${T.border}`,
+                    borderRadius:8, padding:"11px 14px", fontSize:13, color:T.text,
+                    resize:"vertical", lineHeight:1.6, background:T.white,
+                    fontFamily:"'DM Sans',sans-serif" }}
+                    rows={2}
+                    placeholder="e.g. demolish existing 4-unit and build ground-up multi-family"
+                    value={details} onChange={e=>setDetails(e.target.value)} />
+                </div>
+
+                <button className="btn-primary" onClick={handleGeocode} disabled={!ready}>
+                  <svg width={16} height={16} viewBox="0 0 20 20" fill="none">
+                    <path d="M4 10.5L8.5 15L16 6" stroke="white" strokeWidth="2.5"
+                      strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Get Listo Report
+                </button>
+                <div style={{ textAlign:"center", fontSize:11, color:T.muted,
+                  marginTop:10, fontFamily:"'DM Sans',sans-serif" }}>
+                  Results in seconds · AI-generated · Always verify with jurisdiction
+                </div>
               </div>
             </div>
 
-            {overlays.length > 0 && (
-              <div style={{ background:"#0F1A0F",border:"1px solid #1a3020",borderRadius:12,padding:"16px 18px",marginBottom:20 }}>
-                <div style={{ fontSize:12,fontWeight:700,color:B.orange,marginBottom:10 }}>Special Zones Detected for ZIP {editZip}</div>
-                <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:10 }}>
-                  {overlays.map(z => (
-                    <div key={z.key} style={{ background:z.bg,border:`1px solid ${z.color}60`,borderRadius:9,padding:"10px 14px" }}>
-                      <div style={{ fontWeight:700,color:z.color,fontSize:13,marginBottom:3 }}>{z.label}</div>
-                      <div style={{ fontSize:12,color:z.color,lineHeight:1.5 }}>{z.desc}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <button className="btn-primary" style={{ ...S.btnPrimary,marginTop:0 }} onClick={handleAnalyze}>
-              Run Permit Analysis →
-            </button>
-            <div style={{ textAlign:"center",marginTop:14 }}>
-              <button className="btn-ghost" style={S.txtBtn} onClick={reset}>← Start over</button>
+            {/* Coverage note */}
+            <div style={{ textAlign:"center", fontSize:12, color:T.muted,
+              fontFamily:"'DM Sans',sans-serif" }}>
+              Currently covering: <strong style={{ color:T.text }}>City of Los Angeles</strong>
+              {" · "}<strong style={{ color:T.text }}>Santa Monica</strong>
+              {" · "}<strong style={{ color:T.text }}>Beverly Hills</strong>
+              {" · "}More cities coming soon
             </div>
           </div>
         )}
 
-        {/* ── RESULT ─────────────────────────────────────────────────────── */}
+        {/* ── CONFIRM ───────────────────────────────────────────────────── */}
+        {stage === "confirm" && (
+          <div className="fade-up">
+            <button onClick={reset} style={{ background:"none", border:"none",
+              color:T.muted, cursor:"pointer", fontSize:13, padding:"0 0 20px",
+              fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", gap:6 }}>
+              ← Edit Address
+            </button>
+
+            <div style={{ background:T.white, border:`1px solid ${T.border}`,
+              borderRadius:12, overflow:"hidden", marginBottom:16 }}>
+              {/* Header */}
+              <div style={{ background:T.black, padding:"14px 24px" }}>
+                <Logo size={22} light />
+              </div>
+
+              <div style={{ padding:28 }}>
+                <h2 style={{ fontSize:20, fontFamily:"'Georgia',serif", color:T.black,
+                  marginBottom:6 }}>Confirm your address</h2>
+                <p style={{ fontSize:13, color:T.muted, marginBottom:24,
+                  fontFamily:"'DM Sans',sans-serif" }}>
+                  The <strong style={{ color:T.orange }}>ZIP code</strong> determines jurisdiction, zoning, and permit rules.
+                </p>
+
+                {/* Address field */}
+                <div style={{ marginBottom:16 }}>
+                  <label style={{ fontSize:10, color:T.muted, fontFamily:"monospace",
+                    letterSpacing:"0.12em", textTransform:"uppercase",
+                    display:"block", marginBottom:8 }}>Street Address</label>
+                  <input style={{ width:"100%", border:`1px solid ${T.border}`, borderRadius:8,
+                    padding:"11px 14px", fontSize:13, color:T.text, background:T.white }}
+                    value={editStreet} onChange={e=>setEditStreet(e.target.value)}
+                    placeholder="5514 Thornburn St, Los Angeles, CA" />
+                </div>
+
+                {/* ZIP + jurisdiction */}
+                <div style={{ marginBottom:8 }}>
+                  <label style={{ fontSize:10, color:T.orange, fontFamily:"monospace",
+                    letterSpacing:"0.12em", textTransform:"uppercase",
+                    display:"block", marginBottom:8 }}>
+                    ZIP Code <span style={{ fontWeight:300, color:T.muted,
+                      textTransform:"none", letterSpacing:0 }}>— double-check this</span>
+                  </label>
+                  <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                    <input style={{ width:120, border:`2px solid ${T.orange}`,
+                      borderRadius:8, padding:"11px 14px", fontSize:22,
+                      fontWeight:700, color:T.orange, letterSpacing:"0.12em",
+                      textAlign:"center", fontFamily:"'DM Sans',sans-serif" }}
+                      type="text" maxLength={5} value={editZip}
+                      onChange={e=>setEditZip(e.target.value.replace(/\D/g,"").slice(0,5))}
+                      placeholder="90045" />
+                    {editZip.length === 5 && <JurisdictionBadge jurisdiction={jurisdiction} />}
+                  </div>
+                </div>
+
+                {/* Jurisdiction note */}
+                {jurisdiction?.note && (
+                  <div style={{ marginBottom:16 }}>
+                    <Flag level="blue">{jurisdiction.note}</Flag>
+                  </div>
+                )}
+
+                {/* Not covered */}
+                {jurisdiction && !jurisdiction.covered && (
+                  <div style={{ marginBottom:16 }}>
+                    <Flag level="red" title={`${jurisdiction.nearbyCity||"This city"} is not yet covered`}>
+                      Listo currently covers City of LA, Santa Monica, and Beverly Hills.
+                      {jurisdiction.nearbyCity ? ` ${jurisdiction.nearbyCity} has its own building department with different permit rules.` : ""}
+                      {" "}Check back soon as we expand coverage.
+                    </Flag>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button className="btn-primary"
+              onClick={handleAnalyze}
+              disabled={!!(jurisdiction && !jurisdiction.covered)}
+              style={{ opacity:(jurisdiction && !jurisdiction.covered) ? 0.4 : 1 }}>
+              Run Permit Analysis →
+            </button>
+            <div style={{ textAlign:"center", marginTop:12 }}>
+              <button onClick={reset} style={{ background:"none", border:"none",
+                color:T.muted, cursor:"pointer", fontSize:13,
+                fontFamily:"'DM Sans',sans-serif", textDecoration:"underline" }}>
+                ← Start over
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── RESULT ────────────────────────────────────────────────────── */}
         {stage === "result" && (
           <div className="fade-up">
-            <div className="no-print" style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4 }}>
-              <button className="btn-ghost" style={S.backBtn} onClick={reset}>← New Search</button>
-              {result && <button onClick={handlePrint} style={S.printBtn}>↓ Export PDF</button>}
+            <div className="no-print" style={{ display:"flex", justifyContent:"space-between",
+              alignItems:"center", marginBottom:4 }}>
+              <button onClick={reset} style={{ background:"none", border:"none",
+                color:T.muted, cursor:"pointer", fontSize:13, padding:"0 0 16px",
+                fontFamily:"'DM Sans',sans-serif" }}>← New Search</button>
+              {result && <button onClick={handlePrint}
+                style={{ background:"none", border:`1px solid ${T.border}`,
+                  color:T.muted, cursor:"pointer", fontSize:12, padding:"6px 14px",
+                  borderRadius:6, fontFamily:"'DM Sans',sans-serif", marginBottom:16 }}>
+                ↓ Export PDF
+              </button>}
             </div>
 
-            {/* Address bar */}
-            <div style={S.verBar}>
-              <span style={S.verDot} />
-              <div style={{ flex:1 }}>
-                <div style={S.verAddr}>{editStreet || address}</div>
-                <div style={S.verMeta}>
-                  ZIP {editZip || parsed?.zip}
-                  {parsed?.neighborhood ? " · " + parsed.neighborhood : ""}
-                  {parcel?.lotSizeSf ? " · " + parcel.lotSizeSf.toLocaleString() + " sf · " + Math.floor(parcel.lotSizeSf/800) + " units by-right" : ""}
-                  {" · " + (parcel ? "Parcel data verified" : "ZIP-based estimates")}
-                </div>
-              </div>
-              <div style={S.verProj}>{getLabel(projectType)}</div>
-            </div>
-
-            {/* Section nav */}
-            {result && (
-              <div style={{ display:"flex",flexWrap:"wrap",gap:6,marginBottom:20 }} className="no-print">
-                {["Deal Summary","Zone Alerts","Zoning & Density","Permit Roadmap","Fee Summary","Timeline","Next Steps"].map(sec => (
-                  <a key={sec} href={"#sec-"+sec.toLowerCase().replace(/[^a-z0-9]+/g,"-")}
-                    style={{ fontSize:11,color:B.gray2,background:B.black,border:`1px solid ${B.gray1}`,borderRadius:20,padding:"3px 10px",textDecoration:"none",cursor:"pointer" }}>
-                    {sec}
-                  </a>
-                ))}
-              </div>
-            )}
-
-            {/* Loading */}
+            {/* Loading state — from brand preview */}
             {loading && (
-              <div className="fade-up-2" style={S.loadBox}>
-                <div style={S.spinner} />
-                <div style={S.loadTitle}>Pulling parcel data and analyzing...</div>
-                <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
-                  {["Fetching parcel data from LA County Assessor","Checking zoning for ZIP " + (editZip||""),
-                    "Calculating density and unit allowances","Building your permit roadmap"].map((step,i) => (
-                    <div key={i} className="pulse-a" style={{ ...S.loadStep,animationDelay:i*0.5+"s" }}>{step}</div>
+              <div style={{ background:T.black, borderRadius:12, padding:48,
+                textAlign:"center" }}>
+                <div style={{ width:64, height:64, background:T.orange, borderRadius:16,
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  margin:"0 auto 24px" }}>
+                  <svg width={32} height={32} viewBox="0 0 20 20" fill="none">
+                    <path d="M4 10.5L8.5 15L16 6" stroke={T.cream}
+                      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div style={{ fontSize:22, fontFamily:"'Georgia',serif",
+                  color:T.cream, marginBottom:8 }}>Working on it...</div>
+                <div style={{ fontSize:13, color:"#ffffff44",
+                  fontFamily:"'DM Sans',sans-serif", marginBottom:28 }}>
+                  Checking zones, overlays, and permit pathways
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:10,
+                  maxWidth:280, margin:"0 auto" }}>
+                  {LOADING_STEPS.map((step, idx) => (
+                    <div key={idx} style={{ display:"flex", gap:10, alignItems:"center" }}>
+                      <div style={{ width:16, height:16, borderRadius:"50%",
+                        background: idx <= loadingStep ? T.green : "#ffffff15",
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        flexShrink:0, transition:"background 0.3s" }}>
+                        {idx <= loadingStep && (
+                          <svg width={8} height={8} viewBox="0 0 20 20" fill="none">
+                            <path d="M4 10.5L8.5 15L16 6" stroke="white"
+                              strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </div>
+                      <span style={{ fontSize:12, color: idx <= loadingStep ? T.cream : "#ffffff33",
+                        fontFamily:"'DM Sans',sans-serif", textAlign:"left" }}>{step}</span>
+                    </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {error && <div style={S.errBox}>{error}</div>}
+            {error && (
+              <div style={{ padding:"12px 16px", background:"#FEF2F2",
+                border:"1px solid #FECACA", borderRadius:8, color:T.red,
+                fontSize:13, lineHeight:1.6, fontFamily:"'DM Sans',sans-serif" }}>
+                {error}
+              </div>
+            )}
 
-            {/* Result card */}
             {result && (
-              <div className="fade-up-2" style={S.resultCard}>
-                <div style={S.resultHdr} className="no-print">
-                  <div style={{ flex:1 }}>
-                    <div style={S.resultTitle}>Permit Analysis Report</div>
-                    <div style={S.resultSub}>Verify requirements with LADBS before proceeding</div>
-                  </div>
-                  <div style={{ fontSize:10,color:parcel?"#22c55e":B.gray2,background:parcel?"#061a0a":B.black,border:`1px solid ${parcel?"#16a34a":B.gray1}`,borderRadius:20,padding:"3px 10px",whiteSpace:"nowrap",flexShrink:0 }}>
-                    {parcel ? "Parcel verified" : "ZIP estimates"}
+              <div style={{ background:T.white, border:`1px solid ${T.border}`,
+                borderRadius:12, overflow:"hidden" }}>
+                {/* Report header — black */}
+                <div style={{ background:T.black, padding:"18px 28px",
+                  display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <Logo size={22} light />
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontSize:10, color:"#ffffff33",
+                      fontFamily:"monospace" }}>PERMIT ANALYSIS REPORT</div>
+                    <div style={{ fontSize:12, color:"#ffffff55",
+                      fontFamily:"monospace" }}>
+                      {new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})}
+                    </div>
                   </div>
                 </div>
-                <div style={{ height:1,background:B.gray1 }} className="no-print" />
 
-                <div style={S.resultBody}><Markdown text={result} /></div>
-
-                {/* Disclaimer */}
-                <div style={S.disclaimer}>
-                  AI-generated guidance based on publicly available LA permit data. Always verify with your jurisdiction before submitting. This is not legal advice.
+                {/* Address bar — orange */}
+                <div style={{ background:T.orange, padding:"16px 28px" }}>
+                  <div style={{ fontSize:10, color:"#ffffff88", fontFamily:"monospace",
+                    letterSpacing:"0.12em", marginBottom:4 }}>PROPERTY</div>
+                  <div style={{ fontSize:18, fontFamily:"'Georgia',serif",
+                    color:T.white, fontWeight:700 }}>{editStreet || address}</div>
+                  <div style={{ fontSize:13, color:"#ffffff88",
+                    fontFamily:"'DM Sans',sans-serif", marginTop:2,
+                    display:"flex", gap:12, flexWrap:"wrap", alignItems:"center" }}>
+                    <span>{getLabel(projectType)}</span>
+                    {jurisdiction && <span>· {jurisdiction.short}</span>}
+                    {parcel?.lotSizeSf && <span>· {parcel.lotSizeSf.toLocaleString()} sf</span>}
+                    <span style={{ fontSize:10, background:"#ffffff20",
+                      borderRadius:10, padding:"1px 8px" }}>
+                      {parcel?.hasData ? "ZIMAS verified" : "ZIP estimates"}
+                    </span>
+                  </div>
                 </div>
 
-                {/* CTAs */}
-                <div style={{ padding:"0 28px 8px",display:"flex",gap:12,flexWrap:"wrap" }} className="no-print">
-                  <button style={S.ctaPrimary} onClick={() => window.open("https://www.ladbs.org","_blank")}>Apply at LADBS.org →</button>
-                  <button style={S.ctaSecondary} onClick={handlePrint}>↓ Export as PDF</button>
+                {/* Section nav */}
+                <div style={{ borderBottom:`1px solid ${T.border}`,
+                  padding:"0 28px", overflowX:"auto", display:"flex",
+                  gap:0 }} className="no-print">
+                  {["Deal Summary","Zone Alerts","Zoning & Density","Permit Roadmap",
+                    "Fee Summary","Timeline","Next Steps"].map(sec => (
+                    <a key={sec}
+                      href={"#sec-"+sec.toLowerCase().replace(/[^a-z0-9]+/g,"-")}
+                      style={{ fontSize:11, color:T.muted, padding:"10px 16px",
+                        textDecoration:"none", whiteSpace:"nowrap",
+                        fontFamily:"monospace", letterSpacing:"0.04em",
+                        borderBottom:`2px solid transparent`,
+                        display:"inline-block" }}
+                      onMouseEnter={e=>e.target.style.color=T.orange}
+                      onMouseLeave={e=>e.target.style.color=T.muted}>
+                      {sec}
+                    </a>
+                  ))}
+                </div>
+
+                {/* Report body */}
+                <div style={{ padding:"28px 28px 0" }}>
+                  <ReportMarkdown text={result} jurisdiction={jurisdiction} />
+                </div>
+
+                {/* Listo Summary box — from brand preview */}
+                <div style={{ margin:"24px 28px 0", background:T.black,
+                  borderRadius:10, padding:"20px 24px" }}>
+                  <div style={{ fontSize:10, color:T.orange, fontFamily:"monospace",
+                    letterSpacing:"0.12em", marginBottom:10 }}>LISTO SUMMARY</div>
+                  <p style={{ fontSize:14, color:T.cream, lineHeight:1.8, margin:0 }}>
+                    AI-generated guidance based on publicly available{" "}
+                    {jurisdiction?.name || "LA"} permit data. Always verify with{" "}
+                    <strong style={{ color:T.lime }}>{jurisdiction?.agency || "LADBS"}</strong>{" "}
+                    ({jurisdiction?.agencyUrl ? (
+                      <a href={jurisdiction.agencyUrl} target="_blank"
+                        style={{ color:T.lime }}>{jurisdiction.agencyUrl.replace("https://","")}</a>
+                    ) : "ladbs.org"}) before proceeding.
+                    This is not legal advice.
+                  </p>
+                </div>
+
+                {/* CTAs — Share + PDF */}
+                <div style={{ padding:"16px 28px", display:"flex",
+                  justifyContent:"space-between", alignItems:"center",
+                  flexWrap:"wrap", gap:10 }} className="no-print">
+                  <div style={{ display:"flex", gap:10 }}>
+                    <button onClick={handlePrint}
+                      style={{ display:"flex", alignItems:"center", gap:8,
+                        background:T.lime, color:T.black, border:"none",
+                        borderRadius:8, padding:"10px 20px", fontSize:13,
+                        fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth={2}>
+                        <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
+                      </svg>
+                      Share Report
+                    </button>
+                    <button onClick={handlePrint}
+                      style={{ display:"flex", alignItems:"center", gap:8,
+                        background:T.warmGray, color:T.text, border:`1px solid ${T.border}`,
+                        borderRadius:8, padding:"10px 20px", fontSize:13,
+                        fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth={2}>
+                        <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                      </svg>
+                      Export PDF
+                    </button>
+                  </div>
+                  <button onClick={() => window.open(jurisdiction?.agencyUrl||"https://www.ladbs.org","_blank")}
+                    style={{ display:"flex", alignItems:"center", gap:6,
+                      background:"transparent", border:`1px solid ${T.border}`,
+                      color:T.muted, borderRadius:8, padding:"10px 16px",
+                      fontSize:12, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                    Apply at {jurisdiction?.agency||"LADBS"} →
+                  </button>
                 </div>
 
                 {/* Feedback */}
-                <div style={{ padding:"20px 28px 24px",borderTop:`1px solid ${B.gray1}` }} className="no-print">
-                  {!fbDone ? (
-                    <>
-                      <div style={{ fontSize:13,color:B.gray2,marginBottom:12 }}>Was this analysis accurate and useful?</div>
-                      <div style={{ display:"flex",gap:10,marginBottom:fbOpen?16:0 }}>
-                        <button onClick={() => { setFbState("up"); submitFeedback("up"); }}
-                          style={{ fontSize:13,background:fbState==="up"?"#0A1F0A":B.black,border:`1px solid ${fbState==="up"?"#34d399":B.gray1}`,color:fbState==="up"?"#34d399":B.gray2,borderRadius:8,padding:"9px 16px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif" }}>
-                          Accurate
-                        </button>
-                        <button onClick={() => { setFbState("down"); setFbOpen(true); }}
-                          style={{ fontSize:13,background:fbState==="down"?"#1a0808":B.black,border:`1px solid ${fbState==="down"?"#fca5a5":B.gray1}`,color:fbState==="down"?"#fca5a5":B.gray2,borderRadius:8,padding:"9px 16px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif" }}>
-                          Something's wrong
+                <div style={{ padding:"16px 28px 24px", borderTop:`1px solid ${T.border}` }}
+                  className="no-print">
+                  {!fbDone ? (<>
+                    <div style={{ fontSize:13, color:T.muted, marginBottom:10,
+                      fontFamily:"'DM Sans',sans-serif" }}>Was this analysis accurate and useful?</div>
+                    <div style={{ display:"flex", gap:8, marginBottom:fbOpen?14:0 }}>
+                      <button onClick={() => { setFbState("up"); submitFeedback("up"); }}
+                        style={{ fontSize:13, background:fbState==="up"?"#F0FDF4":T.white,
+                          border:`1px solid ${fbState==="up"?"#BBF7D0":T.border}`,
+                          color:fbState==="up"?T.green:T.muted, borderRadius:8,
+                          padding:"8px 16px", cursor:"pointer",
+                          fontFamily:"'DM Sans',sans-serif" }}>
+                        ✓ Accurate
+                      </button>
+                      <button onClick={() => { setFbState("down"); setFbOpen(true); }}
+                        style={{ fontSize:13, background:fbState==="down"?"#FEF2F2":T.white,
+                          border:`1px solid ${fbState==="down"?"#FECACA":T.border}`,
+                          color:fbState==="down"?T.red:T.muted, borderRadius:8,
+                          padding:"8px 16px", cursor:"pointer",
+                          fontFamily:"'DM Sans',sans-serif" }}>
+                        Something's wrong
+                      </button>
+                    </div>
+                    {fbOpen && (
+                      <div style={{ marginTop:12 }}>
+                        <textarea style={{ width:"100%", border:`1px solid ${T.border}`,
+                          borderRadius:8, padding:"11px 14px", fontSize:13,
+                          color:T.text, height:80, resize:"vertical",
+                          fontFamily:"'DM Sans',sans-serif" }}
+                          placeholder="What was wrong or missing?"
+                          value={fbComment} onChange={e=>setFbComment(e.target.value)} />
+                        <button className="btn-primary"
+                          style={{ width:"auto", padding:"10px 24px", fontSize:13, marginTop:8 }}
+                          onClick={() => submitFeedback("down", fbComment)}>
+                          Submit Feedback
                         </button>
                       </div>
-                      {fbOpen && (
-                        <div style={{ marginTop:12 }}>
-                          <textarea style={{ ...S.textarea,height:80,fontSize:13 }}
-                            placeholder="What was wrong or missing? e.g. 'Wrong ZIP used' or 'Missed coastal permit requirement'"
-                            value={fbComment} onChange={e => setFbComment(e.target.value)} />
-                          <button className="btn-primary" style={{ ...S.btnPrimary,width:"auto",padding:"10px 24px",fontSize:13,marginTop:8 }}
-                            onClick={() => submitFeedback("down", fbComment)}>
-                            Submit Feedback
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div style={{ fontSize:13,color:"#22c55e" }}>Thanks — feedback received. This helps us improve accuracy.</div>
+                    )}
+                  </>) : (
+                    <div style={{ fontSize:13, color:T.green,
+                      fontFamily:"'DM Sans',sans-serif" }}>
+                      Thanks — feedback received. This helps us improve accuracy.
+                    </div>
                   )}
                 </div>
               </div>
@@ -786,74 +1373,13 @@ ${result.replace(/^## (.+)$/gm,"<h2>$1</h2>").replace(/^### (.+)$/gm,"<h3>$1</h3
         )}
       </main>
 
-      <footer style={S.footer} className="no-print">
-        listo.zone · Independent tool, not affiliated with the City of Los Angeles or LADBS.
-        {" · "}Always consult a licensed professional for complex projects.
+      <footer style={{ borderTop:`1px solid ${T.border}`, padding:"16px 24px",
+        textAlign:"center", fontSize:11, color:T.muted,
+        fontFamily:"'DM Sans',sans-serif" }} className="no-print">
+        listo.zone · City of LA · Santa Monica · Beverly Hills
+        {" · "}Not affiliated with LADBS or any city building department.
+        {" · "}Always consult a licensed professional.
       </footer>
     </div>
   );
 }
-
-// ── Styles ───────────────────────────────────────────────────────────────
-const S = {
-  root: { fontFamily:"'DM Sans',system-ui,sans-serif",background:B.black,minHeight:"100vh",color:B.cream },
-  header: { borderBottom:`1px solid ${B.gray1}`,background:B.black,position:"sticky",top:0,zIndex:100 },
-  headerInner: { maxWidth:860,margin:"0 auto",padding:"14px 24px",display:"flex",alignItems:"center",justifyContent:"space-between" },
-  logo: { display:"flex",alignItems:"center",gap:10,cursor:"pointer",textDecoration:"none" },
-  logoMark: { flexShrink:0 },
-  logoText: { fontFamily:"Georgia,serif",fontSize:22,color:B.cream,letterSpacing:"-0.02em",fontWeight:700 },
-  headerRight: { display:"flex",alignItems:"center",gap:12 },
-  tagline: { fontSize:12,color:B.gray2,fontStyle:"italic" },
-  badge: { fontSize:10,color:B.gray2,border:`1px solid ${B.gray1}`,borderRadius:20,padding:"3px 10px" },
-  container: { maxWidth:860,margin:"0 auto",padding:"48px 24px 80px" },
-  hero: { marginBottom:44 },
-  heroEye: { fontSize:11,letterSpacing:"0.18em",textTransform:"uppercase",color:B.orange,marginBottom:14,fontWeight:600 },
-  heroTitle: { fontFamily:"Georgia,serif",fontSize:"clamp(36px,6vw,62px)",lineHeight:1.1,color:B.cream,marginBottom:18,fontWeight:700 },
-  heroSub: { fontSize:16,color:B.gray2,lineHeight:1.75,maxWidth:520,fontWeight:300,marginBottom:10 },
-  heroBilingual: { fontSize:13,color:B.gray3,fontStyle:"italic" },
-  card: { background:B.gray1,border:`1px solid #2C2825`,borderRadius:16,padding:"36px 32px 32px",marginBottom:44 },
-  formGroup: { marginBottom:24 },
-  label: { display:"flex",alignItems:"center",gap:9,fontSize:11,fontWeight:600,color:B.gray2,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:9 },
-  num: { background:B.orange,color:B.white,borderRadius:4,fontSize:10,fontWeight:800,padding:"2px 6px" },
-  opt: { fontWeight:300,textTransform:"none",letterSpacing:0,color:B.gray3,fontSize:11 },
-  input: { width:"100%",background:B.black,border:`1px solid ${B.gray1}`,borderRadius:9,padding:"13px 16px",color:B.cream,fontSize:14,transition:"border-color .2s",fontFamily:"'DM Sans',system-ui,sans-serif" },
-  select: { width:"100%",background:B.black,border:`1px solid ${B.gray1}`,borderRadius:9,padding:"13px 16px",color:B.cream,fontSize:14,cursor:"pointer",appearance:"none",fontFamily:"'DM Sans',system-ui,sans-serif",backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%236B6560' d='M5 6L0 0h10z'/%3E%3C/svg%3E")`,backgroundRepeat:"no-repeat",backgroundPosition:"right 14px center" },
-  textarea: { width:"100%",background:B.black,border:`1px solid ${B.gray1}`,borderRadius:9,padding:"13px 16px",color:B.cream,fontSize:14,resize:"vertical",fontFamily:"'DM Sans',system-ui,sans-serif",lineHeight:1.6 },
-  btnPrimary: { width:"100%",background:B.orange,color:B.white,border:"none",borderRadius:9,padding:"15px 28px",fontSize:15,fontWeight:700,cursor:"pointer",letterSpacing:"0.02em",transition:"background .2s,transform .15s",fontFamily:"'DM Sans',system-ui,sans-serif",marginTop:4 },
-  features: { display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14 },
-  feat: { background:B.gray1,border:`1px solid #2C2825`,borderRadius:12,padding:22 },
-  featT: { fontSize:13,fontWeight:600,color:B.cream,marginBottom:5 },
-  featD: { fontSize:12,color:B.gray2,lineHeight:1.6 },
-  backBtn: { background:"none",border:"none",color:B.gray2,cursor:"pointer",fontSize:13,padding:"0 0 20px",fontFamily:"'DM Sans',system-ui,sans-serif",transition:"color .2s",display:"block" },
-  printBtn: { background:"none",border:`1px solid ${B.gray1}`,color:B.gray2,cursor:"pointer",fontSize:12,padding:"6px 14px",fontFamily:"'DM Sans',system-ui,sans-serif",borderRadius:8,marginBottom:20 },
-  confirmHdr: { display:"flex",gap:16,alignItems:"flex-start",marginBottom:24 },
-  confirmTitle: { fontFamily:"Georgia,serif",fontSize:28,color:B.cream,marginBottom:6 },
-  confirmSub: { fontSize:14,color:B.gray2,lineHeight:1.65,maxWidth:520 },
-  confirmCard: { background:B.gray1,border:`1px solid #2C2825`,borderRadius:14,padding:"24px 24px 20px",marginBottom:16 },
-  confirmLabel: { display:"block",fontSize:11,fontWeight:700,color:B.gray2,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8 },
-  txtBtn: { background:"none",border:"none",color:B.gray2,cursor:"pointer",fontSize:13,fontFamily:"'DM Sans',system-ui,sans-serif",textDecoration:"underline",padding:0 },
-  verBar: { background:"#08150F",border:"1px solid #12301E",borderRadius:11,padding:"14px 20px",display:"flex",alignItems:"center",gap:13,marginBottom:16,flexWrap:"wrap" },
-  verDot: { width:7,height:7,borderRadius:"50%",background:B.lime,flexShrink:0 },
-  verAddr: { fontSize:13,color:"#D1FAE5",fontWeight:500 },
-  verMeta: { fontSize:11,color:"#1a5c36",letterSpacing:"0.04em",marginTop:2 },
-  verProj: { fontSize:12,color:B.orange,fontWeight:600,background:"#1A0E00",border:`1px solid ${B.orange}40`,borderRadius:20,padding:"4px 13px",whiteSpace:"nowrap" },
-  loadBox: { textAlign:"center",padding:"68px 36px",background:B.gray1,border:`1px solid #2C2825`,borderRadius:16 },
-  spinner: { width:36,height:36,border:`3px solid ${B.gray1}`,borderTop:`3px solid ${B.orange}`,borderRadius:"50%",animation:"spin .8s linear infinite",margin:"0 auto 20px" },
-  loadTitle: { fontFamily:"Georgia,serif",fontSize:20,color:B.cream,marginBottom:20 },
-  loadStep: { fontSize:13,color:B.gray2 },
-  errBox: { padding:"11px 14px",background:"#1A0808",border:"1px solid #3d1010",borderRadius:8,color:"#fca5a5",fontSize:13,marginBottom:14,lineHeight:1.6 },
-  resultCard: { background:B.gray1,border:`1px solid #2C2825`,borderRadius:16,overflow:"hidden" },
-  resultHdr: { display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"24px 28px",gap:14 },
-  resultTitle: { fontFamily:"Georgia,serif",fontSize:22,color:B.cream,marginBottom:4 },
-  resultSub: { fontSize:11,color:B.gray2 },
-  resultBody: { padding:"26px 28px 0" },
-  disclaimer: { margin:"24px 28px 0",padding:"13px 16px",background:B.black,border:`1px solid ${B.gray1}`,borderRadius:9,fontSize:12,color:B.gray2,lineHeight:1.75,fontStyle:"italic" },
-  ctaPrimary: { background:B.orange,border:"none",color:B.white,borderRadius:9,padding:"12px 20px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',system-ui,sans-serif",flex:1 },
-  ctaSecondary: { background:"transparent",border:`1px solid ${B.gray1}`,color:B.gray2,borderRadius:9,padding:"12px 20px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',system-ui,sans-serif",flex:1 },
-  h2: { fontFamily:"Georgia,serif",fontSize:20,color:B.orange,marginTop:26,marginBottom:11,paddingBottom:8,borderBottom:`2px solid ${B.orange}30` },
-  h3: { fontSize:14,fontWeight:600,color:B.cream,marginTop:16,marginBottom:7 },
-  p: { fontSize:14,color:B.gray2,lineHeight:1.8,marginBottom:3 },
-  ul: { paddingLeft:18,marginBottom:8 },
-  li: { fontSize:14,color:B.gray2,lineHeight:1.75,marginBottom:3 },
-  footer: { borderTop:`1px solid ${B.gray1}`,padding:"20px 24px",textAlign:"center",fontSize:11,color:B.gray1 },
-};
