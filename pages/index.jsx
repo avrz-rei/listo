@@ -1049,6 +1049,8 @@ ${bodyHtml}
       handlePrint();
     });
   };
+
+  const reset = () => {
     setStage("input"); setResult(null); setAddress(""); setProjectType(""); setDetails("");
     setError(null); setParsed(null); setEditZip(""); setEditStreet(""); setParcel(null);
     setJurisdiction(null); setFbState(null); setFbDone(false); setFbOpen(false);
