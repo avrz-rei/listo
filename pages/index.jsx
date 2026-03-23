@@ -29,6 +29,7 @@ const JURISDICTIONS = {
   "city-of-la": {
     name: "City of Los Angeles", short: "City of LA",
     agency: "LADBS", agencyUrl: "https://ladbs.org",
+    applyUrl: "https://www.ladbs.org/permits-inspections/apply-for-a-permit",
     covered: true, color: T.orange,
     zips: [
       "90001","90002","90003","90004","90005","90006","90007","90008","90010","90011",
@@ -47,7 +48,8 @@ const JURISDICTIONS = {
   },
   "santa-monica": {
     name: "Santa Monica", short: "Santa Monica",
-    agency: "Santa Monica Building & Safety", agencyUrl: "https://www.santamonica.gov/permits",
+    agency: "Santa Monica Building & Safety", agencyUrl: "https://www.santamonica.gov/services/building-and-safety/permits",
+    applyUrl: "https://www.santamonica.gov/services/building-and-safety/permits",
     covered: true, color: "#2563eb",
     note: "Santa Monica has its own Rent Control Board (stricter than LA RSO) and is fully within the CA Coastal Zone.",
     zips: ["90401","90402","90403","90404","90405"],
@@ -55,9 +57,18 @@ const JURISDICTIONS = {
   "beverly-hills": {
     name: "Beverly Hills", short: "Beverly Hills",
     agency: "Beverly Hills Building & Safety", agencyUrl: "https://www.beverlyhills.org/departments/communitydevelopment/buildingdivision/",
+    applyUrl: "https://www.beverlyhills.org/departments/communitydevelopment/buildingdivision/permitapplication/",
     covered: true, color: "#7c3aed",
     note: "Beverly Hills has its own building department and zoning code, separate from City of LA.",
     zips: ["90210","90211","90212"],
+  },
+  "malibu": {
+    name: "City of Malibu", short: "Malibu",
+    agency: "Malibu Building & Safety", agencyUrl: "https://www.malibucity.org/208/Building-Safety",
+    applyUrl: "https://www.malibucity.org/208/Building-Safety",
+    covered: true, color: "#0891b2",
+    note: "Malibu is entirely within the California Coastal Zone. A Coastal Development Permit (CDP) is required for virtually all development, in addition to City of Malibu building permits.",
+    zips: ["90265","90266"],
   },
 };
 
@@ -66,8 +77,8 @@ const NOT_COVERED = {
   nearbyJurisdictions: {
     "90069": "West Hollywood", "90046": "West Hollywood (partially)",
     "90230": "Culver City", "90232": "Culver City",
-    "90265": "Malibu", "90266": "Manhattan Beach", "90277": "Redondo Beach",
-    "90278": "Redondo Beach", "90254": "Hermosa Beach",
+    "90277": "Redondo Beach", "90278": "Redondo Beach", "90254": "Hermosa Beach",
+    "90266": "Manhattan Beach",
     "91011": "La Cañada Flintridge", "91030": "South Pasadena",
     "91101": "Pasadena", "91103": "Pasadena", "91104": "Pasadena",
     "91105": "Pasadena", "91106": "Pasadena", "91107": "Pasadena",
@@ -313,8 +324,8 @@ function ReportMarkdown({ text, jurisdiction }) {
           </h2>
         </div>
       );
-      // Insert score cards after Deal Summary header
-      if (sec.includes("deal") && !scoreCardsRendered) {
+      // Insert score cards after Project Overview header
+      if ((sec.includes("project overview") || sec.includes("deal")) && !scoreCardsRendered) {
         scoreCardsRendered = true;
         i++;
         // Skip to end of deal summary KPI lines, then render score cards
@@ -374,15 +385,44 @@ function ReportMarkdown({ text, jurisdiction }) {
     if (sec.includes("alert") && t.includes("|") && t.split("|").length >= 2) {
       const pts = t.split("|").map(p=>p.trim());
       const [sev, name, dollar, time] = pts;
-      const levelMap = { CRITICAL:"red", CAUTION:"yellow", INFO:"blue", CLEAR:"green" };
+      const levelMap = {
+        "ACTION REQUIRED":"red", "CRITICAL":"red",
+        "CAUTION":"yellow",
+        "NOTE":"blue", "INFO":"blue",
+        "CLEAR":"green"
+      };
       const level = levelMap[sev] || "blue";
+      // Update display label
+      const displayLabel = sev === "ACTION REQUIRED" ? "ACTION REQUIRED"
+        : sev === "CRITICAL" ? "ACTION REQUIRED"
+        : sev === "INFO" ? "NOTE"
+        : sev;
       let desc = "";
       if (i+1 < lines.length && !lines[i+1].trim().includes("|") && lines[i+1].trim()) {
         desc = lines[i+1].trim(); i++;
       }
       const meta = [dollar, time ? `+${time}` : ""].filter(Boolean).join(" · ");
+      // Override the flag label display
+      const cfgOverride = level === "red"
+        ? { bg:"#FEF2F2", border:"#FECACA", dot:T.red, label:displayLabel }
+        : level === "yellow"
+        ? { bg:"#FFFBEB", border:"#FDE68A", dot:T.yellow, label:"CAUTION" }
+        : level === "green"
+        ? { bg:"#F0FDF4", border:"#BBF7D0", dot:T.green, label:"CLEAR" }
+        : { bg:"#EFF6FF", border:"#BFDBFE", dot:"#2563eb", label:"NOTE" };
       els.push(<div key={i} style={{ marginBottom:8 }}>
-        <Flag level={level} title={name} meta={meta||undefined}>{desc}</Flag>
+        <div style={{ background:cfgOverride.bg, border:`1px solid ${cfgOverride.border}`,
+          borderRadius:8, padding:"12px 14px", display:"flex", gap:12, alignItems:"flex-start" }}>
+          <div style={{ width:8, height:8, borderRadius:"50%", background:cfgOverride.dot,
+            marginTop:5, flexShrink:0 }} />
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:9, color:cfgOverride.dot, fontFamily:"monospace",
+              letterSpacing:"0.1em", marginBottom:3 }}>{cfgOverride.label}</div>
+            {name && <div style={{ fontSize:13, fontWeight:600, color:T.text, marginBottom:3 }}>{name}</div>}
+            <div style={{ fontSize:13, color:T.text, lineHeight:1.6 }}>{desc}</div>
+            {meta && <div style={{ fontSize:11, color:T.muted, marginTop:4 }}>{meta}</div>}
+          </div>
+        </div>
       </div>);
       i++; continue;
     }
@@ -414,6 +454,85 @@ function ReportMarkdown({ text, jurisdiction }) {
         </div>
       );
       i++; continue;
+    }
+
+    // Development Standards section — pipe-delimited table + EXEMPTION rows
+    if (sec.includes("development standards")) {
+      if (t.startsWith("ZONING:") && !t.includes("DENSITY")) {
+        els.push(<div key={i} style={{ fontSize:13, fontWeight:600, color:T.text,
+          marginBottom:12, paddingBottom:8, borderBottom:`1px solid ${T.border}` }}>
+          {renderInline(t)}
+        </div>);
+        i++; continue;
+      }
+      if (t === "STANDARD | MAX ALLOWED | PROPOSED/TYPICAL | LAMC REF" || t === "STANDARD | MAX ALLOWED | PROPOSED | LAMC REF") {
+        // render table header
+        els.push(<div key={i} style={{ display:"grid",
+          gridTemplateColumns:"2fr 1.8fr 1.5fr 1.2fr",
+          background:T.black, marginBottom:1, borderRadius:"6px 6px 0 0" }}>
+          {["STANDARD","MAX ALLOWED","PROPOSED","LAMC REF"].map((h,hi) => (
+            <div key={hi} style={{ padding:"7px 10px", fontSize:9, fontWeight:700,
+              color:T.orange, fontFamily:"monospace", letterSpacing:"0.08em" }}>{h}</div>
+          ))}
+        </div>);
+        i++;
+        // Render all following pipe rows as table rows until non-pipe or EXEMPTION/ENCROACHMENT/GRADING etc.
+        let rowIdx = 0;
+        while (i < lines.length) {
+          const rt = lines[i].trim();
+          if (!rt || rt.startsWith("##") || rt.startsWith("EXEMPTION:") ||
+              rt.startsWith("ENCROACHMENT") || rt.startsWith("GRADING:") ||
+              rt.startsWith("BASEMENT:") || rt.startsWith("FIRE SPRINKLERS:") ||
+              rt.startsWith("OFFSET PLAN")) break;
+          if (rt.includes("|") && rt.split("|").length >= 2) {
+            const cells = rt.split("|").map(p=>p.trim());
+            const [std, maxA, prop, lamc] = cells;
+            els.push(<div key={"dsr"+i} style={{ display:"grid",
+              gridTemplateColumns:"2fr 1.8fr 1.5fr 1.2fr",
+              background: rowIdx%2===0 ? T.white : T.warmGray,
+              borderBottom:`1px solid ${T.border}` }}>
+              <div style={{ padding:"8px 10px", fontSize:12, fontWeight:600, color:T.text }}>{renderInline(std)}</div>
+              <div style={{ padding:"8px 10px", fontSize:12, color:T.green, fontWeight:500 }}>{renderInline(maxA||"")}</div>
+              <div style={{ padding:"8px 10px", fontSize:12, color:T.muted }}>{renderInline(prop||"")}</div>
+              <div style={{ padding:"8px 10px", fontSize:11, color:T.muted, fontFamily:"monospace" }}>{lamc||""}</div>
+            </div>);
+            rowIdx++;
+          }
+          i++;
+        }
+        els.push(<div key={"dsbot"+i} style={{ height:8 }} />);
+        continue;
+      }
+      if (t.startsWith("EXEMPTION:")) {
+        const rest = t.slice(10).trim();
+        const parts = rest.split("|").map(p=>p.trim());
+        const [desc, amount, lamc] = parts;
+        els.push(<div key={i} style={{ display:"flex", gap:8, alignItems:"flex-start",
+          padding:"7px 10px", background:"#FFF8F0", border:`1px solid ${T.orange}30`,
+          borderRadius:5, marginBottom:4 }}>
+          <span style={{ fontSize:9, fontWeight:700, color:T.orange, fontFamily:"monospace",
+            letterSpacing:"0.08em", minWidth:70, marginTop:1, flexShrink:0 }}>EXEMPT</span>
+          <span style={{ fontSize:12, color:T.text, flex:1, lineHeight:1.5 }}>{renderInline(desc)}</span>
+          {amount && <span style={{ fontSize:11, color:T.orange, fontWeight:600, whiteSpace:"nowrap" }}>{amount}</span>}
+          {lamc && <span style={{ fontSize:10, color:T.muted, fontFamily:"monospace", whiteSpace:"nowrap" }}>{lamc}</span>}
+        </div>);
+        i++; continue;
+      }
+      // Technical spec rows: ENCROACHMENT PLANE, GRADING, BASEMENT, FIRE SPRINKLERS, OFFSET PLAN BREAK
+      if (t.startsWith("ENCROACHMENT PLANE:") || t.startsWith("GRADING:") ||
+          t.startsWith("BASEMENT:") || t.startsWith("FIRE SPRINKLERS:") ||
+          t.startsWith("OFFSET PLAN BREAK:")) {
+        const colonIdx = t.indexOf(":");
+        const label = t.slice(0, colonIdx);
+        const val = t.slice(colonIdx+1).trim();
+        els.push(<div key={i} style={{ display:"flex", gap:10, padding:"6px 0",
+          borderBottom:`1px solid ${T.border}`, alignItems:"flex-start" }}>
+          <span style={{ fontSize:9, fontWeight:700, color:T.muted, fontFamily:"monospace",
+            letterSpacing:"0.06em", minWidth:110, flexShrink:0, paddingTop:2 }}>{label}</span>
+          <span style={{ fontSize:12, color:T.text, lineHeight:1.6 }}>{renderInline(val)}</span>
+        </div>);
+        i++; continue;
+      }
     }
 
     // Density / zoning metric cards
@@ -663,6 +782,77 @@ function ReportMarkdown({ text, jurisdiction }) {
   return els;
 }
 
+// ── Acronym Legend ────────────────────────────────────────────────────────
+function AcronymLegend({ jurisdiction }) {
+  const [open, setOpen] = useState(false);
+  const terms = [
+    ["APN", "Assessor Parcel Number — unique parcel ID from LA County Assessor"],
+    ["OTC", "Over the Counter — permit issued same day, no plan check required"],
+    ["FAR", "Floor Area Ratio — max buildable sq ft as a multiple of lot's buildable area"],
+    ["FHSZ", "Fire Hazard Severity Zone — fire risk classification affecting materials and clearance requirements"],
+    ["RSO", "Rent Stabilization Ordinance — LA city law protecting tenants in pre-1978 multi-unit buildings"],
+    ["HPOZ", "Historic Preservation Overlay Zone — requires design review for exterior changes"],
+    ["TOC", "Transit Oriented Communities — density bonus program for sites near transit (Tiers 1–4)"],
+    ["JADU", "Junior Accessory Dwelling Unit — up to 500 sf ADU created within existing structure"],
+    ["LAMC", "Los Angeles Municipal Code — city building and zoning rules"],
+    ["CBC", "California Building Code — state-level construction standards"],
+    ["LADBS", "LA Department of Building and Safety — main permit agency for City of LA"],
+    ["BOE", "Bureau of Engineering — issues grading permits in Special Grading Areas"],
+    ["HCR", "Hillside Construction Regulation — stricter rules for lots in hillside areas"],
+    ["CCC", "California Coastal Commission — state agency that reviews development in the Coastal Zone"],
+    ["CDP", "Coastal Development Permit — required from CCC or local agency for coastal zone projects"],
+    ["VMT", "Vehicle Miles Traveled — AB 2334 Very Low VMT areas reduce or eliminate parking minimums"],
+  ];
+  const sources = [
+    ["ZIMAS", "zimas.lacity.org", "https://zimas.lacity.org"],
+    ["LAMC", "library.municode.com/ca/los_angeles", "https://library.municode.com/ca/los_angeles"],
+    [jurisdiction?.agency || "LADBS", jurisdiction?.agencyUrl || "https://ladbs.org", jurisdiction?.agencyUrl || "https://ladbs.org"],
+  ];
+  return (
+    <div style={{ margin:"24px 0 0", border:`1px solid ${T.border}`, borderRadius:8, overflow:"hidden" }}>
+      <button onClick={() => setOpen(!open)} style={{
+        width:"100%", background:T.warmGray, border:"none", padding:"10px 16px",
+        display:"flex", justifyContent:"space-between", alignItems:"center",
+        cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+        <span style={{ fontSize:11, fontWeight:700, color:T.muted, fontFamily:"monospace",
+          letterSpacing:"0.1em" }}>TERMS & DATA SOURCES</span>
+        <span style={{ fontSize:11, color:T.muted }}>{open ? "▲ Hide" : "▼ Show"}</span>
+      </button>
+      {open && (
+        <div style={{ padding:"16px 18px", background:T.white }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"4px 24px", marginBottom:16 }}>
+            {terms.map(([term, def]) => (
+              <div key={term} style={{ display:"flex", gap:8, padding:"5px 0",
+                borderBottom:`1px solid ${T.warmGray}`, alignItems:"flex-start" }}>
+                <span style={{ fontSize:10, fontWeight:700, color:T.orange,
+                  fontFamily:"monospace", minWidth:50, flexShrink:0, paddingTop:1 }}>{term}</span>
+                <span style={{ fontSize:11, color:T.muted, lineHeight:1.5 }}>{def}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize:10, color:T.muted, fontFamily:"monospace",
+            letterSpacing:"0.08em", marginBottom:6 }}>DATA SOURCES</div>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+            {sources.map(([label, url, href]) => (
+              <a key={label} href={href} target="_blank" style={{
+                fontSize:11, color:T.orange, textDecoration:"none",
+                border:`1px solid ${T.orange}30`, borderRadius:4, padding:"3px 8px",
+                fontFamily:"'DM Sans',sans-serif" }}>
+                {label} · {url}
+              </a>
+            ))}
+          </div>
+          <div style={{ fontSize:10, color:T.muted, marginTop:12, lineHeight:1.6,
+            fontStyle:"italic" }}>
+            All data sourced from publicly available LA City and County records.
+            Always verify directly with the relevant agency before making project decisions.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────
 export default function Listo() {
   const [address, setAddress]       = useState("");
@@ -704,7 +894,7 @@ export default function Listo() {
     if (!address.trim() || !projectType) return;
     const p = parseAddress(address);
     setParsed(p);
-    setEditZip(p.zip);
+    setEditZip(p.zip || "");  // leave blank if no ZIP detected — don't carry forward
     setEditStreet(p.displayName);
     track("address_submitted", { zip:p.zip, project_type:projectType });
     setStage("confirm");
@@ -780,11 +970,11 @@ export default function Listo() {
     const dateSlug = now.toISOString().slice(0,10);
     const addrSlug = (editStreet||address).replace(/[^a-zA-Z0-9]+/g,"-").slice(0,40);
     const lines = result.split("\n");
-    let bodyHtml = "";
+    let bodyHtml = "", pdfSec = "";
     for (const raw of lines) {
       const t = raw.trim();
       if (!t) { bodyHtml += "<br>"; continue; }
-      if (t.startsWith("## ")) { bodyHtml += `<h2>${t.slice(3)}</h2>`; continue; }
+      if (t.startsWith("## ")) { pdfSec = t.slice(3).toLowerCase(); bodyHtml += `<h2>${pdfSec.toUpperCase()}</h2>`; continue; }
       if (t.startsWith("### ")) { bodyHtml += `<h3>${t.slice(4)}</h3>`; continue; }
       if (t.startsWith("VERDICT:")) {
         const pts = t.slice(8).trim().split("|");
@@ -823,16 +1013,18 @@ export default function Listo() {
       if (/^\d+\./.test(t)){const rest2=t.replace(/^\d+\.\s*/,"");const pi=rest2.indexOf("|");const act=pi>0?rest2.slice(0,pi).trim():rest2;const me=pi>0?rest2.slice(pi+1).trim():"";const n2=(t.match(/^\d+/)||[""])[0];bodyHtml+=`<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #E2D9D0;align-items:flex-start"><span style="font-size:10px;font-weight:800;color:#fff;background:${T.orange};border-radius:4px;padding:2px 6px;white-space:nowrap;margin-top:1px">${n2}</span><div><strong style="font-size:12px">${act}</strong>${me?`<span style="display:block;font-size:11px;color:#8C7B70;margin-top:2px">${me}</span>`:""}</div></div>`;continue;}
       if (t.startsWith("- ")||t.startsWith("* ")){bodyHtml+=`<li style="font-size:12px;color:#2C2420;margin:3px 0">${t.slice(2)}</li>`;continue;}
       if (t==="DEMO"||t==="BUILDING"||t.startsWith("TECHNICAL")){bodyHtml+=`<div style="font-size:9px;font-weight:700;color:${T.orange};text-transform:uppercase;letter-spacing:0.1em;margin-top:12px;margin-bottom:4px;font-family:monospace">${t}</div>`;continue;}
+      // Skip legal notice — rendered separately as footer disclaimer
+      if (pdfSec==="legal notice") continue;
       bodyHtml+=`<p style="font-size:12px;color:#2C2420;margin:4px 0">${t}</p>`;
     }
     const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Listo_${addrSlug}_${dateSlug}</title>
-<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:32px;color:#1A1714;font-size:13px;line-height:1.65}.header{border-bottom:3px solid ${T.orange};padding-bottom:14px;margin-bottom:20px}.brand{font-size:20px;font-weight:700;color:#1A1714;font-family:Georgia,serif}.brand span{color:${T.orange}}.address-bar{background:${T.orange};color:#fff;padding:12px 16px;border-radius:6px;margin:12px 0}.addr-main{font-size:14px;font-weight:600;font-family:Georgia,serif}.addr-sub{font-size:11px;opacity:0.8;margin-top:2px}h2{font-size:14px;font-weight:700;color:${T.orange};font-family:Georgia,serif;border-bottom:1px solid ${T.orange}30;padding-bottom:4px;margin:18px 0 10px;text-transform:uppercase;letter-spacing:0.05em}h3{font-size:12px;font-weight:700;color:#2C2420;margin:12px 0 6px;background:#F0EBE3;padding:3px 8px;border-radius:4px}ul{padding-left:18px;margin:6px 0}.disclaimer{margin-top:20px;padding:10px 12px;background:#FAF7F2;border:1px solid #E2D9D0;border-radius:6px;font-size:11px;color:#8C7B70;line-height:1.6;font-style:italic}.footer{margin-top:16px;font-size:10px;color:#A8A29C;text-align:center;border-top:1px solid #E2D9D0;padding-top:12px}@media print{body{padding:20px}h2{page-break-before:auto}}</style>
+<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:32px;color:#1A1714;font-size:13px;line-height:1.65;counter-reset:page}.header{border-bottom:3px solid ${T.orange};padding-bottom:14px;margin-bottom:20px}.brand{font-size:20px;font-weight:700;color:#1A1714;font-family:Georgia,serif}.brand span{color:${T.orange}}.address-bar{background:${T.orange};color:#1A1714;padding:12px 16px;border-radius:6px;margin:12px 0}.addr-main{font-size:14px;font-weight:700;color:#1A1714;font-family:Georgia,serif}.addr-sub{font-size:11px;color:#2C2420;margin-top:2px;opacity:0.85}h2{font-size:14px;font-weight:700;color:${T.orange};font-family:Georgia,serif;border-bottom:1px solid ${T.orange}30;padding-bottom:4px;margin:18px 0 10px;text-transform:uppercase;letter-spacing:0.05em}h3{font-size:12px;font-weight:700;color:#2C2420;margin:12px 0 6px;background:#F0EBE3;padding:3px 8px;border-radius:4px}ul{padding-left:18px;margin:6px 0}.disclaimer{margin-top:20px;padding:10px 12px;background:#FAF7F2;border:1px solid #E2D9D0;border-radius:6px;font-size:11px;color:#8C7B70;line-height:1.6;font-style:italic}.footer{margin-top:16px;font-size:10px;color:#A8A29C;text-align:center;border-top:1px solid #E2D9D0;padding-top:12px}@media print{body{padding:20px}h2{page-break-before:auto}@page{margin:20mm;@bottom-right{content:"Page " counter(page);font-size:9px;color:#8C7B70;font-family:Arial,sans-serif}}}</style>
 </head><body>
 <div class="header"><div class="brand">listo<span>.</span></div></div>
 <div class="address-bar"><div class="addr-main">${editStreet||address}</div><div class="addr-sub">${label} · ${date}${parcel?" · "+parcel.source:" · ZIP estimates"}${jurisdiction?" · "+jurisdiction.short:""}</div></div>
 ${bodyHtml}
 <div class="disclaimer">AI-generated guidance based on publicly available LA permit data. Always verify with your jurisdiction before submitting. This is not legal advice. Listo makes no warranties regarding accuracy or completeness.</div>
-<div class="footer">listo.zone · Not affiliated with the City of Los Angeles, Santa Monica, Beverly Hills, or LADBS</div>
+<div class="footer">listo.zone · Not affiliated with the City of Los Angeles, Santa Monica, Beverly Hills, Malibu, or LADBS</div>
 </body></html>`;
     const win=window.open("","_blank","width=900,height=700");
     if(!win){alert("Allow pop-ups to export PDF");return;}
@@ -841,7 +1033,22 @@ ${bodyHtml}
     track("pdf_exported");
   };
 
-  const reset = () => {
+  const [shareToast, setShareToast] = useState(false);
+
+  const handleShare = () => {
+    if (!result) return;
+    const label = getLabel(projectType);
+    const addr = editStreet || address;
+    const shareText = `Listo Permit Report\n${addr}\n${label}\n\n${result}\n\n---\nGenerated by listo.zone`;
+    navigator.clipboard?.writeText(shareText).then(() => {
+      setShareToast(true);
+      setTimeout(() => setShareToast(false), 2500);
+      track("report_shared");
+    }).catch(() => {
+      // Fallback: open print dialog
+      handlePrint();
+    });
+  };
     setStage("input"); setResult(null); setAddress(""); setProjectType(""); setDetails("");
     setError(null); setParsed(null); setEditZip(""); setEditStreet(""); setParcel(null);
     setJurisdiction(null); setFbState(null); setFbDone(false); setFbOpen(false);
@@ -849,7 +1056,7 @@ ${bodyHtml}
   };
 
   const ready = address.trim().length > 5 && projectType !== "";
-  const coverageText = "City of LA · Santa Monica · Beverly Hills";
+  const coverageText = "City of LA · Santa Monica · Beverly Hills · Malibu";
 
   return (
     <div style={{ fontFamily:"'Georgia',serif", background:T.warmGray, minHeight:"100vh" }}>
@@ -1045,6 +1252,7 @@ ${bodyHtml}
               Currently covering: <strong style={{ color:T.text }}>City of Los Angeles</strong>
               {" · "}<strong style={{ color:T.text }}>Santa Monica</strong>
               {" · "}<strong style={{ color:T.text }}>Beverly Hills</strong>
+              {" · "}<strong style={{ color:T.text }}>Malibu</strong>
               {" · "}More cities coming soon
             </div>
           </div>
@@ -1094,15 +1302,21 @@ ${bodyHtml}
                       textTransform:"none", letterSpacing:0 }}>— double-check this</span>
                   </label>
                   <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-                    <input style={{ width:120, border:`2px solid ${T.orange}`,
+                    <input style={{ width:120, border:`2px solid ${editZip.length === 5 ? T.orange : T.red}`,
                       borderRadius:8, padding:"11px 14px", fontSize:22,
-                      fontWeight:700, color:T.orange, letterSpacing:"0.12em",
+                      fontWeight:700, color: editZip.length === 5 ? T.orange : T.red, letterSpacing:"0.12em",
                       textAlign:"center", fontFamily:"'DM Sans',sans-serif" }}
                       type="text" maxLength={5} value={editZip}
                       onChange={e=>setEditZip(e.target.value.replace(/\D/g,"").slice(0,5))}
                       placeholder="90045" />
                     {editZip.length === 5 && <JurisdictionBadge jurisdiction={jurisdiction} />}
                   </div>
+                  {!editZip && (
+                    <div style={{ marginTop:8, fontSize:12, color:T.red,
+                      fontFamily:"'DM Sans',sans-serif" }}>
+                      ⚠ ZIP not detected from your address — enter it manually above. It determines zoning, permits, and fees.
+                    </div>
+                  )}
                 </div>
 
                 {/* Jurisdiction note */}
@@ -1246,7 +1460,7 @@ ${bodyHtml}
                 <div style={{ borderBottom:`1px solid ${T.border}`,
                   padding:"0 28px", overflowX:"auto", display:"flex",
                   gap:0 }} className="no-print">
-                  {["Deal Summary","Zone Alerts","Zoning & Density","Permit Roadmap",
+                  {["Project Overview","Zone Alerts","Development Standards","Zoning & Density","Permit Roadmap",
                     "Fee Summary","Timeline","Next Steps"].map(sec => (
                     <a key={sec}
                       href={"#sec-"+sec.toLowerCase().replace(/[^a-z0-9]+/g,"-")}
@@ -1267,7 +1481,12 @@ ${bodyHtml}
                   <ReportMarkdown text={result} jurisdiction={jurisdiction} />
                 </div>
 
-                {/* Listo Summary box — from brand preview */}
+                {/* Acronym legend */}
+                <div style={{ padding:"0 28px" }} className="no-print">
+                  <AcronymLegend jurisdiction={jurisdiction} />
+                </div>
+
+                {/* Listo Summary box */}
                 <div style={{ margin:"24px 28px 0", background:T.black,
                   borderRadius:10, padding:"20px 24px" }}>
                   <div style={{ fontSize:10, color:T.orange, fontFamily:"monospace",
@@ -1276,9 +1495,9 @@ ${bodyHtml}
                     AI-generated guidance based on publicly available{" "}
                     {jurisdiction?.name || "LA"} permit data. Always verify with{" "}
                     <strong style={{ color:T.lime }}>{jurisdiction?.agency || "LADBS"}</strong>{" "}
-                    ({jurisdiction?.agencyUrl ? (
-                      <a href={jurisdiction.agencyUrl} target="_blank"
-                        style={{ color:T.lime }}>{jurisdiction.agencyUrl.replace("https://","")}</a>
+                    ({jurisdiction?.applyUrl || jurisdiction?.agencyUrl ? (
+                      <a href={jurisdiction.applyUrl || jurisdiction.agencyUrl} target="_blank"
+                        style={{ color:T.lime }}>{(jurisdiction.applyUrl || jurisdiction.agencyUrl).replace("https://","")}</a>
                     ) : "ladbs.org"}) before proceeding.
                     This is not legal advice.
                   </p>
@@ -1288,18 +1507,28 @@ ${bodyHtml}
                 <div style={{ padding:"16px 28px", display:"flex",
                   justifyContent:"space-between", alignItems:"center",
                   flexWrap:"wrap", gap:10 }} className="no-print">
-                  <div style={{ display:"flex", gap:10 }}>
-                    <button onClick={handlePrint}
-                      style={{ display:"flex", alignItems:"center", gap:8,
-                        background:T.lime, color:T.black, border:"none",
-                        borderRadius:8, padding:"10px 20px", fontSize:13,
-                        fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" strokeWidth={2}>
-                        <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
-                      </svg>
-                      Share Report
-                    </button>
+                  <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                    <div style={{ position:"relative" }}>
+                      <button onClick={handleShare}
+                        style={{ display:"flex", alignItems:"center", gap:8,
+                          background:T.lime, color:T.black, border:"none",
+                          borderRadius:8, padding:"10px 20px", fontSize:13,
+                          fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" strokeWidth={2}>
+                          <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
+                        </svg>
+                        Share Report
+                      </button>
+                      {shareToast && (
+                        <div style={{ position:"absolute", bottom:"calc(100% + 8px)", left:"50%",
+                          transform:"translateX(-50%)", background:T.black, color:T.lime,
+                          fontSize:11, padding:"5px 12px", borderRadius:6, whiteSpace:"nowrap",
+                          fontFamily:"'DM Sans',sans-serif", border:`1px solid ${T.lime}40` }}>
+                          ✓ Copied to clipboard
+                        </div>
+                      )}
+                    </div>
                     <button onClick={handlePrint}
                       style={{ display:"flex", alignItems:"center", gap:8,
                         background:T.warmGray, color:T.text, border:`1px solid ${T.border}`,
@@ -1312,7 +1541,7 @@ ${bodyHtml}
                       Export PDF
                     </button>
                   </div>
-                  <button onClick={() => window.open(jurisdiction?.agencyUrl||"https://www.ladbs.org","_blank")}
+                  <button onClick={() => window.open(jurisdiction?.applyUrl || jurisdiction?.agencyUrl || "https://www.ladbs.org/permits-inspections/apply-for-a-permit","_blank")}
                     style={{ display:"flex", alignItems:"center", gap:6,
                       background:"transparent", border:`1px solid ${T.border}`,
                       color:T.muted, borderRadius:8, padding:"10px 16px",
@@ -1376,7 +1605,7 @@ ${bodyHtml}
       <footer style={{ borderTop:`1px solid ${T.border}`, padding:"16px 24px",
         textAlign:"center", fontSize:11, color:T.muted,
         fontFamily:"'DM Sans',sans-serif" }} className="no-print">
-        listo.zone · City of LA · Santa Monica · Beverly Hills
+        listo.zone · City of LA · Santa Monica · Beverly Hills · Malibu
         {" · "}Not affiliated with LADBS or any city building department.
         {" · "}Always consult a licensed professional.
       </footer>

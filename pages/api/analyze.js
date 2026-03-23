@@ -3,12 +3,13 @@
  *
  * Data pipeline:
  * 1. Census geocoder → verified address + lat/lng
- * 2. ZIMAS D_QUERYLAYERS → parcel profile by address (zoning, lot, RSO, etc.)
- * 3. ZIMAS spatial layers → coastal zone, overlays by coordinates
- * 4. Claude analysis with verified parcel data
+ * 2. ZIMAS B_ZONING spatial query → authoritative zoning by lat/lng (PRIMARY)
+ * 3. ZIMAS D_QUERYLAYERS → lot size, RSO, year built, overlays by address (SUPPLEMENTARY)
+ * 4. ZIMAS D_LEGENDLAYERS → coastal zone check by lat/lng
+ * 5. Claude analysis with verified parcel data
  *
- * All ZIMAS services are public — no API key required.
- * ArcGIS REST accepts inSR=4326 (WGS84 lat/lng) — no coordinate conversion needed.
+ * B_ZONING spatial query is PRIMARY because it only needs lat/lng (always available
+ * from geocoder) and doesn't depend on address string matching.
  */
 
 export default async function handler(req, res) {
@@ -21,7 +22,7 @@ export default async function handler(req, res) {
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured." });
 
   try {
-    // Step 1: Geocode
+    // Step 1: Geocode — gives us verified address + lat/lng
     let geocode = null;
     try {
       const params = new URLSearchParams({
@@ -88,6 +89,7 @@ export default async function handler(req, res) {
 
 async function queryZIMAS(address, geocode) {
   const BASE = "https://zimas.lacity.org/ArcGIS/rest/services";
+  const ARCGIS = "https://zimas.lacity.org/arcgis/rest/services";
   const result = { source: "ZIMAS", hasData: false };
 
   // Clean address for ZIMAS query: "5514 W THORNBURN ST"
@@ -97,6 +99,61 @@ async function queryZIMAS(address, geocode) {
     .replace(/,?\s*\d{5}.*$/, "")
     .trim()
     .toUpperCase();
+
+  // ── SPATIAL QUERIES FIRST — these use lat/lng and always work ─────────────
+  // B_ZONING/MapServer/9 is the authoritative zoning source.
+  // It accepts inSR=4326 (standard WGS84 lat/lng) — no conversion needed.
+  if (geocode?.lat && geocode?.lng) {
+    const geo = geocode.lng + "," + geocode.lat;
+    const sp = (fields) => new URLSearchParams({
+      geometry: geo,
+      geometryType: "esriGeometryPoint",
+      inSR: "4326",
+      spatialRel: "esriSpatialRelIntersects",
+      outFields: fields,
+      returnGeometry: "false",
+      f: "json",
+    });
+
+    // PRIMARY: Authoritative zoning from B_ZONING spatial layer
+    try {
+      const r = await fetch(
+        ARCGIS + "/B_ZONING/MapServer/9/query?" + sp("ZONE_CMPLT,ZONE_CLASS,SPECIFIC_PLAN,HEIGHT_DIST"),
+        { signal: AbortSignal.timeout(8000) }
+      );
+      if (r.ok) {
+        const d = await r.json();
+        const f = d?.features?.[0]?.attributes;
+        if (f) {
+          result.zoning = f.ZONE_CMPLT || f.ZONE_CLASS || null;
+          result.heightDistrict = f.HEIGHT_DIST || null;
+          result.specificPlan = f.SPECIFIC_PLAN || null;
+          result.hasData = true;
+          result.zoningSource = "ZIMAS B_ZONING spatial (verified)";
+          console.log("B_ZONING hit:", result.zoning);
+        }
+      }
+    } catch (e) { console.log("B_ZONING spatial:", e.message); }
+
+    // Coastal Zone — spatial point-in-polygon check
+    try {
+      const r = await fetch(
+        ARCGIS + "/D_LEGENDLAYERS/MapServer/112/query?" + sp("CST_TYPE,CST_ZONE"),
+        { signal: AbortSignal.timeout(6000) }
+      );
+      if (r.ok) {
+        const d = await r.json();
+        result.coastalZone = d?.features?.length > 0 ? "Yes" : "No";
+        if (d?.features?.length > 0) {
+          result.coastalZoneType = d.features[0].attributes?.CST_TYPE || "Coastal Zone";
+        }
+      }
+    } catch (e) { console.log("Coastal zone:", e.message); }
+  }
+
+  // ── ADDRESS QUERIES — lot size, RSO, year built, units ───────────────────
+  // These depend on address string matching. May not always return results
+  // but give us the rich parcel data when they do.
 
   // Layer 0: Main parcel profile
   try {
@@ -114,26 +171,28 @@ async function queryZIMAS(address, geocode) {
         result.hasData = true;
         result.rawFields = Object.keys(f);
         result.apn = f.APN || f.ASSESSOR_ID || null;
-        result.zoning = f.ZONE_CMPLT || f.ZONING || null;
+        // Only override zoning if B_ZONING didn't return anything
+        if (!result.zoning) result.zoning = f.ZONE_CMPLT || f.ZONING || null;
         result.lotSizeSf = f.LOT_SIZE ? Math.round(parseFloat(f.LOT_SIZE)) : null;
         result.yearBuilt = f.YEAR_BUILT || null;
         result.existingUnits = f.NO_OF_UNITS || f.UNITS || null;
         result.existingBuildingSqft = f.BUILDING_SQ_FT || f.BLDG_SQ_FT || null;
         result.useCode = f.USE_CODE || null;
         result.communityPlan = f.COMM_PLAN || f.COMMUNITY_PLAN_AREA || null;
-        result.specificPlan = f.SPECIFIC_PLAN || null;
+        if (!result.specificPlan) result.specificPlan = f.SPECIFIC_PLAN || null;
         result.generalPlanLandUse = f.GENERAL_PLAN || f.GP_LAND_USE || null;
         result.hillside = f.HILLSIDE === "Y" || f.HCR === "YES" || null;
         result.hpoz = f.HPOZ || null;
-        result.coastalZone = f.COASTAL_ZONE || null;
+        if (!result.coastalZone) result.coastalZone = f.COASTAL_ZONE || null;
         result.liquefaction = f.LIQUEFACTION === "Y" || f.LIQUEFACTION === "Yes" || null;
         result.specialGrading = f.SPEC_GRADING_AREA === "Y" || f.SPECIAL_GRADING === "Y" || null;
         result.toc = f.TOC_TIER || f.TOC || null;
+        console.log("D_QUERYLAYERS layer 0 hit:", result.apn, result.lotSizeSf, "sf");
       }
     }
   } catch (e) { console.log("ZIMAS layer 0:", e.message); }
 
-  // Layer 12: RSO (confirmed working per cityhubla/a_modest_proposal_1)
+  // Layer 12: RSO — confirmed working, address-based
   try {
     const q = new URLSearchParams({
       where: "Property_Address LIKE '" + streetOnly.replace(/'/g, "''") + "%'",
@@ -150,56 +209,12 @@ async function queryZIMAS(address, geocode) {
         result.rso = result.rsoUnits > 0;
         result.rsoSource = "ZIMAS RSO Registry (verified)";
         result.hasData = true;
+        console.log("RSO hit:", result.rso, result.rsoUnits, "units");
       }
     }
   } catch (e) { console.log("ZIMAS RSO:", e.message); }
 
-  // Spatial queries with lat/lng (inSR=4326)
-  if (geocode?.lat && geocode?.lng) {
-    const geo = geocode.lng + "," + geocode.lat;
-    const sp = (fields) => new URLSearchParams({
-      geometry: geo, geometryType: "esriGeometryPoint",
-      inSR: "4326", spatialRel: "esriSpatialRelIntersects",
-      outFields: fields, returnGeometry: "false", f: "json",
-    });
-
-    // Zoning from B_ZONING (most reliable)
-    if (!result.zoning) {
-      try {
-        const r = await fetch(
-          "https://zimas.lacity.org/arcgis/rest/services/B_ZONING/MapServer/9/query?" + sp("ZONE_CMPLT,ZONE_CLASS,SPECIFIC_PLAN,HEIGHT_DIST"),
-          { signal: AbortSignal.timeout(6000) }
-        );
-        if (r.ok) {
-          const d = await r.json();
-          const f = d?.features?.[0]?.attributes;
-          if (f) {
-            result.zoning = f.ZONE_CMPLT || f.ZONE_CLASS;
-            result.heightDistrict = f.HEIGHT_DIST || null;
-            if (!result.specificPlan) result.specificPlan = f.SPECIFIC_PLAN || null;
-            result.hasData = true;
-          }
-        }
-      } catch (e) { console.log("B_ZONING:", e.message); }
-    }
-
-    // Coastal zone check
-    if (!result.coastalZone) {
-      try {
-        const r = await fetch(
-          "https://zimas.lacity.org/arcgis/rest/services/D_LEGENDLAYERS/MapServer/112/query?" + sp("CST_TYPE"),
-          { signal: AbortSignal.timeout(6000) }
-        );
-        if (r.ok) {
-          const d = await r.json();
-          result.coastalZone = d?.features?.length > 0 ? "Yes" : "No";
-          if (d?.features?.length > 0) result.coastalZoneType = d.features[0].attributes?.CST_TYPE;
-        }
-      } catch (e) { console.log("Coastal:", e.message); }
-    }
-  }
-
-  // RSO inference fallback
+  // ── RSO inference fallback ─────────────────────────────────────────────
   if (result.rso === undefined || result.rso === null) {
     const pre78 = result.yearBuilt && parseInt(result.yearBuilt) < 1978;
     const multi = result.existingUnits && parseInt(result.existingUnits) >= 2;
@@ -209,7 +224,7 @@ async function queryZIMAS(address, geocode) {
       : "Not verified";
   }
 
-  // Lot size and density
+  // ── Density calculation ────────────────────────────────────────────────
   if (result.lotSizeSf > 0) {
     result.unitsByRight = Math.floor(result.lotSizeSf / 800);
     result.densityCalc = result.lotSizeSf.toLocaleString() + " sf / 800 = " + result.unitsByRight + " units by-right";
@@ -234,46 +249,76 @@ function buildSystem(jurisdictionKey) {
       "Beverly Hills Municipal Code applies, not LAMC. Own zoning code (BHMC Title 10). " +
       "No RSO equivalent but strong tenant protections. Own fee schedule. " +
       "Some hillside areas with specific grading requirements." : "",
+    jurisdictionKey === "malibu" ?
+      "JURISDICTION: City of Malibu — separate from City of LA and LA County. Building dept: City of Malibu Building & Safety. " +
+      "Malibu Municipal Code applies. The ENTIRE city of Malibu is within the California Coastal Zone — " +
+      "California Coastal Commission (CCC) permit required for virtually all development. " +
+      "Coastal Development Permit (CDP) required. Fee schedule and timelines differ significantly from LADBS." : "",
     jurisdictionKey === "city-of-la" || !jurisdictionKey ?
       "JURISDICTION: City of Los Angeles. Building dept: LADBS. Permit agency: LADBS (ladbs.org). LAMC applies." : "",
+    "",
+    "CRITICAL LANGUAGE RULE — VERIFIED vs NOT VERIFIED:",
+    "NEVER use 'likely', 'may require', 'appears to be', 'probably', 'seems to', or any hedging language.",
+    "Two modes only: VERIFIED (state as fact, cite source) or NOT VERIFIED (say so + direct to verification source).",
+    "Example: Do NOT say 'Liquefaction may be an issue.' DO say: 'Liquefaction Zone: NOT VERIFIED — check at zimas.lacity.org.'",
     "",
     "RULES:",
     "1. Facts only. No investment advice whatsoever.",
     "2. VERIFIED data = use exactly. Never override verified parcel data.",
-    "3. ESTIMATED data = flag clearly, recommend verification.",
+    "3. NOT VERIFIED data = state explicitly as unverified + direct user to source.",
     "4. If lot size provided: use exact density math (lot sf / 800 = N). Show arithmetic.",
-    "5. If lot size unknown: say so. Do not estimate.",
+    "5. If lot size unknown: say 'Lot size not provided — density calculation not possible. Verify at zimas.lacity.org.'",
     "6. VERDICT: GO | CAUTION | COMPLEX — one only.",
-    "7. Coastal Transportation Corridor (ZI-1874) = TRANSPORTATION plan, NOT Coastal Zone.",
-    "8. RSO verified: state unit count + full compliance. RSO inferred: flag as estimate.",
-    "9. If demolishing RSO units: flag HE Replacement Required + Housing Crisis Act + relocation costs.",
+    "7. ZI-1874 'Specific Plan: Los Angeles Coastal Transportation Corridor' is a TRANSPORTATION plan near I-405/LAX. NOT the California Coastal Zone. NEVER flag CCC or Coastal Development Permit requirements for ZI-1874 addresses. ZIP codes 90045, 90293, 90094, 90066 are Transportation Corridor, NOT Coastal Zone.",
+    "8. RSO verified: state unit count + full compliance. RSO not verified: say 'NOT VERIFIED — check at hcidla.lacity.org.'",
+    "9. If demolishing RSO units: flag HE Replacement Required + Housing Crisis Act + relocation costs as ACTION REQUIRED.",
     "10. Liquefaction confirmed: flag geotech requirements + cost range $15K-$40K.",
     "11. Special Grading Area: flag BOE grading permit.",
     "12. Complete every section. Never truncate.",
-    "13. Documents: STAMP YES for all architect/engineer plans in LA — never mark architectural, structural, or MEP as NOT REQUIRED.",
-    "14. DEMO, BUILDING, TECHNICAL REPORTS are section headers in Documents — put each on its own line before the docs in that group.",
+    "13. Documents: STAMP YES for all architect/engineer plans — never mark architectural, structural, or MEP as NOT REQUIRED.",
+    "14. DEMO, BUILDING, TECHNICAL REPORTS are section headers in Documents — each on its own line.",
+    "15. Always include LAMC code citations in Development Standards (e.g. LAMC 12.08 C.2).",
+    "16. List all exemptions explicitly: garage FAR exemptions, JADU FAR exemptions, detached parking lot coverage exemptions.",
     "",
     "OUTPUT — ## sections in this exact order:",
-    "## Deal Summary",
-    "VERDICT: [GO|CAUTION|COMPLEX] | [one sentence facts]",
+    "## Project Overview",
+    "VERDICT: [GO|CAUTION|COMPLEX] | [one sentence facts only]",
     "ZONING: [exact code] | [permitted uses 6 words]",
     "UNITS: [N] by-right ([lot sf] sf / 800 = [N]) | TOC: [eligibility]",
     "PERMITS: $[low]-$[high] | [N]-[N] week critical path",
-    "ALERTS: [N] critical | [N] caution | [N] informational",
+    "ALERTS: [N] action-required | [N] caution | [N] informational",
     "DATA: [Verified — ZIMAS | Estimated — ZIP knowledge]",
     "",
     "## Zone Alerts",
-    "[CRITICAL|CAUTION|INFO] | [Name] | [$ impact] | [time impact]",
-    "[One sentence what must be done]",
+    "Use label ACTION REQUIRED for true blockers, CAUTION for watch items, NOTE for context, CLEAR if none.",
+    "[ACTION REQUIRED|CAUTION|NOTE] | [Name] | [$ impact] | [time impact]",
+    "[One sentence — VERIFIED or NOT VERIFIED, no hedging]",
     "If none: CLEAR | No special zone restrictions detected",
     "",
+    "## Development Standards",
+    "ZONING: [code] — [full name] ([LAMC section])",
+    "STANDARD | MAX ALLOWED | PROPOSED/TYPICAL | LAMC REF",
+    "Front Yard Setback | [value] | [value] | LAMC 12.08 C.1",
+    "Side Yard Setback | [value] | [value] | LAMC 12.08 C.2",
+    "Rear Yard Setback | [value] | [value] | LAMC 12.08 C.2",
+    "Max Height | [value] | [value] | LAMC 12.21.1",
+    "Floor Area Ratio | [multiplier] × [buildable sf] = [max sf] | [proposed sf] | LAMC 12.21.1(a)",
+    "Lot Coverage | [%] = [max sf] | [proposed sf] | LAMC 12.21C.10(e)",
+    "Parking | [N spaces] | [proposed] | LAMC 12.21C.10(g)",
+    "Then list each exemption on its own line:",
+    "EXEMPTION: [description] | [amount/condition] | [LAMC ref]",
+    "Then add applicable technical specs:",
+    "ENCROACHMENT PLANE: [origin height] ft above grade, 45° inward slope (LAMC 12.08 C.5)",
+    "GRADING: [threshold]+ cy requires BOE grading permit (LAMC 91.7006.5)",
+    "BASEMENT: Exempt from FAR if ceiling ≤6 ft above grade (LAMC 12.21 C.10(d))",
+    "FIRE SPRINKLERS: [trigger condition] (LAMC 12.21 C.10(h))",
+    "OFFSET PLAN BREAK: Required for side walls >45 ft long and >14 ft high (LAMC 12.21 C.10(a))",
+    "",
     "## Zoning & Density",
-    "ZONING: [code] — [full name]",
-    "Development standards table (setbacks, height, FAR, coverage, parking, open space)",
     "DENSITY MATH: [lot sf] sf / 800 = [N] units by-right",
     "TOC BONUS: [result] | ADU: [N ADUs + N JADUs]",
     "MAX BUILDOUT: [N] total units",
-    "EXISTING STRUCTURE: [year, units, sqft, RSO status]",
+    "EXISTING STRUCTURE: [year, units, sqft, RSO status — VERIFIED or NOT VERIFIED]",
     "",
     "## Permit Roadmap",
     "### Phase 1 - Pre-Application",
@@ -305,7 +350,7 @@ function buildSystem(jurisdictionKey) {
     "",
     "## Legal Notice",
     "AI-generated guidance based on publicly available LA permit data. Always verify with your jurisdiction before submitting. This is not legal advice. Listo makes no warranties regarding accuracy or completeness.",
-  ].join("\n");
+  ].filter(s => s !== "").join("\n");
 }
 
 function buildMessage(rawAddr, geocode, parcel, projectType, details, jurisdictionKey) {
@@ -324,7 +369,7 @@ function buildMessage(rawAddr, geocode, parcel, projectType, details, jurisdicti
   if (parcel?.hasData) {
     lines.push("PARCEL DATA (Source: " + parcel.source + " — treat as ground truth):");
     if (parcel.apn)                 lines.push("APN: " + parcel.apn);
-    if (parcel.zoning)              lines.push("Zoning: " + parcel.zoning + " (VERIFIED)");
+    if (parcel.zoning)              lines.push("Zoning: " + parcel.zoning + " (" + (parcel.zoningSource || "VERIFIED") + ")");
     if (parcel.heightDistrict)      lines.push("Height District: " + parcel.heightDistrict);
     if (parcel.lotSizeSf)           lines.push("Lot Size: " + parcel.lotSizeSf.toLocaleString() + " sf (VERIFIED)");
     if (parcel.densityCalc)         lines.push("Density: " + parcel.densityCalc + " (VERIFIED — use exactly)");
@@ -336,7 +381,6 @@ function buildMessage(rawAddr, geocode, parcel, projectType, details, jurisdicti
     if (parcel.specificPlan)        lines.push("Specific Plan: " + parcel.specificPlan);
     if (parcel.generalPlanLandUse)  lines.push("General Plan Land Use: " + parcel.generalPlanLandUse);
 
-    // RSO
     if (parcel.rso !== null && parcel.rso !== undefined) {
       lines.push("RSO: " + (parcel.rso ? "YES — " + (parcel.rsoUnits || "unknown") + " RSO units" : "No") + " (" + parcel.rsoSource + ")");
     } else {
@@ -350,7 +394,7 @@ function buildMessage(rawAddr, geocode, parcel, projectType, details, jurisdicti
     if (parcel.liquefaction !== null) lines.push("Liquefaction Zone: " + (parcel.liquefaction ? "Yes" : "No"));
     if (parcel.specialGrading !== null) lines.push("Special Grading Area: " + (parcel.specialGrading ? "Yes" : "No"));
     if (parcel.toc)                 lines.push("TOC: " + parcel.toc);
-    if (parcel.rawFields?.length)   lines.push("[Available ZIMAS fields: " + parcel.rawFields.slice(0,30).join(", ") + "]");
+    if (parcel.rawFields?.length)   lines.push("[Available ZIMAS fields: " + parcel.rawFields.slice(0,20).join(", ") + "]");
   } else {
     lines.push("PARCEL DATA: ZIMAS returned no results for this address.");
     lines.push("Use ZIP/neighborhood knowledge. Flag ALL estimates as unverified.");
