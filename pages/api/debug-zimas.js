@@ -1,28 +1,40 @@
 /**
- * Listo ZIMAS Diagnostic — /api/debug-zimas
+ * Listo ZIMAS Debug v3 — tests ACTIVE services under zma/ folder
  *
- * Deploy alongside analyze.js. Hit it with:
- *   POST /api/debug-zimas { "address": "622 Woodlawn Ave, Venice" }
+ * The old B_ZONING, D_QUERYLAYERS, D_LEGENDLAYERS services are STOPPED.
+ * Active services are all under zma/:
+ *   zma/zimas/MapServer     — zoning, parcels
+ *   zma/coastal_zones       — coastal zone layers
+ *   zma/legend              — TOC, liquefaction, overlays
+ *   zma/lotlines            — parcel lot lines
+ *   zm4/landbase__FGDB      — landbase parcel data
  *
- * Returns step-by-step results for every query in the pipeline,
- * including raw response bodies so you can see exactly what ZIMAS returns.
+ * Step 1: Geocoder (Census + Nominatim with directional retries)
+ * Step 2: Active ZIMAS services identify + query
  *
- * DELETE THIS FILE before going to production.
+ * DELETE before production.
  */
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
-  const { address } = req.body;
-  if (!address) return res.status(400).json({ error: "address required" });
+  const { address, step, lat, lng } = req.body;
+  if (!step) return res.status(400).json({
+    error: "Pass step: 1 (geocode) or 2 (ZIMAS spatial — needs lat/lng from step 1)"
+  });
 
   const log = [];
-  const step = (name, data) => { log.push({ step: name, ...data }); };
+  const s = (name, data) => log.push({ step: name, ...data });
+  const BASE = "https://zimas.lacity.org/arcgis/rest/services";
 
-  // ── 1. Census Geocoder — with directional prefix retries ─────────────
-  let lat = null, lng = null, matchedAddr = null;
-  {
-    const normalized = address.replace(/,?\s*Venice\b/i, "") + ", Los Angeles, CA";
-    // Build variants: original + directional prefixes
+  // ═══════════════════════════════════════════════════════════════════════
+  // STEP 1: Geocoder
+  // ═══════════════════════════════════════════════════════════════════════
+  if (step === 1) {
+    if (!address) return res.status(400).json({ error: "address required" });
+    const normalized = address
+      .replace(/,?\s*(Venice|Westchester|Playa Del Rey|Mar Vista|Pacific Palisades|Silver Lake|Echo Park|Los Feliz|Hollywood Hills|Brentwood|Bel Air)\b/i, "")
+      .trim().replace(/,\s*$/, "") + ", Los Angeles, CA";
+
     const variants = [normalized];
     const m = normalized.match(/^(\d+)\s+(?!([NSEW])\s)(.+)/i);
     if (m) {
@@ -30,322 +42,182 @@ export default async function handler(req, res) {
         variants.push(m[1] + " " + dir + " " + m[3]);
       }
     }
-    step("geocode_variants", { variants });
 
-    for (const variant of variants) {
+    // Census
+    for (const v of variants) {
       try {
-        const params = new URLSearchParams({
-          address: variant,
-          benchmark: "Public_AR_Current",
-          format: "json",
-        });
-        const url = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?" + params;
-        step("census_try", { variant, url });
-        const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        const p = new URLSearchParams({ address: v, benchmark: "Public_AR_Current", format: "json" });
+        const r = await fetch("https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?" + p, { signal: AbortSignal.timeout(6000) });
         const d = await r.json();
         const match = d?.result?.addressMatches?.[0];
         if (match) {
-          lat = match.coordinates?.y;
-          lng = match.coordinates?.x;
-          matchedAddr = match.matchedAddress;
-          step("census_result", { status: "HIT", variant, matchedAddr, lat, lng });
-          break;
-        } else {
-          step("census_miss", { variant, matchCount: 0 });
+          return res.status(200).json({
+            result: "GEOCODE SUCCESS (Census)",
+            lat: match.coordinates?.y, lng: match.coordinates?.x,
+            matchedAddress: match.matchedAddress,
+            variant: v,
+            nextStep: "Run step 2 with these lat/lng values",
+          });
         }
-      } catch (e) {
-        step("census_error", { variant, message: e.message });
-      }
+      } catch (e) {}
     }
-    if (!lat) step("census_result", { status: "ALL VARIANTS FAILED" });
-  }
 
-  // ── 2. Nominatim fallback ──────────────────────────────────────────────
-  if (!lat) {
+    // Nominatim fallback
     try {
       const q = encodeURIComponent(address + ", Los Angeles, CA");
-      const url = "https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=us";
-      step("nominatim_url", { url });
-      const r = await fetch(url, {
-        headers: { "User-Agent": "Listo/1.0 (listo.zone)" },
-        signal: AbortSignal.timeout(8000),
-      });
+      const r = await fetch(
+        "https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=us",
+        { headers: { "User-Agent": "Listo/1.0 (listo.zone)" }, signal: AbortSignal.timeout(6000) }
+      );
       if (r.ok) {
         const d = await r.json();
         if (d?.[0]) {
-          lat = parseFloat(d[0].lat);
-          lng = parseFloat(d[0].lon);
-          step("nominatim_result", { status: "HIT", lat, lng, display: d[0].display_name });
-        } else {
-          step("nominatim_result", { status: "NO MATCH" });
+          return res.status(200).json({
+            result: "GEOCODE SUCCESS (Nominatim)",
+            lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon),
+            display: d[0].display_name,
+            nextStep: "Run step 2 with these lat/lng values",
+          });
         }
-      } else {
-        step("nominatim_result", { status: "HTTP " + r.status });
       }
-    } catch (e) {
-      step("nominatim_result", { status: "ERROR", message: e.message });
-    }
+    } catch (e) {}
+
+    return res.status(200).json({ result: "GEOCODE FAILED", log });
   }
 
-  if (!lat || !lng) {
-    step("FATAL", { message: "No geocode coordinates — cannot test spatial queries" });
-    return res.status(200).json({ log });
-  }
+  // ═══════════════════════════════════════════════════════════════════════
+  // STEP 2: ZIMAS active services (needs lat/lng)
+  // ═══════════════════════════════════════════════════════════════════════
+  if (step === 2) {
+    if (!lat || !lng) return res.status(400).json({ error: "lat and lng required. Run step 1 first." });
 
-  const BASE = "https://zimas.lacity.org/ArcGIS/rest/services";
-  const geoJSON = JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } });
-  const geoSimple = lng + "," + lat;
-  const extent = [lng - 0.001, lat - 0.001, lng + 0.001, lat + 0.001].join(",");
+    const geoJSON = JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } });
+    const geoSimple = lng + "," + lat;
+    const extent = [lng - 0.0005, lat - 0.0005, lng + 0.0005, lat + 0.0005].join(",");
 
-  // ── 3. B_ZONING identify ──────────────────────────────────────────────
-  try {
-    const params = new URLSearchParams({
+    const identifyParams = (layers) => new URLSearchParams({
       geometry: geoJSON,
       geometryType: "esriGeometryPoint",
       sr: "4326",
-      layers: "all",
-      tolerance: "3",
+      layers: layers || "all",
+      tolerance: "5",
       mapExtent: extent,
-      imageDisplay: "400,300,96",
+      imageDisplay: "600,400,96",
       returnGeometry: "false",
       f: "json",
     });
-    const url = BASE + "/B_ZONING/MapServer/identify?" + params;
-    step("b_zoning_identify_url", { url: url.substring(0, 300) });
-    const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
-    const d = await r.json();
-    step("b_zoning_identify", {
-      status: r.ok ? "OK" : "HTTP " + r.status,
-      resultCount: d?.results?.length || 0,
-      error: d?.error || null,
-      results: (d?.results || []).map(r => ({
-        layerId: r.layerId,
-        layerName: r.layerName,
-        attributes: r.attributes
-      })).slice(0, 5),
-    });
-  } catch (e) {
-    step("b_zoning_identify", { status: "ERROR", message: e.message });
-  }
 
-  // ── 4. B_ZONING query (layers 0, 1, 2, 9) ────────────────────────────
-  for (const layerNum of [0, 1, 2, 9]) {
-    for (const geo of [geoJSON, geoSimple]) {
-      try {
-        const params = new URLSearchParams({
-          geometry: geo,
-          geometryType: "esriGeometryPoint",
-          inSR: "4326",
-          spatialRel: "esriSpatialRelIntersects",
-          outFields: "*",
-          returnGeometry: "false",
-          f: "json",
-        });
-        const url = BASE + "/B_ZONING/MapServer/" + layerNum + "/query?" + params;
-        const geoLabel = geo.startsWith("{") ? "JSON" : "simple";
-        const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
-        const d = await r.json();
-        const featureCount = d?.features?.length || 0;
-        step("b_zoning_query_" + layerNum + "_" + geoLabel, {
-          status: r.ok ? "OK" : "HTTP " + r.status,
-          featureCount,
-          error: d?.error || null,
-          fields: featureCount > 0 ? Object.keys(d.features[0].attributes) : [],
-          sample: featureCount > 0 ? d.features[0].attributes : null,
-        });
-        if (featureCount > 0) break; // Found data with this layer, skip other geo format
-      } catch (e) {
-        step("b_zoning_query_" + layerNum, { status: "ERROR", message: e.message });
-      }
-    }
-  }
-
-  // ── 5. D_QUERYLAYERS identify ─────────────────────────────────────────
-  try {
-    const params = new URLSearchParams({
-      geometry: geoJSON,
+    const queryParams = (geo) => new URLSearchParams({
+      geometry: geo,
       geometryType: "esriGeometryPoint",
-      sr: "4326",
-      layers: "all:0",
-      tolerance: "3",
-      mapExtent: extent,
-      imageDisplay: "400,300,96",
-      returnGeometry: "false",
-      f: "json",
-    });
-    const url = BASE + "/D_QUERYLAYERS/MapServer/identify?" + params;
-    step("d_query_identify_url", { url: url.substring(0, 300) });
-    const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
-    const d = await r.json();
-    step("d_query_identify", {
-      status: r.ok ? "OK" : "HTTP " + r.status,
-      resultCount: d?.results?.length || 0,
-      error: d?.error || null,
-      results: (d?.results || []).map(r => ({
-        layerId: r.layerId,
-        layerName: r.layerName,
-        fields: r.attributes ? Object.keys(r.attributes) : [],
-        attributes: r.attributes,
-      })).slice(0, 3),
-    });
-  } catch (e) {
-    step("d_query_identify", { status: "ERROR", message: e.message });
-  }
-
-  // ── 6. D_QUERYLAYERS spatial query (layer 0) ──────────────────────────
-  for (const geo of [geoJSON, geoSimple]) {
-    try {
-      const geoLabel = geo.startsWith("{") ? "JSON" : "simple";
-      const params = new URLSearchParams({
-        geometry: geo,
-        geometryType: "esriGeometryPoint",
-        inSR: "4326",
-        spatialRel: "esriSpatialRelIntersects",
-        outFields: "*",
-        returnGeometry: "false",
-        f: "json",
-      });
-      const url = BASE + "/D_QUERYLAYERS/MapServer/0/query?" + params;
-      const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
-      const d = await r.json();
-      const featureCount = d?.features?.length || 0;
-      step("d_query_layer0_" + geoLabel, {
-        status: r.ok ? "OK" : "HTTP " + r.status,
-        featureCount,
-        error: d?.error || null,
-        fields: featureCount > 0 ? Object.keys(d.features[0].attributes) : [],
-        sample: featureCount > 0 ? d.features[0].attributes : null,
-      });
-    } catch (e) {
-      step("d_query_layer0_" + (geo.startsWith("{") ? "JSON" : "simple"), { status: "ERROR", message: e.message });
-    }
-  }
-
-  // ── 7. D_QUERYLAYERS APN query (known good APN) ───────────────────────
-  try {
-    const params = new URLSearchParams({
-      where: "APN='4237012009'",
+      inSR: "4326",
+      spatialRel: "esriSpatialRelIntersects",
       outFields: "*",
       returnGeometry: "false",
       f: "json",
     });
-    const url = BASE + "/D_QUERYLAYERS/MapServer/0/query?" + params;
-    const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    const d = await r.json();
-    const featureCount = d?.features?.length || 0;
-    step("d_query_apn_lookup", {
-      status: r.ok ? "OK" : "HTTP " + r.status,
-      apn: "4237012009",
-      featureCount,
-      error: d?.error || null,
-      fields: featureCount > 0 ? Object.keys(d.features[0].attributes) : [],
-      sample: featureCount > 0 ? d.features[0].attributes : null,
-    });
-  } catch (e) {
-    step("d_query_apn_lookup", { status: "ERROR", message: e.message });
-  }
 
-  // ── 8. Address query with variants ────────────────────────────────────
-  for (const variant of ["622 WOODLAWN AVE", "622 W WOODLAWN AVE"]) {
+    // ── Test 1: zma/zimas identify (zoning + everything) ────────────────
     try {
-      const params = new URLSearchParams({
-        where: "SITUS_ADDR LIKE '" + variant + "%'",
-        outFields: "*",
-        returnGeometry: "false",
-        f: "json",
-      });
-      const url = BASE + "/D_QUERYLAYERS/MapServer/0/query?" + params;
-      const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      const r = await fetch(BASE + "/zma/zimas/MapServer/identify?" + identifyParams("all"), { signal: AbortSignal.timeout(8000) });
       const d = await r.json();
-      const featureCount = d?.features?.length || 0;
-      step("address_query_" + variant.replace(/\s+/g, "_"), {
-        status: r.ok ? "OK" : "HTTP " + r.status,
-        featureCount,
+      s("zma_zimas_identify", {
+        ok: !d?.error,
+        resultCount: d?.results?.length || 0,
         error: d?.error || null,
-        fields: featureCount > 0 ? Object.keys(d.features[0].attributes) : [],
-        sample: featureCount > 0 ? d.features[0].attributes : null,
+        results: (d?.results || []).map(x => ({
+          layerId: x.layerId, layerName: x.layerName, attrs: x.attributes,
+        })).slice(0, 10),
       });
-    } catch (e) {
-      step("address_query_" + variant, { status: "ERROR", message: e.message });
-    }
-  }
+    } catch (e) { s("zma_zimas_identify", { error: e.message }); }
 
-  // ── 9. D_LEGENDLAYERS identify ────────────────────────────────────────
-  try {
-    const params = new URLSearchParams({
-      geometry: geoJSON,
-      geometryType: "esriGeometryPoint",
-      sr: "4326",
-      layers: "all",
-      tolerance: "3",
-      mapExtent: extent,
-      imageDisplay: "400,300,96",
-      returnGeometry: "false",
-      f: "json",
-    });
-    const url = BASE + "/D_LEGENDLAYERS/MapServer/identify?" + params;
-    const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
-    const d = await r.json();
-    step("d_legend_identify", {
-      status: r.ok ? "OK" : "HTTP " + r.status,
-      resultCount: d?.results?.length || 0,
-      error: d?.error || null,
-      results: (d?.results || []).map(r => ({
-        layerId: r.layerId,
-        layerName: r.layerName,
-        attributes: r.attributes,
-      })).slice(0, 15),
-    });
-  } catch (e) {
-    step("d_legend_identify", { status: "ERROR", message: e.message });
-  }
-
-  // ── 10. Service directory check ───────────────────────────────────────
-  for (const svc of ["B_ZONING", "D_QUERYLAYERS", "D_LEGENDLAYERS"]) {
+    // ── Test 2: zma/zimas layer 1902 query (Zoning) ─────────────────────
     try {
-      const url = BASE + "/" + svc + "/MapServer?f=json";
-      const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      const r = await fetch(BASE + "/zma/zimas/MapServer/1902/query?" + queryParams(geoJSON), { signal: AbortSignal.timeout(6000) });
       const d = await r.json();
-      step("service_" + svc, {
-        status: r.ok ? "OK" : "HTTP " + r.status,
-        serviceName: d?.mapName || d?.serviceDescription || "?",
-        layerCount: d?.layers?.length || 0,
-        layers: (d?.layers || []).map(l => ({
-          id: l.id,
-          name: l.name,
-          type: l.type,
-        })).slice(0, 20),
+      s("zma_zimas_1902_query", {
+        ok: !d?.error,
+        featureCount: d?.features?.length || 0,
+        error: d?.error || null,
+        fields: d?.features?.[0]?.attributes ? Object.keys(d.features[0].attributes) : [],
+        sample: d?.features?.[0]?.attributes || null,
       });
-    } catch (e) {
-      step("service_" + svc, { status: "ERROR", message: e.message });
-    }
+    } catch (e) { s("zma_zimas_1902_query", { error: e.message }); }
+
+    // ── Test 3: zma/coastal_zones identify ───────────────────────────────
+    try {
+      const r = await fetch(BASE + "/zma/coastal_zones/MapServer/identify?" + identifyParams("all"), { signal: AbortSignal.timeout(6000) });
+      const d = await r.json();
+      s("zma_coastal_identify", {
+        ok: !d?.error,
+        resultCount: d?.results?.length || 0,
+        error: d?.error || null,
+        results: (d?.results || []).map(x => ({
+          layerId: x.layerId, layerName: x.layerName, attrs: x.attributes,
+        })).slice(0, 10),
+      });
+    } catch (e) { s("zma_coastal_identify", { error: e.message }); }
+
+    // ── Test 4: zma/legend identify (TOC, liquefaction, overlays) ────────
+    try {
+      const r = await fetch(BASE + "/zma/legend/MapServer/identify?" + identifyParams("all"), { signal: AbortSignal.timeout(8000) });
+      const d = await r.json();
+      s("zma_legend_identify", {
+        ok: !d?.error,
+        resultCount: d?.results?.length || 0,
+        error: d?.error || null,
+        results: (d?.results || []).map(x => ({
+          layerId: x.layerId, layerName: x.layerName, attrs: x.attributes,
+        })).slice(0, 15),
+      });
+    } catch (e) { s("zma_legend_identify", { error: e.message }); }
+
+    // ── Test 5: zma/lotlines identify (parcel boundaries) ────────────────
+    try {
+      const r = await fetch(BASE + "/zma/lotlines/MapServer/identify?" + identifyParams("all"), { signal: AbortSignal.timeout(6000) });
+      const d = await r.json();
+      s("zma_lotlines_identify", {
+        ok: !d?.error,
+        resultCount: d?.results?.length || 0,
+        error: d?.error || null,
+        results: (d?.results || []).map(x => ({
+          layerId: x.layerId, layerName: x.layerName,
+          fields: x.attributes ? Object.keys(x.attributes) : [],
+          attrs: x.attributes,
+        })).slice(0, 5),
+      });
+    } catch (e) { s("zma_lotlines_identify", { error: e.message }); }
+
+    // ── Test 6: zm4/landbase__FGDB identify (parcel data?) ───────────────
+    try {
+      const r = await fetch(BASE + "/zm4/landbase__FGDB/MapServer/identify?" + identifyParams("all"), { signal: AbortSignal.timeout(6000) });
+      const d = await r.json();
+      s("zm4_landbase_identify", {
+        ok: !d?.error,
+        resultCount: d?.results?.length || 0,
+        error: d?.error || null,
+        results: (d?.results || []).map(x => ({
+          layerId: x.layerId, layerName: x.layerName,
+          fields: x.attributes ? Object.keys(x.attributes) : [],
+          attrs: x.attributes,
+        })).slice(0, 10),
+      });
+    } catch (e) { s("zm4_landbase_identify", { error: e.message }); }
+
+    // ── Test 7: simple format fallback on zma/zimas/1902 ────────────────
+    try {
+      const r = await fetch(BASE + "/zma/zimas/MapServer/1902/query?" + queryParams(geoSimple), { signal: AbortSignal.timeout(6000) });
+      const d = await r.json();
+      s("zma_zimas_1902_simple", {
+        ok: !d?.error,
+        featureCount: d?.features?.length || 0,
+        error: d?.error || null,
+        sample: d?.features?.[0]?.attributes || null,
+      });
+    } catch (e) { s("zma_zimas_1902_simple", { error: e.message }); }
+
+    return res.status(200).json({ result: "ACTIVE SERVICE TESTS DONE", lat, lng, log });
   }
 
-  // ── 11. RSO layer check ───────────────────────────────────────────────
-  try {
-    const params = new URLSearchParams({
-      where: "Property_Address LIKE '622 W WOODLAWN%'",
-      outFields: "*",
-      returnGeometry: "false",
-      f: "json",
-    });
-    const url = BASE + "/D_QUERYLAYERS/MapServer/12/query?" + params;
-    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    const d = await r.json();
-    step("rso_query", {
-      status: r.ok ? "OK" : "HTTP " + r.status,
-      featureCount: d?.features?.length || 0,
-      error: d?.error || null,
-      sample: d?.features?.[0]?.attributes || null,
-    });
-  } catch (e) {
-    step("rso_query", { status: "ERROR", message: e.message });
-  }
-
-  return res.status(200).json({
-    address,
-    geocode: { lat, lng, matchedAddr },
-    testCount: log.length,
-    log,
-  });
+  return res.status(400).json({ error: "Invalid step. Use 1 or 2." });
 }
