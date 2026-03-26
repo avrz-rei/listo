@@ -18,30 +18,46 @@ export default async function handler(req, res) {
   const log = [];
   const step = (name, data) => { log.push({ step: name, ...data }); };
 
-  // ── 1. Census Geocoder ─────────────────────────────────────────────────
+  // ── 1. Census Geocoder — with directional prefix retries ─────────────
   let lat = null, lng = null, matchedAddr = null;
-  try {
+  {
     const normalized = address.replace(/,?\s*Venice\b/i, "") + ", Los Angeles, CA";
-    const params = new URLSearchParams({
-      address: normalized,
-      benchmark: "Public_AR_Current",
-      format: "json",
-    });
-    const url = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?" + params;
-    step("census_url", { url });
-    const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    const d = await r.json();
-    const m = d?.result?.addressMatches?.[0];
+    // Build variants: original + directional prefixes
+    const variants = [normalized];
+    const m = normalized.match(/^(\d+)\s+(?!([NSEW])\s)(.+)/i);
     if (m) {
-      lat = m.coordinates?.y;
-      lng = m.coordinates?.x;
-      matchedAddr = m.matchedAddress;
-      step("census_result", { status: "HIT", matchedAddr, lat, lng });
-    } else {
-      step("census_result", { status: "NO MATCH", input: normalized, matchCount: d?.result?.addressMatches?.length || 0 });
+      for (const dir of ["W", "E", "N", "S"]) {
+        variants.push(m[1] + " " + dir + " " + m[3]);
+      }
     }
-  } catch (e) {
-    step("census_result", { status: "ERROR", message: e.message });
+    step("geocode_variants", { variants });
+
+    for (const variant of variants) {
+      try {
+        const params = new URLSearchParams({
+          address: variant,
+          benchmark: "Public_AR_Current",
+          format: "json",
+        });
+        const url = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?" + params;
+        step("census_try", { variant, url });
+        const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        const d = await r.json();
+        const match = d?.result?.addressMatches?.[0];
+        if (match) {
+          lat = match.coordinates?.y;
+          lng = match.coordinates?.x;
+          matchedAddr = match.matchedAddress;
+          step("census_result", { status: "HIT", variant, matchedAddr, lat, lng });
+          break;
+        } else {
+          step("census_miss", { variant, matchCount: 0 });
+        }
+      } catch (e) {
+        step("census_error", { variant, message: e.message });
+      }
+    }
+    if (!lat) step("census_result", { status: "ALL VARIANTS FAILED" });
   }
 
   // ── 2. Nominatim fallback ──────────────────────────────────────────────
@@ -50,14 +66,21 @@ export default async function handler(req, res) {
       const q = encodeURIComponent(address + ", Los Angeles, CA");
       const url = "https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=us";
       step("nominatim_url", { url });
-      const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
-      const d = await r.json();
-      if (d?.[0]) {
-        lat = parseFloat(d[0].lat);
-        lng = parseFloat(d[0].lon);
-        step("nominatim_result", { status: "HIT", lat, lng, display: d[0].display_name });
+      const r = await fetch(url, {
+        headers: { "User-Agent": "Listo/1.0 (listo.zone)" },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        if (d?.[0]) {
+          lat = parseFloat(d[0].lat);
+          lng = parseFloat(d[0].lon);
+          step("nominatim_result", { status: "HIT", lat, lng, display: d[0].display_name });
+        } else {
+          step("nominatim_result", { status: "NO MATCH" });
+        }
       } else {
-        step("nominatim_result", { status: "NO MATCH" });
+        step("nominatim_result", { status: "HTTP " + r.status });
       }
     } catch (e) {
       step("nominatim_result", { status: "ERROR", message: e.message });

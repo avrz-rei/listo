@@ -81,67 +81,96 @@ export default async function handler(req, res) {
     // ── Step 1: Geocode ──────────────────────────────────────────────────
     let geocode = null;
 
-    // 1a. Census geocoder (primary)
-    try {
+    // 1a. Census geocoder (primary) — with directional prefix retries
+    // Census stores "622 W WOODLAWN AVE" — if user enters "622 Woodlawn Ave"
+    // the geocoder returns no match. We retry with W/E/N/S prefixes.
+    {
       const geocodeAddr = normalizeAddressForGeocode(address);
-      const params = new URLSearchParams({
-        address: geocodeAddr,
-        benchmark: "Public_AR_Current",
-        format: "json",
-      });
-      console.log("[GEOCODE] Census query:", geocodeAddr);
-      const r = await safeFetch(
-        "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?" + params,
-        10000
-      );
-      if (r.ok) {
-        const d = await r.json();
-        const m = d?.result?.addressMatches?.[0];
-        if (m) {
-          geocode = {
-            address: m.matchedAddress,
-            city: m.addressComponents?.city || "",
-            state: m.addressComponents?.state || "CA",
-            zip: m.addressComponents?.zip || "",
-            lat: m.coordinates?.y,
-            lng: m.coordinates?.x,
-          };
-          console.log("[GEOCODE] Census SUCCESS:", geocode.address, "lat=" + geocode.lat, "lng=" + geocode.lng);
-        } else {
-          console.log("[GEOCODE] Census: no match. Matches returned:", d?.result?.addressMatches?.length || 0);
+      // Build variants: original first, then with directional prefixes
+      const addrVariants = [geocodeAddr];
+      const streetMatch = geocodeAddr.match(/^(\d+)\s+(?!([NSEW])\s)(.+)/i);
+      if (streetMatch) {
+        const [, num, , rest] = streetMatch;
+        for (const dir of ["W", "E", "N", "S"]) {
+          addrVariants.push(num + " " + dir + " " + rest);
         }
-      } else {
-        console.log("[GEOCODE] Census HTTP error:", r.status);
       }
-    } catch (e) { console.log("[GEOCODE] Census error:", e.message); }
+      console.log("[GEOCODE] Census variants to try:", addrVariants);
+
+      for (const variant of addrVariants) {
+        try {
+          const params = new URLSearchParams({
+            address: variant,
+            benchmark: "Public_AR_Current",
+            format: "json",
+          });
+          console.log("[GEOCODE] Census trying:", variant);
+          const r = await safeFetch(
+            "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?" + params,
+            10000
+          );
+          if (r.ok) {
+            const d = await r.json();
+            const m = d?.result?.addressMatches?.[0];
+            if (m) {
+              geocode = {
+                address: m.matchedAddress,
+                city: m.addressComponents?.city || "",
+                state: m.addressComponents?.state || "CA",
+                zip: m.addressComponents?.zip || "",
+                lat: m.coordinates?.y,
+                lng: m.coordinates?.x,
+              };
+              console.log("[GEOCODE] Census SUCCESS:", geocode.address, "lat=" + geocode.lat, "lng=" + geocode.lng);
+              break; // Got a match — stop trying variants
+            }
+          }
+        } catch (e) { console.log("[GEOCODE] Census error for '" + variant + "':", e.message); }
+      }
+      if (!geocode) console.log("[GEOCODE] Census: no match on any variant");
+    }
 
     // 1b. Nominatim fallback (if Census returned nothing)
     if (!geocode) {
-      try {
-        const geocodeAddr = normalizeAddressForGeocode(address);
-        const q = encodeURIComponent(geocodeAddr + (geocodeAddr.includes("CA") ? "" : ", CA"));
-        console.log("[GEOCODE] Nominatim fallback:", geocodeAddr);
-        const r = await safeFetch(
-          "https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=us",
-          8000
-        );
-        if (r.ok) {
-          const d = await r.json();
-          if (d?.[0]) {
-            geocode = {
-              address: d[0].display_name,
-              city: "Los Angeles",
-              state: "CA",
-              zip: "",
-              lat: parseFloat(d[0].lat),
-              lng: parseFloat(d[0].lon),
-            };
-            console.log("[GEOCODE] Nominatim SUCCESS:", geocode.lat, geocode.lng);
-          } else {
-            console.log("[GEOCODE] Nominatim: no match");
-          }
+      const geocodeAddr = normalizeAddressForGeocode(address);
+      // Try original + directional variants on Nominatim too
+      const nomVariants = [geocodeAddr];
+      const nomMatch = geocodeAddr.match(/^(\d+)\s+(?!([NSEW])\s)(.+)/i);
+      if (nomMatch) {
+        const [, num, , rest] = nomMatch;
+        for (const dir of ["W", "E", "N", "S"]) {
+          nomVariants.push(num + " " + dir + " " + rest);
         }
-      } catch (e) { console.log("[GEOCODE] Nominatim error:", e.message); }
+      }
+      for (const variant of nomVariants) {
+        try {
+          const q = encodeURIComponent(variant + (variant.includes("CA") ? "" : ", CA"));
+          console.log("[GEOCODE] Nominatim trying:", variant);
+          const r = await fetch(
+            "https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=us",
+            {
+              headers: { "User-Agent": "Listo/1.0 (listo.zone)" },
+              signal: AbortSignal.timeout(8000),
+            }
+          );
+          if (r.ok) {
+            const d = await r.json();
+            if (d?.[0]) {
+              geocode = {
+                address: d[0].display_name,
+                city: "Los Angeles",
+                state: "CA",
+                zip: "",
+                lat: parseFloat(d[0].lat),
+                lng: parseFloat(d[0].lon),
+              };
+              console.log("[GEOCODE] Nominatim SUCCESS:", geocode.lat, geocode.lng);
+              break;
+            }
+          }
+        } catch (e) { console.log("[GEOCODE] Nominatim error:", e.message); }
+      }
+      if (!geocode) console.log("[GEOCODE] Nominatim: no match on any variant");
     }
 
     // ── Step 2: ZIMAS parcel data ────────────────────────────────────────
