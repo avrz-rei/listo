@@ -902,12 +902,199 @@ export default function Listo() {
 
   const LOADING_STEPS = [
     "Geocoding address...",
-    "Querying ZIMAS parcel database...",
-    "Checking zoning classification...",
-    "Verifying overlay zones...",
-    "Building permit roadmap...",
+    "Querying ZIMAS zoning...",
+    "Checking overlay zones...",
+    "Scanning coastal & seismic data...",
+    "Generating permit analysis...",
   ];
 
+  // ── Client-side ZIMAS query helpers (browser → ZIMAS, no Vercel) ─────
+  const ZIMAS = "https://zimas.lacity.org/arcgis/rest/services";
+
+  const zimasQuery = async (service, layerId, lng, lat) => {
+    const p = new URLSearchParams({
+      geometry: lng + "," + lat,
+      geometryType: "esriGeometryPoint",
+      inSR: "4326",
+      spatialRel: "esriSpatialRelIntersects",
+      outFields: "*",
+      returnGeometry: "false",
+      f: "json",
+    });
+    const r = await fetch(ZIMAS + "/" + service + "/MapServer/" + layerId + "/query?" + p);
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (d?.error) return null;
+    return d?.features?.[0]?.attributes || null;
+  };
+
+  const zimasIdentify = async (service, lng, lat) => {
+    const ext = [lng - 0.0005, lat - 0.0005, lng + 0.0005, lat + 0.0005].join(",");
+    const p = new URLSearchParams({
+      geometry: JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } }),
+      geometryType: "esriGeometryPoint",
+      sr: "4326",
+      layers: "all",
+      tolerance: "10",
+      mapExtent: ext,
+      imageDisplay: "600,400,96",
+      returnGeometry: "false",
+      f: "json",
+    });
+    const r = await fetch(ZIMAS + "/" + service + "/MapServer/identify?" + p);
+    if (!r.ok) return [];
+    const d = await r.json();
+    if (d?.error) return [];
+    return d?.results || [];
+  };
+
+  const geocodeAddress = async (addr) => {
+    // Normalize LA neighborhoods → "Los Angeles"
+    const LA_HOODS = ["Venice","Westchester","Playa Del Rey","Playa del Rey","Marina del Rey",
+      "Pacific Palisades","Brentwood","Bel Air","Westwood","Century City","Mar Vista",
+      "Silver Lake","Echo Park","Hancock Park","Los Feliz","Hollywood Hills",
+      "Koreatown","Highland Park","Eagle Rock","Atwater Village","Chinatown","Downtown",
+      "North Hollywood","Van Nuys","Sherman Oaks","Studio City","Encino","Tarzana",
+      "Woodland Hills","Reseda","Canoga Park","Chatsworth","Granada Hills","Northridge",
+      "Panorama City","Pacoima","Sun Valley","Sylmar","San Pedro","Wilmington",
+      "Harbor City","Playa Vista","Del Rey","Palms","Sawtelle","Mid-Wilshire",
+      "Boyle Heights","Lincoln Heights","El Sereno","Cypress Park","Mount Washington",
+      "Glassell Park","Filipinotown","Ladera Heights","View Park","Hyde Park","Watts"];
+
+    let normalized = addr.trim();
+    for (const hood of LA_HOODS) {
+      if (normalized.toLowerCase().includes(hood.toLowerCase())) {
+        const re = new RegExp(",?\\s*" + hood.replace(/[-]/g, "[-]?"), "i");
+        normalized = normalized.replace(re, "").trim().replace(/,\s*$/, "");
+        break;
+      }
+    }
+    if (!/Los Angeles|Santa Monica|Beverly Hills|Malibu|\b\d{5}\b/i.test(normalized)) {
+      normalized += ", Los Angeles, CA";
+    }
+
+    // Build directional variants
+    const variants = [normalized];
+    const m = normalized.match(/^(\d+)\s+(?!([NSEW])\s)(.+)/i);
+    if (m) { for (const dir of ["W","E","N","S"]) variants.push(m[1]+" "+dir+" "+m[3]); }
+
+    // Try Census first
+    for (const v of variants) {
+      try {
+        const p = new URLSearchParams({ address: v, benchmark: "Public_AR_Current", format: "json" });
+        const r = await fetch("https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?" + p);
+        if (r.ok) {
+          const d = await r.json();
+          const match = d?.result?.addressMatches?.[0];
+          if (match) return {
+            address: match.matchedAddress,
+            city: match.addressComponents?.city || "",
+            zip: match.addressComponents?.zip || "",
+            lat: match.coordinates?.y,
+            lng: match.coordinates?.x,
+            source: "Census",
+          };
+        }
+      } catch (e) {}
+    }
+
+    // Nominatim fallback
+    try {
+      const q = encodeURIComponent(addr + ", Los Angeles, CA");
+      const r = await fetch(
+        "https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=us",
+        { headers: { "User-Agent": "Listo/1.0 (listo.zone)" } }
+      );
+      if (r.ok) {
+        const d = await r.json();
+        if (d?.[0]) return {
+          address: d[0].display_name,
+          city: "Los Angeles", zip: "",
+          lat: parseFloat(d[0].lat),
+          lng: parseFloat(d[0].lon),
+          source: "Nominatim",
+        };
+      }
+    } catch (e) {}
+    return null;
+  };
+
+  const queryZIMASFromBrowser = async (lng, lat) => {
+    const parcel = { source: "ZIMAS", hasData: false, overlayLayers: [] };
+
+    // 1. Zoning — confirmed working via zma/zimas layer 1902
+    try {
+      const z = await zimasQuery("zma/zimas", 1902, lng, lat);
+      if (z) {
+        parcel.hasData = true;
+        parcel.zoning = z.ZONE_CMPLT || z.ZONE_CLASS || null;
+        parcel.zoneClass = z.ZONE_CLASS || null;
+        parcel.zoningSource = "ZIMAS zma/zimas/1902 (verified)";
+      }
+    } catch (e) { console.log("[ZIMAS] Zoning query error:", e.message); }
+
+    // 2. Legend layers — TOC, liquefaction, hazards, overlays
+    try {
+      const results = await zimasIdentify("zma/legend", lng, lat);
+      for (const r of results) {
+        const a = r.attributes || {};
+        const name = (r.layerName || "").toUpperCase();
+        parcel.overlayLayers.push({ layerId: r.layerId, layerName: r.layerName, attrs: a });
+
+        if (name.includes("LIQUEFACTION")) { parcel.liquefaction = true; parcel.hasData = true; }
+        if (name.includes("LANDSLIDE")) { parcel.landslide = true; parcel.hasData = true; }
+        if (name.includes("FAULT") || name.includes("ALQUIST")) { parcel.faultZone = r.layerName; parcel.hasData = true; }
+        if (name.includes("TSUNAMI")) { parcel.tsunami = true; parcel.hasData = true; }
+        if (name.includes("TOC") || name.includes("TRANSIT ORIENTED")) {
+          const tier = a.TIER || a.TOC_TIER || a.LABEL || a.TOC;
+          if (tier) { parcel.toc = "Tier " + String(tier).replace(/\D/g, ""); parcel.hasData = true; }
+        }
+        if (name.includes("FIRE") && name.includes("HAZARD")) { parcel.fireHazard = true; parcel.hasData = true; }
+        if (name.includes("FLOOD")) { parcel.floodZone = r.layerName; parcel.hasData = true; }
+        if (name.includes("METHANE")) { parcel.methane = r.layerName; parcel.hasData = true; }
+        if (name.includes("GRADING") || name.includes("SPECIAL GRADING")) { parcel.specialGrading = true; parcel.hasData = true; }
+        if (name.includes("HILLSIDE")) { parcel.hillside = true; parcel.hasData = true; }
+        if (name.includes("SEA LEVEL")) { parcel.seaLevelRise = true; parcel.hasData = true; }
+        if (name.includes("COASTAL") && !name.includes("TRANSPORTATION")) {
+          parcel.coastalZone = "Yes";
+          parcel.coastalZoneType = a.CST_TYPE || a.TYPE || a.LABEL || r.layerName;
+          parcel.hasData = true;
+        }
+        if (name.includes("HPOZ") || name.includes("HISTORIC PRESERVATION OVERLAY")) {
+          parcel.hpoz = r.layerName; parcel.hasData = true;
+        }
+      }
+    } catch (e) { console.log("[ZIMAS] Legend identify error:", e.message); }
+
+    // 3. Coastal zones — dedicated service
+    if (!parcel.coastalZone) {
+      try {
+        const results = await zimasIdentify("zma/coastal_zones", lng, lat);
+        for (const r of results) {
+          const a = r.attributes || {};
+          const name = (r.layerName || "").toUpperCase();
+          if (name.includes("PERMIT") || name.includes("COASTAL")) {
+            parcel.coastalZone = "Yes";
+            parcel.coastalZoneType = a.CST_TYPE || a.NAME || r.layerName;
+            parcel.hasData = true;
+            parcel.overlayLayers.push({ layerId: r.layerId, layerName: r.layerName, attrs: a });
+          }
+        }
+      } catch (e) { console.log("[ZIMAS] Coastal identify error:", e.message); }
+    }
+    if (!parcel.coastalZone) parcel.coastalZone = "No";
+
+    // Set defaults for booleans not detected
+    if (parcel.liquefaction === undefined) parcel.liquefaction = false;
+    if (parcel.hillside === undefined) parcel.hillside = false;
+    if (parcel.specialGrading === undefined) parcel.specialGrading = false;
+    if (parcel.fireHazard === undefined) parcel.fireHazard = false;
+    if (parcel.seaLevelRise === undefined) parcel.seaLevelRise = false;
+
+    return parcel;
+  };
+
+  // ── Main analysis handler ──────────────────────────────────────────────
   const handleAnalyze = async () => {
     if (jurisdiction && !jurisdiction.covered) return;
     setStage("result");
@@ -918,31 +1105,51 @@ export default function Listo() {
     setFbState(null); setFbDone(false); setFbOpen(false);
     track("analysis_started", { zip:editZip, project_type:projectType, jurisdiction:jurisdiction?.key });
 
-    const stepInterval = setInterval(() => {
-      setLoadingStep(s => Math.min(s+1, LOADING_STEPS.length-1));
-    }, 1800);
+    let step = 0;
+    const nextStep = () => { step++; setLoadingStep(Math.min(step, LOADING_STEPS.length - 1)); };
 
     try {
+      // Step 1: Geocode (browser-side)
+      const addr = editStreet || parsed?.displayName || address;
+      const geo = await geocodeAddress(addr);
+      nextStep();
+
+      if (!geo) {
+        setError("Could not geocode this address. Try adding a ZIP code or 'Los Angeles, CA'.");
+        setLoading(false);
+        return;
+      }
+
+      // Step 2-4: Query ZIMAS directly from browser (bypasses Vercel timeout)
+      let parcelData = null;
+      if (geo.lat && geo.lng) {
+        parcelData = await queryZIMASFromBrowser(geo.lng, geo.lat);
+        nextStep(); nextStep();
+      }
+
+      // Step 5: Send to server for Claude analysis
+      nextStep();
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type":"application/json" },
         body: JSON.stringify({
-          address: editStreet || parsed?.displayName || address,
+          address: addr,
           projectType: getLabel(projectType),
           projectDetails: details,
           jurisdiction: jurisdiction?.key || "city-of-la",
+          geocode: geo,
+          parcel: parcelData,
         }),
       });
       const data = await res.json();
       if (!res.ok || data.error) { setError(data.error || "Analysis failed."); return; }
       setResult(data.analysis);
-      if (data.parcel) setParcel(data.parcel);
-      track("analysis_completed", { zip:editZip, project_type:projectType, parcel_verified:!!data.parcel });
+      if (parcelData) setParcel(parcelData);
+      track("analysis_completed", { zip:editZip, project_type:projectType, parcel_verified:!!parcelData?.hasData, zoning: parcelData?.zoning || "none" });
     } catch (err) {
       setError("Request failed: " + err.message);
       track("analysis_error", { error:err.message });
     } finally {
-      clearInterval(stepInterval);
       setLoading(false);
     }
   };
