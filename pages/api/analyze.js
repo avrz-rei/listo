@@ -1,21 +1,22 @@
 /**
- * Listo API — /api/analyze
+ * Listo API — /api/analyze  (v4 — ZIMAS debug fix)
  *
  * Data pipeline:
- * 1. Census geocoder → verified address + lat/lng
- * 2. ZIMAS B_ZONING spatial query → authoritative zoning by lat/lng (PRIMARY)
- * 3. ZIMAS D_QUERYLAYERS → lot size, RSO, year built, overlays by address (SUPPLEMENTARY)
- * 4. ZIMAS D_LEGENDLAYERS → coastal zone check by lat/lng
- * 5. Claude analysis with verified parcel data
+ * 1. Census geocoder → verified address + lat/lng (Nominatim fallback)
+ * 2. ZIMAS spatial queries via identify + query → zoning, lot, overlays
+ * 3. ZIMAS address queries with directional retries → supplementary data
+ * 4. Claude analysis with verified parcel data
  *
- * B_ZONING spatial query is PRIMARY because it only needs lat/lng (always available
- * from geocoder) and doesn't depend on address string matching.
+ * v4 fixes:
+ * - JSON geometry format for all spatial queries (ESRI compliance)
+ * - identify operation as primary spatial lookup (what ZIMAS website uses)
+ * - outFields=* on all queries to auto-detect field names
+ * - Full response body logging for Vercel debug
+ * - Nominatim geocoder fallback when Census fails
+ * - Auto-detection of field names from response attributes
  */
 
 // ── LA neighborhood → city mapping ───────────────────────────────────────
-// The Census geocoder needs "Los Angeles" as the city, not a neighborhood name.
-// Without this, addresses like "622 Woodlawn Ave, Venice" return no match
-// and ALL downstream spatial queries are skipped.
 const LA_NEIGHBORHOODS = [
   "Venice","Westchester","Playa Del Rey","Playa del Rey","Marina del Rey",
   "Marina Del Rey","Pacific Palisades","Brentwood","Bel Air","Bel-Air",
@@ -33,29 +34,38 @@ const LA_NEIGHBORHOODS = [
   "Toluca Lake","Burbank-adjacent","Ladera Heights","Windsor Hills",
   "View Park","Westlake","Thai Town","Little Armenia",
   "Griffith Park","Mount Washington","Cypress Park",
-  "San Pedro","Watts","Wilmington","Harbor City","Harbor Gateway",
-  "Playa Vista","Westchester","El Segundo-adjacent",
+  "San Pedro","Wilmington","Harbor City","Harbor Gateway",
+  "Playa Vista","El Segundo-adjacent",
 ];
 
 function normalizeAddressForGeocode(raw) {
   const s = raw.trim();
-  // Already has a city-like token recognized by Census — leave alone
   const knownCities = /\b(Los Angeles|Santa Monica|Beverly Hills|Malibu|Burbank|Glendale|Pasadena|Long Beach|Torrance|Inglewood|Compton|Carson|Culver City|West Hollywood|El Segundo|Hawthorne|Gardena|Redondo Beach|Hermosa Beach|Manhattan Beach)\b/i;
   if (knownCities.test(s)) return s;
-  // Has a ZIP — Census can use that
   if (/\b\d{5}\b/.test(s)) return s;
-  // Check for neighborhood names and substitute Los Angeles
   for (const hood of LA_NEIGHBORHOODS) {
     if (s.toLowerCase().includes(hood.toLowerCase())) {
-      // Replace neighborhood with Los Angeles in the string
       const re = new RegExp(",?\\s*" + hood.replace(/[-]/g, "[-]?"), "i");
       const cleaned = s.replace(re, "").trim().replace(/,\s*$/, "");
-      console.log("Geocode normalize: '" + s + "' → '" + cleaned + ", Los Angeles, CA'");
+      console.log("[GEOCODE] Normalize: '" + s + "' → '" + cleaned + ", Los Angeles, CA'");
       return cleaned + ", Los Angeles, CA";
     }
   }
-  // Fallback: append Los Angeles if no state/city clue
   return /CA|California/i.test(s) ? s : s + ", Los Angeles, CA";
+}
+
+// ── Safe fetch with timeout (works on Node 16+) ─────────────────────────
+async function safeFetch(url, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    return r;
+  } catch (e) {
+    clearTimeout(timer);
+    throw e;
+  }
 }
 
 export default async function handler(req, res) {
@@ -68,8 +78,10 @@ export default async function handler(req, res) {
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured." });
 
   try {
-    // Step 1: Geocode with neighborhood normalization
+    // ── Step 1: Geocode ──────────────────────────────────────────────────
     let geocode = null;
+
+    // 1a. Census geocoder (primary)
     try {
       const geocodeAddr = normalizeAddressForGeocode(address);
       const params = new URLSearchParams({
@@ -77,9 +89,10 @@ export default async function handler(req, res) {
         benchmark: "Public_AR_Current",
         format: "json",
       });
-      const r = await fetch(
+      console.log("[GEOCODE] Census query:", geocodeAddr);
+      const r = await safeFetch(
         "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?" + params,
-        { signal: AbortSignal.timeout(8000) }
+        10000
       );
       if (r.ok) {
         const d = await r.json();
@@ -93,20 +106,53 @@ export default async function handler(req, res) {
             lat: m.coordinates?.y,
             lng: m.coordinates?.x,
           };
-          console.log("Geocode success:", geocode.address, geocode.lat, geocode.lng);
+          console.log("[GEOCODE] Census SUCCESS:", geocode.address, "lat=" + geocode.lat, "lng=" + geocode.lng);
         } else {
-          console.log("Geocode: no match for", geocodeAddr);
+          console.log("[GEOCODE] Census: no match. Matches returned:", d?.result?.addressMatches?.length || 0);
         }
+      } else {
+        console.log("[GEOCODE] Census HTTP error:", r.status);
       }
-    } catch (e) { console.log("Geocode error:", e.message); }
+    } catch (e) { console.log("[GEOCODE] Census error:", e.message); }
 
-    // Step 2: ZIMAS parcel data
+    // 1b. Nominatim fallback (if Census returned nothing)
+    if (!geocode) {
+      try {
+        const geocodeAddr = normalizeAddressForGeocode(address);
+        const q = encodeURIComponent(geocodeAddr + (geocodeAddr.includes("CA") ? "" : ", CA"));
+        console.log("[GEOCODE] Nominatim fallback:", geocodeAddr);
+        const r = await safeFetch(
+          "https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=us",
+          8000
+        );
+        if (r.ok) {
+          const d = await r.json();
+          if (d?.[0]) {
+            geocode = {
+              address: d[0].display_name,
+              city: "Los Angeles",
+              state: "CA",
+              zip: "",
+              lat: parseFloat(d[0].lat),
+              lng: parseFloat(d[0].lon),
+            };
+            console.log("[GEOCODE] Nominatim SUCCESS:", geocode.lat, geocode.lng);
+          } else {
+            console.log("[GEOCODE] Nominatim: no match");
+          }
+        }
+      } catch (e) { console.log("[GEOCODE] Nominatim error:", e.message); }
+    }
+
+    // ── Step 2: ZIMAS parcel data ────────────────────────────────────────
     let parcel = null;
     try {
       parcel = await queryZIMAS(geocode?.address || address, geocode);
-    } catch (e) { console.log("ZIMAS failed:", e.message); }
+    } catch (e) {
+      console.log("[ZIMAS] Top-level failure:", e.message);
+    }
 
-    // Step 3: Claude
+    // ── Step 3: Claude ───────────────────────────────────────────────────
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -134,132 +180,310 @@ export default async function handler(req, res) {
     return res.status(200).json({ analysis, geocode, parcel });
 
   } catch (err) {
-    console.error("Handler error:", err);
+    console.error("[HANDLER] Fatal error:", err);
     return res.status(500).json({ error: err.message });
   }
 }
 
+
+// ══════════════════════════════════════════════════════════════════════════
+// ZIMAS QUERY ENGINE
+// ══════════════════════════════════════════════════════════════════════════
+
 async function queryZIMAS(address, geocode) {
-  const BASE   = "https://zimas.lacity.org/ArcGIS/rest/services";
-  const ARCGIS = "https://zimas.lacity.org/arcgis/rest/services";
+  const BASE = "https://zimas.lacity.org/ArcGIS/rest/services";
   const result = { source: "ZIMAS", hasData: false };
 
-  // ── SPATIAL QUERIES — use lat/lng, no address string matching ─────────────
-  // These work whenever the geocoder succeeds. They are the PRIMARY data path.
+  // ── SPATIAL QUERIES — use lat/lng (PRIMARY path) ───────────────────────
   if (geocode?.lat && geocode?.lng) {
-    const geo = geocode.lng + "," + geocode.lat;
-    const sp = (fields) => new URLSearchParams({
-      geometry: geo,
-      geometryType: "esriGeometryPoint",
-      inSR: "4326",
-      spatialRel: "esriSpatialRelIntersects",
-      outFields: fields,
-      returnGeometry: "false",
-      f: "json",
+    const lng = geocode.lng;
+    const lat = geocode.lat;
+
+    // Build JSON geometry (ESRI-compliant format — more reliable than x,y string)
+    const geoJSON = JSON.stringify({
+      x: lng, y: lat,
+      spatialReference: { wkid: 4326 }
     });
 
-    // 1. Authoritative zoning (B_ZONING MapServer/9)
-    try {
-      const r = await fetch(
-        ARCGIS + "/B_ZONING/MapServer/9/query?" + sp("ZONE_CMPLT,ZONE_CLASS,SPECIFIC_PLAN,HEIGHT_DIST"),
-        { signal: AbortSignal.timeout(8000) }
-      );
-      if (r.ok) {
-        const d = await r.json();
-        const f = d?.features?.[0]?.attributes;
-        if (f) {
-          result.zoning = f.ZONE_CMPLT || f.ZONE_CLASS || null;
-          result.heightDistrict = f.HEIGHT_DIST || null;
-          result.specificPlan = f.SPECIFIC_PLAN || null;
-          result.hasData = true;
-          result.zoningSource = "ZIMAS B_ZONING spatial (verified)";
-          console.log("B_ZONING hit:", result.zoning);
-        }
-      }
-    } catch (e) { console.log("B_ZONING spatial:", e.message); }
+    // Simple comma format as fallback
+    const geoSimple = lng + "," + lat;
 
-    // 2. Parcel data spatially — bypasses address string matching entirely
-    // D_QUERYLAYERS/MapServer/0 supports spatial queries, returns same rich fields
+    // Build a mapExtent around the point for identify operations
+    const extent = [lng - 0.001, lat - 0.001, lng + 0.001, lat + 0.001].join(",");
+
+    console.log("[ZIMAS] Starting spatial queries at lat=" + lat + " lng=" + lng);
+
+    // ── 1. B_ZONING — authoritative zoning via identify ──────────────────
+    // The identify operation is what ESRI web apps use for point-click lookups.
+    // It's more reliable than query for point-in-polygon on map services.
     try {
-      const r = await fetch(
-        BASE + "/D_QUERYLAYERS/MapServer/0/query?" + sp(
-          "APN,ASSESSOR_ID,SITUS_ADDR,ZONE_CMPLT,ZONING,LOT_SIZE,YEAR_BUILT," +
-          "NO_OF_UNITS,UNITS,BUILDING_SQ_FT,BLDG_SQ_FT,USE_CODE," +
-          "COMM_PLAN,COMMUNITY_PLAN_AREA,SPECIFIC_PLAN,GENERAL_PLAN,GP_LAND_USE," +
-          "HILLSIDE,HCR,HPOZ,COASTAL_ZONE,LIQUEFACTION,SPEC_GRADING_AREA,SPECIAL_GRADING,TOC_TIER,TOC"
-        ),
-        { signal: AbortSignal.timeout(10000) }
-      );
+      const identifyParams = new URLSearchParams({
+        geometry: geoJSON,
+        geometryType: "esriGeometryPoint",
+        sr: "4326",
+        layers: "all",
+        tolerance: "3",
+        mapExtent: extent,
+        imageDisplay: "400,300,96",
+        returnGeometry: "false",
+        f: "json",
+      });
+      const url = BASE + "/B_ZONING/MapServer/identify?" + identifyParams;
+      console.log("[ZIMAS] B_ZONING identify...");
+      const r = await safeFetch(url, 12000);
       if (r.ok) {
         const d = await r.json();
-        const f = d?.features?.[0]?.attributes;
-        if (f) {
-          result.hasData = true;
-          result.spatialParcelHit = true;
-          result.apn = f.APN || f.ASSESSOR_ID || null;
-          // Don't override zoning already found from B_ZONING (more authoritative)
-          if (!result.zoning) result.zoning = f.ZONE_CMPLT || f.ZONING || null;
-          result.lotSizeSf = f.LOT_SIZE ? Math.round(parseFloat(f.LOT_SIZE)) : null;
-          result.yearBuilt = f.YEAR_BUILT || null;
-          result.existingUnits = f.NO_OF_UNITS || f.UNITS || null;
-          result.existingBuildingSqft = f.BUILDING_SQ_FT || f.BLDG_SQ_FT || null;
-          result.useCode = f.USE_CODE || null;
-          result.communityPlan = f.COMM_PLAN || f.COMMUNITY_PLAN_AREA || null;
-          if (!result.specificPlan) result.specificPlan = f.SPECIFIC_PLAN || null;
-          result.generalPlanLandUse = f.GENERAL_PLAN || f.GP_LAND_USE || null;
-          result.hillside = f.HILLSIDE === "Y" || f.HCR === "YES" || false;
-          result.hpoz = f.HPOZ || null;
-          if (!result.coastalZone) result.coastalZone = f.COASTAL_ZONE || null;
-          result.liquefaction = f.LIQUEFACTION === "Y" || f.LIQUEFACTION === "Yes" || false;
-          result.specialGrading = f.SPEC_GRADING_AREA === "Y" || f.SPECIAL_GRADING === "Y" || false;
-          result.toc = f.TOC_TIER || f.TOC || null;
-          // Also capture the verified SITUS address for display
-          if (f.SITUS_ADDR) result.situsAddr = f.SITUS_ADDR;
-          console.log("D_QUERYLAYERS SPATIAL hit:", result.apn, result.lotSizeSf, "sf lot,", result.zoning);
+        console.log("[ZIMAS] B_ZONING identify response: " + JSON.stringify(d).substring(0, 500));
+        if (d?.results?.length > 0) {
+          for (const item of d.results) {
+            const a = item.attributes;
+            if (!a) continue;
+            const zoning = findField(a, ["ZONE_CMPLT", "ZONE_CLASS", "ZONING", "Zone"]);
+            if (zoning && !result.zoning) {
+              result.zoning = zoning;
+              result.zoningSource = "ZIMAS B_ZONING identify (verified)";
+              result.hasData = true;
+              console.log("[ZIMAS] B_ZONING identify HIT — zoning:", zoning, "layer:", item.layerId);
+            }
+            const hd = findField(a, ["HEIGHT_DIST", "HT_DIST", "HEIGHT"]);
+            if (hd && !result.heightDistrict) result.heightDistrict = hd;
+            const sp = findField(a, ["SPECIFIC_PLAN", "SP_NAME"]);
+            if (sp && !result.specificPlan) result.specificPlan = sp;
+          }
         } else {
-          console.log("D_QUERYLAYERS spatial: no features at this point");
+          console.log("[ZIMAS] B_ZONING identify: 0 results");
+          if (d?.error) console.log("[ZIMAS] B_ZONING identify error:", JSON.stringify(d.error));
         }
+      } else {
+        console.log("[ZIMAS] B_ZONING identify HTTP:", r.status);
       }
-    } catch (e) { console.log("D_QUERYLAYERS spatial:", e.message); }
+    } catch (e) { console.log("[ZIMAS] B_ZONING identify error:", e.message); }
 
-    // 3. Coastal Zone — dedicated spatial check (more detailed than layer 0)
+    // ── 1b. B_ZONING query fallback ──────────────────────────────────────
+    if (!result.zoning) {
+      for (const geo of [geoJSON, geoSimple]) {
+        try {
+          const qp = new URLSearchParams({
+            geometry: geo,
+            geometryType: "esriGeometryPoint",
+            inSR: "4326",
+            spatialRel: "esriSpatialRelIntersects",
+            outFields: "*",
+            returnGeometry: "false",
+            f: "json",
+          });
+          // Try multiple layer numbers — the zoning layer may not be 9
+          for (const layerNum of [9, 0, 1, 2]) {
+            const url = BASE + "/B_ZONING/MapServer/" + layerNum + "/query?" + qp;
+            console.log("[ZIMAS] B_ZONING query layer/" + layerNum + " geo=" + geo.substring(0, 20));
+            const r = await safeFetch(url, 10000);
+            if (r.ok) {
+              const d = await r.json();
+              if (d?.error) {
+                console.log("[ZIMAS] B_ZONING/" + layerNum + " ESRI error:", d.error.message || d.error.code);
+                continue;
+              }
+              const f = d?.features?.[0]?.attributes;
+              if (f) {
+                result.zoning = findField(f, ["ZONE_CMPLT", "ZONE_CLASS", "ZONING"]);
+                result.heightDistrict = findField(f, ["HEIGHT_DIST", "HT_DIST"]);
+                result.specificPlan = findField(f, ["SPECIFIC_PLAN"]);
+                result.hasData = true;
+                result.zoningSource = "ZIMAS B_ZONING/" + layerNum + " query (verified)";
+                console.log("[ZIMAS] B_ZONING/" + layerNum + " query HIT:", result.zoning, "fields:", Object.keys(f).join(","));
+                break;
+              }
+            }
+          }
+          if (result.zoning) break; // Got zoning, stop trying geo formats
+        } catch (e) { console.log("[ZIMAS] B_ZONING query error:", e.message); }
+      }
+    }
+
+    // ── 2. D_QUERYLAYERS — parcel data via identify ──────────────────────
     try {
-      const r = await fetch(
-        ARCGIS + "/D_LEGENDLAYERS/MapServer/112/query?" + sp("CST_TYPE,CST_ZONE"),
-        { signal: AbortSignal.timeout(6000) }
-      );
+      const identifyParams = new URLSearchParams({
+        geometry: geoJSON,
+        geometryType: "esriGeometryPoint",
+        sr: "4326",
+        layers: "all:0",
+        tolerance: "3",
+        mapExtent: extent,
+        imageDisplay: "400,300,96",
+        returnGeometry: "false",
+        f: "json",
+      });
+      const url = BASE + "/D_QUERYLAYERS/MapServer/identify?" + identifyParams;
+      console.log("[ZIMAS] D_QUERYLAYERS identify...");
+      const r = await safeFetch(url, 12000);
       if (r.ok) {
         const d = await r.json();
-        if (d?.features?.length > 0) {
-          result.coastalZone = "Yes";
-          result.coastalZoneType = d.features[0].attributes?.CST_TYPE || "Coastal Zone";
-          console.log("Coastal zone hit:", result.coastalZoneType);
-        } else if (result.coastalZone === null || result.coastalZone === undefined) {
-          result.coastalZone = "No";
+        console.log("[ZIMAS] D_QUERYLAYERS identify response: " + JSON.stringify(d).substring(0, 800));
+        if (d?.results?.length > 0) {
+          const a = d.results[0].attributes;
+          if (a) {
+            extractParcelFields(a, result);
+            result.spatialParcelHit = true;
+            console.log("[ZIMAS] D_QUERYLAYERS identify HIT — APN:", result.apn, "lot:", result.lotSizeSf);
+          }
+        } else {
+          console.log("[ZIMAS] D_QUERYLAYERS identify: 0 results");
+          if (d?.error) console.log("[ZIMAS] D_QUERYLAYERS identify error:", JSON.stringify(d.error));
         }
+      } else {
+        console.log("[ZIMAS] D_QUERYLAYERS identify HTTP:", r.status);
       }
-    } catch (e) { console.log("Coastal zone:", e.message); }
+    } catch (e) { console.log("[ZIMAS] D_QUERYLAYERS identify error:", e.message); }
 
-    // 4. TOC tier — dedicated spatial layer (more reliable than parcel field)
+    // ── 2b. D_QUERYLAYERS spatial query fallback ─────────────────────────
+    if (!result.spatialParcelHit) {
+      for (const geo of [geoJSON, geoSimple]) {
+        try {
+          const qp = new URLSearchParams({
+            geometry: geo,
+            geometryType: "esriGeometryPoint",
+            inSR: "4326",
+            spatialRel: "esriSpatialRelIntersects",
+            outFields: "*",
+            returnGeometry: "false",
+            f: "json",
+          });
+          const url = BASE + "/D_QUERYLAYERS/MapServer/0/query?" + qp;
+          console.log("[ZIMAS] D_QUERYLAYERS/0 query geo=" + geo.substring(0, 20));
+          const r = await safeFetch(url, 10000);
+          if (r.ok) {
+            const d = await r.json();
+            console.log("[ZIMAS] D_QUERYLAYERS/0 query response: " + JSON.stringify(d).substring(0, 500));
+            if (d?.error) {
+              console.log("[ZIMAS] D_QUERYLAYERS/0 ESRI error:", d.error.message || d.error.code);
+              continue;
+            }
+            const f = d?.features?.[0]?.attributes;
+            if (f) {
+              extractParcelFields(f, result);
+              result.spatialParcelHit = true;
+              console.log("[ZIMAS] D_QUERYLAYERS/0 query HIT — APN:", result.apn);
+              break;
+            }
+          }
+        } catch (e) { console.log("[ZIMAS] D_QUERYLAYERS query error:", e.message); }
+      }
+    }
+
+    // ── 3. D_LEGENDLAYERS — Coastal Zone + TOC + Liquefaction (spatial) ──
     try {
-      const r = await fetch(
-        ARCGIS + "/D_LEGENDLAYERS/MapServer/101/query?" + sp("TIER"),
-        { signal: AbortSignal.timeout(6000) }
-      );
+      const identifyParams = new URLSearchParams({
+        geometry: geoJSON,
+        geometryType: "esriGeometryPoint",
+        sr: "4326",
+        layers: "all",
+        tolerance: "3",
+        mapExtent: extent,
+        imageDisplay: "400,300,96",
+        returnGeometry: "false",
+        f: "json",
+      });
+      const url = BASE + "/D_LEGENDLAYERS/MapServer/identify?" + identifyParams;
+      console.log("[ZIMAS] D_LEGENDLAYERS identify...");
+      const r = await safeFetch(url, 15000);
       if (r.ok) {
         const d = await r.json();
-        const f = d?.features?.[0]?.attributes;
-        if (f?.TIER) {
-          result.toc = "Tier " + f.TIER;
-          console.log("TOC hit: Tier", f.TIER);
+        console.log("[ZIMAS] D_LEGENDLAYERS identify: " + (d?.results?.length || 0) + " results");
+        if (d?.results?.length > 0) {
+          for (const item of d.results) {
+            const a = item.attributes;
+            if (!a) continue;
+            const layerName = (item.layerName || "").toUpperCase();
+
+            // Coastal Zone
+            if (layerName.includes("COASTAL") || findField(a, ["CST_TYPE", "CST_ZONE"])) {
+              result.coastalZone = "Yes";
+              result.coastalZoneType = findField(a, ["CST_TYPE", "CST_ZONE", "SUBTYPE", "TYPE", "LABEL"]) || "Coastal Zone";
+              result.hasData = true;
+              console.log("[ZIMAS] Coastal zone HIT:", result.coastalZoneType, "layer:", item.layerId);
+            }
+
+            // TOC
+            if (layerName.includes("TOC") || layerName.includes("TRANSIT ORIENTED")) {
+              const tier = findField(a, ["TIER", "TOC_TIER", "TOC", "LABEL"]);
+              if (tier) {
+                result.toc = String(tier).match(/\d/) ? "Tier " + tier.toString().replace(/\D/g, "") : tier;
+                result.hasData = true;
+                console.log("[ZIMAS] TOC HIT:", result.toc, "layer:", item.layerId);
+              }
+            }
+
+            // Liquefaction
+            if (layerName.includes("LIQUEFACTION")) {
+              result.liquefaction = true;
+              result.hasData = true;
+              console.log("[ZIMAS] Liquefaction HIT from legend layer:", item.layerId);
+            }
+          }
         }
       }
-    } catch (e) { console.log("TOC spatial:", e.message); }
+    } catch (e) { console.log("[ZIMAS] D_LEGENDLAYERS identify error:", e.message); }
+
+    // ── 3b. Coastal Zone query fallback (layer 112) ──────────────────────
+    if (!result.coastalZone) {
+      try {
+        const qp = new URLSearchParams({
+          geometry: geoJSON,
+          geometryType: "esriGeometryPoint",
+          inSR: "4326",
+          spatialRel: "esriSpatialRelIntersects",
+          outFields: "*",
+          returnGeometry: "false",
+          f: "json",
+        });
+        const r = await safeFetch(BASE + "/D_LEGENDLAYERS/MapServer/112/query?" + qp, 8000);
+        if (r.ok) {
+          const d = await r.json();
+          if (d?.features?.length > 0) {
+            const a = d.features[0].attributes;
+            result.coastalZone = "Yes";
+            result.coastalZoneType = findField(a, ["CST_TYPE", "CST_ZONE", "SUBTYPE", "TYPE"]) || "Coastal Zone";
+            result.hasData = true;
+            console.log("[ZIMAS] Coastal query HIT (layer 112):", result.coastalZoneType);
+          } else if (!result.coastalZone) {
+            result.coastalZone = "No";
+          }
+        }
+      } catch (e) { console.log("[ZIMAS] Coastal query error:", e.message); }
+    }
+
+    // ── 3c. TOC query fallback (layer 101) ───────────────────────────────
+    if (!result.toc) {
+      try {
+        const qp = new URLSearchParams({
+          geometry: geoJSON,
+          geometryType: "esriGeometryPoint",
+          inSR: "4326",
+          spatialRel: "esriSpatialRelIntersects",
+          outFields: "*",
+          returnGeometry: "false",
+          f: "json",
+        });
+        const r = await safeFetch(BASE + "/D_LEGENDLAYERS/MapServer/101/query?" + qp, 8000);
+        if (r.ok) {
+          const d = await r.json();
+          const f = d?.features?.[0]?.attributes;
+          if (f) {
+            const tier = findField(f, ["TIER", "TOC_TIER", "TOC", "LABEL"]);
+            if (tier) {
+              result.toc = "Tier " + tier.toString().replace(/\D/g, "");
+              result.hasData = true;
+              console.log("[ZIMAS] TOC query HIT (layer 101):", result.toc);
+            }
+          }
+        }
+      } catch (e) { console.log("[ZIMAS] TOC query error:", e.message); }
+    }
+  } else {
+    console.log("[ZIMAS] No geocode coordinates — skipping ALL spatial queries");
   }
 
-  // ── ADDRESS QUERIES — supplementary, fills gaps when spatial misses fields ─
-  // Build streetOnly from the best available address.
-  // Prefer the SITUS address returned by the spatial query (already clean + directional).
+  // ── ADDRESS QUERIES — supplementary, fills gaps ────────────────────────
   const baseAddr = result.situsAddr || geocode?.address || address;
   const streetOnly = baseAddr
     .replace(/,?\s*(Los Angeles|Venice|Westchester|Playa Del Rey|Marina del Rey|Pacific Palisades|Santa Monica|Beverly Hills|Malibu)\b.*$/i, "")
@@ -268,11 +492,10 @@ async function queryZIMAS(address, geocode) {
     .trim()
     .toUpperCase();
 
-  // Try to get additional parcel fields not covered by spatial query above
-  // (raw fields list, RSO from layer 12)
-  // Only run address query if spatial parcel query didn't already get the core fields
-  if (!result.spatialParcelHit || !result.lotSizeSf) {
+  // Run address queries if spatial queries missed key fields
+  if (!result.spatialParcelHit || !result.lotSizeSf || !result.apn) {
     const addressVariants = buildAddressVariants(streetOnly);
+    console.log("[ZIMAS] Address variants to try:", addressVariants);
     for (const variant of addressVariants) {
       try {
         const q = new URLSearchParams({
@@ -281,64 +504,61 @@ async function queryZIMAS(address, geocode) {
           returnGeometry: "false",
           f: "json",
         });
-        const r = await fetch(BASE + "/D_QUERYLAYERS/MapServer/0/query?" + q, { signal: AbortSignal.timeout(8000) });
+        const url = BASE + "/D_QUERYLAYERS/MapServer/0/query?" + q;
+        console.log("[ZIMAS] Address query:", variant);
+        const r = await safeFetch(url, 8000);
         if (r.ok) {
           const d = await r.json();
+          if (d?.error) {
+            console.log("[ZIMAS] Address query ESRI error:", d.error.message);
+            continue;
+          }
+          console.log("[ZIMAS] Address query '" + variant + "': " + (d?.features?.length || 0) + " features");
           const f = d?.features?.[0]?.attributes;
           if (f) {
-            result.hasData = true;
+            extractParcelFields(f, result);
             result.rawFields = Object.keys(f);
-            if (!result.apn) result.apn = f.APN || f.ASSESSOR_ID || null;
-            if (!result.zoning) result.zoning = f.ZONE_CMPLT || f.ZONING || null;
-            if (!result.lotSizeSf) result.lotSizeSf = f.LOT_SIZE ? Math.round(parseFloat(f.LOT_SIZE)) : null;
-            if (!result.yearBuilt) result.yearBuilt = f.YEAR_BUILT || null;
-            if (!result.existingUnits) result.existingUnits = f.NO_OF_UNITS || f.UNITS || null;
-            if (!result.existingBuildingSqft) result.existingBuildingSqft = f.BUILDING_SQ_FT || f.BLDG_SQ_FT || null;
-            if (!result.useCode) result.useCode = f.USE_CODE || null;
-            if (!result.communityPlan) result.communityPlan = f.COMM_PLAN || f.COMMUNITY_PLAN_AREA || null;
-            if (!result.specificPlan) result.specificPlan = f.SPECIFIC_PLAN || null;
-            if (!result.generalPlanLandUse) result.generalPlanLandUse = f.GENERAL_PLAN || f.GP_LAND_USE || null;
-            if (result.hillside === undefined || result.hillside === null)
-              result.hillside = f.HILLSIDE === "Y" || f.HCR === "YES" || false;
-            if (!result.hpoz) result.hpoz = f.HPOZ || null;
-            if (!result.coastalZone) result.coastalZone = f.COASTAL_ZONE || null;
-            if (result.liquefaction === undefined || result.liquefaction === null)
-              result.liquefaction = f.LIQUEFACTION === "Y" || f.LIQUEFACTION === "Yes" || false;
-            if (result.specialGrading === undefined || result.specialGrading === null)
-              result.specialGrading = f.SPEC_GRADING_AREA === "Y" || f.SPECIAL_GRADING === "Y" || false;
-            if (!result.toc) result.toc = f.TOC_TIER || f.TOC || null;
-            console.log("D_QUERYLAYERS address hit (variant: '" + variant + "'):", result.apn);
-            break; // Got data — stop trying variants
+            console.log("[ZIMAS] Address query HIT:", result.apn, "lot:", result.lotSizeSf, "fields:", Object.keys(f).slice(0, 10).join(","));
+            break;
           }
         }
-      } catch (e) { console.log("ZIMAS address variant '" + variant + "':", e.message); }
+      } catch (e) { console.log("[ZIMAS] Address query error:", e.message); }
     }
   }
 
-  // RSO — layer 12, address-based (this data isn't in spatial layers)
+  // ── RSO — layer 12, address-based ──────────────────────────────────────
   const rsoVariants = buildAddressVariants(streetOnly);
   for (const variant of rsoVariants) {
     try {
       const q = new URLSearchParams({
         where: "Property_Address LIKE '" + variant.replace(/'/g, "''") + "%'",
-        outFields: "Property_Address,RSO_Units",
+        outFields: "*",
         returnGeometry: "false",
         f: "json",
       });
-      const r = await fetch(BASE + "/D_QUERYLAYERS/MapServer/12/query?" + q, { signal: AbortSignal.timeout(6000) });
+      const r = await safeFetch(BASE + "/D_QUERYLAYERS/MapServer/12/query?" + q, 8000);
       if (r.ok) {
         const d = await r.json();
-        const f = d?.features?.[0]?.attributes;
-        if (f !== undefined) {
-          result.rsoUnits = parseInt(f?.RSO_Units) || 0;
+        if (d?.error) continue;
+        if (d?.features?.length > 0) {
+          const f = d.features[0].attributes;
+          const rsoUnitsField = findField(f, ["RSO_Units", "RSO_UNITS", "UNITS"]);
+          result.rsoUnits = parseInt(rsoUnitsField) || 0;
           result.rso = result.rsoUnits > 0;
           result.rsoSource = "ZIMAS RSO Registry (verified)";
           result.hasData = true;
-          console.log("RSO hit (variant: '" + variant + "'):", result.rso, result.rsoUnits, "units");
+          console.log("[ZIMAS] RSO HIT ('" + variant + "'):", result.rso, result.rsoUnits, "units");
+          break;
+        } else {
+          // Address not found in RSO registry — verified non-RSO
+          result.rso = false;
+          result.rsoSource = "ZIMAS RSO Registry — not listed (verified)";
+          result.hasData = true;
+          console.log("[ZIMAS] RSO: not in registry ('" + variant + "')");
           break;
         }
       }
-    } catch (e) { console.log("RSO variant:", e.message); }
+    } catch (e) { console.log("[ZIMAS] RSO query error:", e.message); }
   }
 
   // ── RSO inference fallback ─────────────────────────────────────────────
@@ -357,23 +577,113 @@ async function queryZIMAS(address, geocode) {
     result.densityCalc = result.lotSizeSf.toLocaleString() + " sf / 800 = " + result.unitsByRight + " units by-right";
   }
 
+  console.log("[ZIMAS] === FINAL RESULT ===",
+    "hasData=" + result.hasData,
+    "zoning=" + result.zoning,
+    "lot=" + result.lotSizeSf,
+    "APN=" + result.apn,
+    "coastal=" + result.coastalZone,
+    "TOC=" + result.toc,
+    "liq=" + result.liquefaction,
+    "RSO=" + result.rso
+  );
+
   return result;
 }
 
-// Build address variants to try against ZIMAS when directional prefix is unknown.
-// ZIMAS stores addresses as "622 W WOODLAWN AVE" — user may enter "622 WOODLAWN AVE".
-// Try: exact, then each directional, then strip any existing directional.
+
+// ══════════════════════════════════════════════════════════════════════════
+// HELPER: Find field value from attributes (case-insensitive, multi-name)
+// ══════════════════════════════════════════════════════════════════════════
+
+function findField(attrs, candidates) {
+  if (!attrs) return null;
+  // Try exact match first
+  for (const name of candidates) {
+    if (attrs[name] !== undefined && attrs[name] !== null && attrs[name] !== "") return attrs[name];
+  }
+  // Try case-insensitive match
+  const keys = Object.keys(attrs);
+  for (const name of candidates) {
+    const lc = name.toLowerCase();
+    const match = keys.find(k => k.toLowerCase() === lc);
+    if (match && attrs[match] !== undefined && attrs[match] !== null && attrs[match] !== "") return attrs[match];
+  }
+  return null;
+}
+
+function extractParcelFields(a, result) {
+  result.hasData = true;
+
+  if (!result.apn) result.apn = findField(a, ["APN", "ASSESSOR_ID", "PARCEL_ID"]);
+
+  if (!result.zoning) {
+    const z = findField(a, ["ZONE_CMPLT", "ZONE_CLASS", "ZONING", "ZONE"]);
+    if (z) {
+      result.zoning = z;
+      if (!result.zoningSource) result.zoningSource = "ZIMAS D_QUERYLAYERS (verified)";
+    }
+  }
+
+  if (!result.lotSizeSf) {
+    const lot = findField(a, ["LOT_SIZE", "LOT_AREA", "PARCEL_AREA", "LAND_AREA"]);
+    if (lot) result.lotSizeSf = Math.round(parseFloat(lot));
+  }
+
+  if (!result.yearBuilt) result.yearBuilt = findField(a, ["YEAR_BUILT", "YR_BUILT", "YEARBUILT"]);
+  if (!result.existingUnits) result.existingUnits = findField(a, ["NO_OF_UNITS", "UNITS", "NUM_UNITS", "UNIT_COUNT"]);
+  if (!result.existingBuildingSqft) result.existingBuildingSqft = findField(a, ["BUILDING_SQ_FT", "BLDG_SQ_FT", "BLDG_SQFT", "BUILDING_SQFT"]);
+  if (!result.useCode) result.useCode = findField(a, ["USE_CODE", "USECODE", "LAND_USE"]);
+  if (!result.communityPlan) result.communityPlan = findField(a, ["COMM_PLAN", "COMMUNITY_PLAN_AREA", "COMMUNITY_PLAN"]);
+  if (!result.specificPlan) result.specificPlan = findField(a, ["SPECIFIC_PLAN", "SP_NAME"]);
+  if (!result.generalPlanLandUse) result.generalPlanLandUse = findField(a, ["GENERAL_PLAN", "GP_LAND_USE", "GENERAL_PLAN_LU"]);
+
+  if (result.hillside === undefined || result.hillside === null) {
+    const h = findField(a, ["HILLSIDE", "HCR", "HILLSIDE_AREA"]);
+    if (h !== null) result.hillside = (h === "Y" || h === "YES" || h === "Yes" || h === true);
+  }
+
+  if (!result.hpoz) result.hpoz = findField(a, ["HPOZ", "HPOZ_NAME"]);
+
+  if (!result.coastalZone) {
+    const cz = findField(a, ["COASTAL_ZONE", "CST_ZONE", "COASTAL"]);
+    if (cz) result.coastalZone = cz;
+  }
+
+  if (result.liquefaction === undefined || result.liquefaction === null) {
+    const liq = findField(a, ["LIQUEFACTION", "LIQFACTION"]);
+    if (liq !== null) result.liquefaction = (liq === "Y" || liq === "YES" || liq === "Yes" || liq === true);
+  }
+
+  if (result.specialGrading === undefined || result.specialGrading === null) {
+    const sg = findField(a, ["SPEC_GRADING_AREA", "SPECIAL_GRADING", "GRADING_AREA"]);
+    if (sg !== null) result.specialGrading = (sg === "Y" || sg === "YES" || sg === "Yes" || sg === true);
+  }
+
+  if (!result.toc) {
+    const toc = findField(a, ["TOC_TIER", "TOC", "TIER"]);
+    if (toc) result.toc = String(toc).match(/tier/i) ? toc : "Tier " + toc;
+  }
+
+  // Capture SITUS address for display
+  const situs = findField(a, ["SITUS_ADDR", "PROPERTY_ADDRESS", "ADDRESS"]);
+  if (situs && !result.situsAddr) result.situsAddr = situs;
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// Address variant builder (directional prefix retries)
+// ══════════════════════════════════════════════════════════════════════════
+
 function buildAddressVariants(streetOnly) {
-  const variants = [streetOnly]; // always try exact first
+  const variants = [streetOnly];
   const dirMatch = streetOnly.match(/^(\d+)\s+([NSEW])\s+(.+)$/);
   if (dirMatch) {
-    // Has a directional — also try without it
     variants.push(dirMatch[1] + " " + dirMatch[3]);
   } else {
     const numMatch = streetOnly.match(/^(\d+)\s+(.+)$/);
     if (numMatch) {
       const [, num, rest] = numMatch;
-      // Try adding each directional
       for (const dir of ["W", "N", "E", "S"]) {
         variants.push(num + " " + dir + " " + rest);
       }
@@ -381,6 +691,11 @@ function buildAddressVariants(streetOnly) {
   }
   return variants;
 }
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// Claude prompt builders
+// ══════════════════════════════════════════════════════════════════════════
 
 function buildSystem(jurisdictionKey) {
   return [
@@ -418,8 +733,7 @@ function buildSystem(jurisdictionKey) {
     "4. If lot size provided: use exact density math (lot sf / 800 = N). Show arithmetic.",
     "5. If lot size unknown: say 'Lot size not provided — density calculation not possible. Verify at zimas.lacity.org.'",
     "6. VERDICT: GO | CAUTION | COMPLEX — one only.",
-    "7. ZI-1874 'Specific Plan: Los Angeles Coastal Transportation Corridor' is a TRANSPORTATION plan near I-405/LAX. NOT the California Coastal Zone. NEVER flag CCC or Coastal Development Permit requirements for ZI-1874 addresses. ZIP codes 90045, 90293, 90094, 90066 are Transportation Corridor, NOT Coastal Zone.",
-    "7b. Venice Coastal Zone (ZI-2273) — distinct from the general California Coastal Zone. City of LA is the Single Permit Authority (not CCC). Applies throughout Venice (ZIP 90291). Requires Venice Specific Plan compliance + City of LA Coastal Development Permit. Calvo Exclusion Area within Venice has additional demolition/rebuild restrictions. When ZI-2273 is present, flag: ACTION REQUIRED — Venice Coastal Zone applies. Design must comply with Venice Specific Plan. City of LA Coastal Development Permit required (not CCC).",
+    "7. Never say 'consult a professional' — assume user IS the professional (architect/contractor).",
     "8. RSO verified: state unit count + full compliance. RSO not verified: say 'NOT VERIFIED — check at hcidla.lacity.org.'",
     "9. If demolishing RSO units: flag HE Replacement Required + Housing Crisis Act + relocation costs as ACTION REQUIRED.",
     "10. Liquefaction confirmed: flag geotech requirements + cost range $15K-$40K.",
@@ -537,7 +851,6 @@ function buildMessage(rawAddr, geocode, parcel, projectType, details, jurisdicti
     if (parcel.specificPlan)        lines.push("Specific Plan: " + parcel.specificPlan);
     if (parcel.generalPlanLandUse)  lines.push("General Plan Land Use: " + parcel.generalPlanLandUse);
 
-    // RSO
     if (parcel.rso !== null && parcel.rso !== undefined) {
       lines.push("RSO: " + (parcel.rso ? "YES — " + (parcel.rsoUnits || "unknown") + " RSO units" : "No") + " (" + parcel.rsoSource + ")");
     } else {
