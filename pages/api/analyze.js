@@ -311,16 +311,20 @@ function buildMessage(rawAddr, geocode, parcel, projectType, details, jurisdicti
   lines.push("");
 
   if (parcel?.hasData) {
-    lines.push("PARCEL DATA (Source: ZIMAS browser query — treat as ground truth):");
+    lines.push("PARCEL DATA (Source: ZIMAS + LA County Assessor — treat as ground truth):");
 
     // Core identification
     if (parcel.zoning) lines.push("Zoning: " + parcel.zoning + " (VERIFIED — ZIMAS zma/zimas layer 1902)");
     if (parcel.zoneClass) lines.push("Zone Class: " + parcel.zoneClass);
-    if (parcel.apn) lines.push("APN: " + parcel.apn);
-    if (parcel.lotSizeSf) lines.push("Lot Size: " + parcel.lotSizeSf.toLocaleString() + " sf (VERIFIED)");
+    if (parcel.apn) lines.push("APN: " + parcel.apn + " (VERIFIED — LA County Assessor Parcel Layer)");
+    if (parcel.situsAddr) lines.push("ZIMAS/Assessor Address: " + parcel.situsAddr);
+    if (parcel.lotSizeSf) lines.push("Lot Size: " + parcel.lotSizeSf.toLocaleString() + " sf (VERIFIED — calculated from parcel geometry)");
     if (parcel.yearBuilt) lines.push("Year Built: " + parcel.yearBuilt);
     if (parcel.existingUnits) lines.push("Existing Units: " + parcel.existingUnits);
     if (parcel.existingBuildingSqft) lines.push("Existing Building: " + parcel.existingBuildingSqft + " sf");
+    if (parcel.useCode) lines.push("Use Code: " + parcel.useCode + (parcel.useDescription ? " — " + parcel.useDescription : ""));
+    if (parcel.useType) lines.push("Use Type: " + parcel.useType);
+    if (parcel.agencyName) lines.push("Agency: " + parcel.agencyName);
     if (parcel.generalPlanLandUse) lines.push("General Plan Land Use: " + parcel.generalPlanLandUse);
     if (parcel.communityPlan) lines.push("Community Plan: " + parcel.communityPlan);
     if (parcel.specificPlan) lines.push("Specific Plan: " + parcel.specificPlan);
