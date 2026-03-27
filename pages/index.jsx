@@ -1055,14 +1055,25 @@ export default function Listo() {
     else setJurisdiction(null);
   }, [editZip, parsed?.zip]);
 
-  const handleGeocode = () => {
+  const handleGeocode = async () => {
     if (!address.trim() || !projectType) return;
     const p = parseAddress(address);
     setParsed(p);
-    setEditZip(p.zip || "");  // leave blank if no ZIP detected — don't carry forward
     setEditStreet(p.displayName);
     track("address_submitted", { zip:p.zip, project_type:projectType });
     setStage("confirm");
+
+    // Run geocoder in background to populate ZIP if not in the address string
+    if (!p.zip) {
+      try {
+        const geo = await geocodeAddress(address);
+        if (geo?.zip && geo.zip.length === 5) {
+          setEditZip(geo.zip);
+        }
+      } catch (e) { console.log("[GEOCODE] Background geocode failed:", e.message); }
+    } else {
+      setEditZip(p.zip);
+    }
   };
 
   const LOADING_STEPS = [
@@ -1076,7 +1087,7 @@ export default function Listo() {
   // ── Client-side ZIMAS query helpers (browser → ZIMAS, no Vercel) ─────
   const ZIMAS = "https://zimas.lacity.org/arcgis/rest/services";
 
-  const zimasQuery = async (service, layerId, lng, lat) => {
+  const zimasQuery = async (service, layerId, lng, lat, timeoutMs = 12000) => {
     const p = new URLSearchParams({
       geometry: lng + "," + lat,
       geometryType: "esriGeometryPoint",
@@ -1086,14 +1097,15 @@ export default function Listo() {
       returnGeometry: "false",
       f: "json",
     });
-    const r = await fetch(ZIMAS + "/" + service + "/MapServer/" + layerId + "/query?" + p);
+    const r = await fetch(ZIMAS + "/" + service + "/MapServer/" + layerId + "/query?" + p,
+      { signal: AbortSignal.timeout(timeoutMs) });
     if (!r.ok) return null;
     const d = await r.json();
     if (d?.error) return null;
     return d?.features?.[0]?.attributes || null;
   };
 
-  const zimasIdentify = async (service, lng, lat) => {
+  const zimasIdentify = async (service, lng, lat, timeoutMs = 15000) => {
     const ext = [lng - 0.0005, lat - 0.0005, lng + 0.0005, lat + 0.0005].join(",");
     const p = new URLSearchParams({
       geometry: JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } }),
@@ -1106,7 +1118,8 @@ export default function Listo() {
       returnGeometry: "false",
       f: "json",
     });
-    const r = await fetch(ZIMAS + "/" + service + "/MapServer/identify?" + p);
+    const r = await fetch(ZIMAS + "/" + service + "/MapServer/identify?" + p,
+      { signal: AbortSignal.timeout(timeoutMs) });
     if (!r.ok) return [];
     const d = await r.json();
     if (d?.error) return [];
@@ -1214,7 +1227,7 @@ export default function Listo() {
         outSR: "102645",
         f: "json",
       });
-      const r = await fetch(PARCEL_URL + "?" + p);
+      const r = await fetch(PARCEL_URL + "?" + p, { signal: AbortSignal.timeout(12000) });
       if (r.ok) {
         const d = await r.json();
         const f = d?.features?.[0];
@@ -2010,22 +2023,24 @@ ${bodyHtml}
 
                 {/* Section nav */}
                 <div style={{ borderBottom:`1px solid ${T.border}`,
-                  padding:"0 28px", overflowX:"auto", display:"flex",
-                  gap:0 }} className="no-print">
-                  {["Project Overview","Parcel Survey","Zone Alerts","Development Standards","Zoning & Density","Permit Roadmap",
-                    "Fee Summary","Timeline","Next Steps"].map(sec => (
+                  padding:"10px 28px 8px", display:"flex", flexWrap:"wrap",
+                  gap:6 }} className="no-print">
+                  {["Overview","Survey","Alerts","Standards","Density","Permits",
+                    "Fees","Timeline","Next Steps"].map((sec, idx) => {
+                    const fullNames = ["Project Overview","Parcel Survey","Zone Alerts","Development Standards","Zoning & Density","Permit Roadmap","Fee Summary","Timeline","Next Steps"];
+                    return (
                     <a key={sec}
-                      href={"#sec-"+sec.toLowerCase().replace(/[^a-z0-9]+/g,"-")}
-                      style={{ fontSize:11, color:T.muted, padding:"10px 16px",
-                        textDecoration:"none", whiteSpace:"nowrap",
+                      href={"#sec-"+fullNames[idx].toLowerCase().replace(/[^a-z0-9]+/g,"-")}
+                      style={{ fontSize:10, color:T.muted, padding:"4px 10px",
+                        textDecoration:"none",
                         fontFamily:"monospace", letterSpacing:"0.04em",
-                        borderBottom:`2px solid transparent`,
-                        display:"inline-block" }}
-                      onMouseEnter={e=>e.target.style.color=T.orange}
-                      onMouseLeave={e=>e.target.style.color=T.muted}>
+                        border:`1px solid ${T.border}`, borderRadius:4,
+                        background:T.warmGray }}
+                      onMouseEnter={e=>{e.target.style.color=T.orange;e.target.style.borderColor=T.orange}}
+                      onMouseLeave={e=>{e.target.style.color=T.muted;e.target.style.borderColor=T.border}}>
                       {sec}
                     </a>
-                  ))}
+                  );})}
                 </div>
 
                 {/* Report body */}
