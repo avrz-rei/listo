@@ -246,6 +246,161 @@ function JurisdictionBadge({ jurisdiction }) {
   );
 }
 
+// ── Parcel Survey Cards — visual parcel data display ─────────────────────
+function ParcelSurveyCards({ parcel, onManualEntry }) {
+  if (!parcel) return null;
+
+  const Badge = ({ yes, value, flagged }) => {
+    if (value === undefined || value === null) return (
+      <span style={{ fontSize:10, fontWeight:600, padding:"2px 8px", borderRadius:4,
+        background:"#FEF3C7", color:"#92400E", fontFamily:"monospace" }}>NOT VERIFIED</span>
+    );
+    if (flagged || yes === true) return (
+      <span style={{ fontSize:10, fontWeight:600, padding:"2px 8px", borderRadius:4,
+        background: flagged ? "#FEE2E2" : "#D1FAE5", color: flagged ? "#991B1B" : "#065F46",
+        fontFamily:"monospace" }}>{flagged ? "YES — ACTION" : typeof value === "string" ? value : "YES"}</span>
+    );
+    return (
+      <span style={{ fontSize:10, fontWeight:600, padding:"2px 8px", borderRadius:4,
+        background:"#F3F4F6", color:"#6B7280", fontFamily:"monospace" }}>{typeof value === "string" ? value : "NO"}</span>
+    );
+  };
+
+  const Row = ({ label, value, flagged, bold }) => (
+    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+      padding:"6px 0", borderBottom:"1px solid #F3F4F6", gap:8 }}>
+      <span style={{ fontSize:12, color:"#374151", fontWeight: bold ? 600 : 400 }}>{label}</span>
+      {typeof value === "string" || typeof value === "number" ? (
+        <span style={{ fontSize:12, fontWeight:600, color: bold ? T.black : "#374151",
+          textAlign:"right", flex:"0 0 auto" }}>{value} <Badge yes={true} value={value} /></span>
+      ) : value !== undefined && value !== null ? (
+        <Badge yes={value} value={value} flagged={flagged} />
+      ) : (
+        <Badge />
+      )}
+    </div>
+  );
+
+  const Card = ({ title, color, children }) => (
+    <div style={{ background:"white", border:"1px solid #E5E7EB", borderRadius:10,
+      borderLeft:`4px solid ${color}`, marginBottom:12, overflow:"hidden" }}>
+      <div style={{ padding:"10px 16px", background:"#FAFAFA", borderBottom:"1px solid #F3F4F6" }}>
+        <span style={{ fontSize:11, fontWeight:700, color, textTransform:"uppercase",
+          letterSpacing:"0.08em", fontFamily:"monospace" }}>{title}</span>
+      </div>
+      <div style={{ padding:"8px 16px" }}>{children}</div>
+    </div>
+  );
+
+  const HazardGrid = ({ items }) => (
+    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"0 16px" }}>
+      {items.map(([label, val, flag]) => (
+        <Row key={label} label={label} value={val} flagged={flag} />
+      ))}
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop:4 }}>
+      {/* Key Identification — hero card */}
+      <Card title="Parcel Identification" color={T.orange}>
+        <Row label="Address" value={parcel.situsAddr || parcel.address || null} bold />
+        <Row label="APN" value={parcel.apn || null} bold />
+        <Row label="Zoning" value={parcel.zoning || null} bold />
+        <Row label="Lot Size" value={parcel.lotSizeSf ? parcel.lotSizeSf.toLocaleString() + " sf" : null} bold />
+        <Row label="Year Built" value={parcel.yearBuilt || null} />
+        <Row label="Existing Building" value={parcel.existingBuildingSqft ? parcel.existingBuildingSqft + " sf" : null} />
+        <Row label="Units" value={parcel.existingUnits || null} />
+        <Row label="Use Code" value={parcel.useDescription || parcel.useCode || null} />
+      </Card>
+
+      {/* Density — only if lot size is known */}
+      {parcel.lotSizeSf > 0 && (
+        <div style={{ background:"#1A1714", borderRadius:10, padding:"14px 18px", marginBottom:12,
+          display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 }}>
+          <div>
+            <div style={{ fontSize:10, color:T.orange, fontFamily:"monospace", letterSpacing:"0.1em" }}>DENSITY</div>
+            <div style={{ fontSize:16, fontWeight:700, color:"white", fontFamily:"Georgia,serif", marginTop:2 }}>
+              {parcel.lotSizeSf.toLocaleString()} sf ÷ 800 = {Math.floor(parcel.lotSizeSf/800)} units by-right
+            </div>
+          </div>
+          {parcel.toc && (
+            <div style={{ background:T.orange+"20", border:`1px solid ${T.orange}40`, borderRadius:6, padding:"4px 12px" }}>
+              <div style={{ fontSize:9, color:T.orange, fontFamily:"monospace" }}>TOC</div>
+              <div style={{ fontSize:14, fontWeight:700, color:T.orange }}>{parcel.toc}</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Housing */}
+      <Card title="Housing" color="#7C3AED">
+        <Row label="RSO (Rent Stabilization)" value={parcel.rso} />
+        <Row label="TOC (Transit Oriented Communities)" value={parcel.toc || null} />
+        <Row label="HE Replacement Required" value={null} />
+        <Row label="Just Cause Eviction (JCO)" value={null} />
+      </Card>
+
+      {/* Hazards & Environmental */}
+      <Card title="Hazards & Environmental" color="#DC2626">
+        <HazardGrid items={[
+          ["Coastal Zone", parcel.coastalZone === "Yes" ? parcel.coastalZoneType || "Yes" : parcel.coastalZone === "No" ? false : null, parcel.coastalZone === "Yes"],
+          ["Very High Fire Hazard Zone", parcel.fireHazard, false],
+          ["Liquefaction", parcel.liquefaction, parcel.liquefaction === true],
+          ["Landslide", parcel.landslide, parcel.landslide === true],
+          ["Hillside Area", parcel.hillside, false],
+          ["Special Grading", parcel.specialGrading, false],
+          ["Sea Level Rise", parcel.seaLevelRise, parcel.seaLevelRise === true],
+          ["Tsunami Hazard", parcel.tsunami, parcel.tsunami === true],
+          ["Flood Zone", parcel.floodZone ? parcel.floodZone : parcel.floodZone === undefined ? null : false, false],
+          ["Methane Hazard", parcel.methane ? parcel.methane : parcel.methane === undefined ? null : false, !!parcel.methane],
+          ["Fault Zone", parcel.faultZone || null, !!parcel.faultZone],
+          ["Airport Hazard", null, false],
+        ]} />
+      </Card>
+
+      {/* Planning & Zoning Overlays */}
+      <Card title="Planning & Zoning Overlays" color="#2563EB">
+        <Row label="Specific Plan" value={parcel.specificPlan || null} />
+        <Row label="HPOZ (Historic Preservation)" value={parcel.hpoz || (parcel.hpoz === undefined ? null : false)} />
+        <Row label="General Plan Land Use" value={parcel.generalPlanLandUse || null} />
+        <Row label="Community Plan" value={parcel.communityPlan || null} />
+        {parcel.overlayLayers?.length > 0 && (
+          <div style={{ marginTop:8 }}>
+            <div style={{ fontSize:10, color:T.muted, fontFamily:"monospace", marginBottom:4,
+              letterSpacing:"0.08em" }}>ALL DETECTED OVERLAYS ({parcel.overlayLayers.length})</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
+              {parcel.overlayLayers.map((o,i) => (
+                <span key={i} style={{ fontSize:10, background:"#EFF6FF", color:"#1E40AF",
+                  border:"1px solid #BFDBFE", borderRadius:4, padding:"2px 6px" }}>
+                  {o.layerName}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Manual entry prompt for missing data */}
+      {(!parcel.yearBuilt || !parcel.existingUnits || !parcel.lotSizeSf) && (
+        <div style={{ background:"#FFFBEB", border:"1px solid #FDE68A", borderRadius:10,
+          padding:"14px 18px", marginBottom:12 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:"#92400E", marginBottom:4 }}>
+            Missing parcel data — verify at zimas.lacity.org
+          </div>
+          <div style={{ fontSize:12, color:"#78350F", lineHeight:1.6 }}>
+            {!parcel.lotSizeSf && "Lot size · "}{!parcel.yearBuilt && "Year built · "}{!parcel.existingUnits && "Unit count · "}
+            These fields are needed for complete development standards analysis. Visit{" "}
+            <a href="https://zimas.lacity.org" target="_blank" style={{ color:"#B45309", fontWeight:600 }}>
+              zimas.lacity.org
+            </a> and search by address to find the missing data.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Inline markdown renderer ──────────────────────────────────────────────
 function renderInline(text) {
   return (text||"").split(/(\*\*[^*]+\*\*)/g).map((p,i) =>
@@ -255,7 +410,7 @@ function renderInline(text) {
 }
 
 // ── Report markdown renderer — light mode ─────────────────────────────────
-function ReportMarkdown({ text, jurisdiction }) {
+function ReportMarkdown({ text, jurisdiction, parcel }) {
   const lines = text.split("\n");
   const els = [];
   let i = 0, lk = 0, sec = "";
@@ -367,6 +522,14 @@ function ReportMarkdown({ text, jurisdiction }) {
         }
         els.push(<div key="kpis">{kpiEls}</div>);
         els.push(renderScoreCardsBlock());
+        continue;
+      }
+      // Insert visual parcel survey cards instead of Claude's text
+      if (sec.includes("parcel survey") && parcel) {
+        els.push(<ParcelSurveyCards key="parcel-cards" parcel={parcel} />);
+        i++;
+        // Skip Claude's text for this section
+        while (i < lines.length && !lines[i].trim().startsWith("## ")) { i++; }
         continue;
       }
       i++; continue;
@@ -809,34 +972,34 @@ function AcronymLegend({ jurisdiction }) {
     [jurisdiction?.agency || "LADBS", jurisdiction?.agencyUrl || "https://ladbs.org", jurisdiction?.agencyUrl || "https://ladbs.org"],
   ];
   return (
-    <div style={{ margin:"24px 0 0", border:`1px solid ${T.border}`, borderRadius:8, overflow:"hidden" }}>
+    <div style={{ margin:0 }}>
       <button onClick={() => setOpen(!open)} style={{
-        width:"100%", background:T.warmGray, border:"none", padding:"10px 16px",
+        width:"100%", background:"#ffffff10", border:"none", padding:"10px 16px",
         display:"flex", justifyContent:"space-between", alignItems:"center",
-        cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-        <span style={{ fontSize:11, fontWeight:700, color:T.muted, fontFamily:"monospace",
+        cursor:"pointer", fontFamily:"'DM Sans',sans-serif", borderRadius:6 }}>
+        <span style={{ fontSize:11, fontWeight:700, color:"#ffffff77", fontFamily:"monospace",
           letterSpacing:"0.1em" }}>TERMS & DATA SOURCES</span>
-        <span style={{ fontSize:11, color:T.muted }}>{open ? "▲ Hide" : "▼ Show"}</span>
+        <span style={{ fontSize:11, color:"#ffffff55" }}>{open ? "▲ Hide" : "▼ Show"}</span>
       </button>
       {open && (
-        <div style={{ padding:"16px 18px", background:T.white }}>
+        <div style={{ padding:"16px 0 0" }}>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"4px 24px", marginBottom:16 }}>
             {terms.map(([term, def]) => (
               <div key={term} style={{ display:"flex", gap:8, padding:"5px 0",
-                borderBottom:`1px solid ${T.warmGray}`, alignItems:"flex-start" }}>
+                borderBottom:"1px solid #ffffff10", alignItems:"flex-start" }}>
                 <span style={{ fontSize:10, fontWeight:700, color:T.orange,
                   fontFamily:"monospace", minWidth:50, flexShrink:0, paddingTop:1 }}>{term}</span>
-                <span style={{ fontSize:11, color:T.muted, lineHeight:1.5 }}>{def}</span>
+                <span style={{ fontSize:11, color:"#ffffff77", lineHeight:1.5 }}>{def}</span>
               </div>
             ))}
           </div>
-          <div style={{ fontSize:10, color:T.muted, fontFamily:"monospace",
+          <div style={{ fontSize:10, color:"#ffffff55", fontFamily:"monospace",
             letterSpacing:"0.08em", marginBottom:6 }}>DATA SOURCES</div>
           <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
             {sources.map(([label, url, href]) => (
               <a key={label} href={href} target="_blank" style={{
-                fontSize:11, color:T.orange, textDecoration:"none",
-                border:`1px solid ${T.orange}30`, borderRadius:4, padding:"3px 8px",
+                fontSize:11, color:T.lime, textDecoration:"none",
+                border:"1px solid #ffffff20", borderRadius:4, padding:"3px 8px",
                 fontFamily:"'DM Sans',sans-serif" }}>
                 {label} · {url}
               </a>
@@ -1033,7 +1196,53 @@ export default function Listo() {
       }
     } catch (e) { console.log("[ZIMAS] Zoning query error:", e.message); }
 
-    // 2. Legend layers — TOC, liquefaction, hazards, overlays
+    // 2. LA County Parcel — APN, address, use code + lot area from geometry
+    try {
+      const PARCEL_URL = "https://public.gis.lacounty.gov/public/rest/services/LACounty_Cache/LACounty_Parcel/MapServer/0/query";
+      const p = new URLSearchParams({
+        geometry: lng + "," + lat,
+        geometryType: "esriGeometryPoint",
+        inSR: "4326",
+        spatialRel: "esriSpatialRelIntersects",
+        outFields: "APN,AIN,SitusAddress,SitusFullAddress,SitusCity,SitusZIP,SitusDirection,SitusStreet,SitusHouseNo,UseCode,UseType,UseDescription,AgencyName,TaxRateArea,TaxRateCity",
+        returnGeometry: "true",
+        outSR: "102645",
+        f: "json",
+      });
+      const r = await fetch(PARCEL_URL + "?" + p);
+      if (r.ok) {
+        const d = await r.json();
+        const f = d?.features?.[0];
+        if (f?.attributes) {
+          const a = f.attributes;
+          parcel.hasData = true;
+          parcel.apn = a.APN || a.AIN || null;
+          parcel.situsAddr = a.SitusFullAddress || a.SitusAddress || null;
+          parcel.situsCity = a.SitusCity || null;
+          parcel.situsZip = a.SitusZIP || null;
+          parcel.useCode = a.UseCode || null;
+          parcel.useType = a.UseType || null;
+          parcel.useDescription = a.UseDescription || null;
+          parcel.agencyName = a.AgencyName || null;
+          console.log("[PARCEL] LA County hit — APN:", parcel.apn, "addr:", parcel.situsAddr);
+
+          // Calculate lot area from polygon geometry (CA State Plane feet → sq ft)
+          if (f.geometry?.rings?.[0]) {
+            const ring = f.geometry.rings[0];
+            let area = 0;
+            for (let i = 0; i < ring.length; i++) {
+              const j = (i + 1) % ring.length;
+              area += ring[i][0] * ring[j][1];
+              area -= ring[j][0] * ring[i][1];
+            }
+            parcel.lotSizeSf = Math.round(Math.abs(area) / 2);
+            console.log("[PARCEL] Calculated lot area:", parcel.lotSizeSf, "sf");
+          }
+        }
+      }
+    } catch (e) { console.log("[PARCEL] LA County query error:", e.message); }
+
+    // 3. Legend layers — TOC, liquefaction, hazards, overlays
     try {
       const results = await zimasIdentify("zma/legend", lng, lat);
       for (const r of results) {
@@ -1063,10 +1272,13 @@ export default function Listo() {
         if (name.includes("HPOZ") || name.includes("HISTORIC PRESERVATION OVERLAY")) {
           parcel.hpoz = r.layerName; parcel.hasData = true;
         }
+        if (name.includes("SPECIFIC PLAN")) {
+          parcel.specificPlan = a.NAME || a.SP_NAME || a.LABEL || r.layerName; parcel.hasData = true;
+        }
       }
     } catch (e) { console.log("[ZIMAS] Legend identify error:", e.message); }
 
-    // 3. Coastal zones — dedicated service
+    // 4. Coastal zones — dedicated service
     if (!parcel.coastalZone) {
       try {
         const results = await zimasIdentify("zma/coastal_zones", lng, lat);
@@ -1084,12 +1296,46 @@ export default function Listo() {
     }
     if (!parcel.coastalZone) parcel.coastalZone = "No";
 
+    // 5. ZIMAS main map identify — catches additional overlays the legend might miss
+    try {
+      const results = await zimasIdentify("zma/zimas", lng, lat);
+      for (const r of results) {
+        const a = r.attributes || {};
+        const name = (r.layerName || "").toUpperCase();
+        // Only capture layers we haven't already got
+        if (name.includes("LIQUEFACTION") && !parcel.liquefaction) { parcel.liquefaction = true; parcel.hasData = true; }
+        if (name.includes("TOC") && !parcel.toc) {
+          const tier = a.TIER || a.TOC_TIER || a.LABEL;
+          if (tier) { parcel.toc = "Tier " + String(tier).replace(/\D/g, ""); parcel.hasData = true; }
+        }
+        if (name.includes("SEISMIC") || name.includes("FAULT")) {
+          if (!parcel.faultZone) { parcel.faultZone = r.layerName; parcel.hasData = true; }
+        }
+        // Capture any overlay we haven't logged yet
+        if (!parcel.overlayLayers.find(o => o.layerId === r.layerId)) {
+          parcel.overlayLayers.push({ layerId: r.layerId, layerName: r.layerName, attrs: a });
+        }
+      }
+    } catch (e) { console.log("[ZIMAS] Main identify error:", e.message); }
+
     // Set defaults for booleans not detected
     if (parcel.liquefaction === undefined) parcel.liquefaction = false;
     if (parcel.hillside === undefined) parcel.hillside = false;
     if (parcel.specialGrading === undefined) parcel.specialGrading = false;
     if (parcel.fireHazard === undefined) parcel.fireHazard = false;
     if (parcel.seaLevelRise === undefined) parcel.seaLevelRise = false;
+
+    // Density calculation if we have lot size
+    if (parcel.lotSizeSf > 0) {
+      parcel.unitsByRight = Math.floor(parcel.lotSizeSf / 800);
+      parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 800 = " + parcel.unitsByRight + " units";
+    }
+
+    console.log("[ZIMAS] FINAL:", JSON.stringify({
+      zoning: parcel.zoning, apn: parcel.apn, lot: parcel.lotSizeSf,
+      coastal: parcel.coastalZone, toc: parcel.toc, liq: parcel.liquefaction,
+      overlays: parcel.overlayLayers.length
+    }));
 
     return parcel;
   };
@@ -1657,7 +1903,9 @@ ${bodyHtml}
                     display:"flex", gap:12, flexWrap:"wrap", alignItems:"center" }}>
                     <span>{getLabel(projectType)}</span>
                     {jurisdiction && <span>· {jurisdiction.short}</span>}
+                    {parcel?.zoning && <span>· {parcel.zoning}</span>}
                     {parcel?.lotSizeSf && <span>· {parcel.lotSizeSf.toLocaleString()} sf</span>}
+                    {parcel?.apn && <span>· APN {parcel.apn}</span>}
                     <span style={{ fontSize:10, background:"#ffffff20",
                       borderRadius:10, padding:"1px 8px" }}>
                       {parcel?.hasData ? "ZIMAS verified" : "ZIP estimates"}
@@ -1669,7 +1917,7 @@ ${bodyHtml}
                 <div style={{ borderBottom:`1px solid ${T.border}`,
                   padding:"0 28px", overflowX:"auto", display:"flex",
                   gap:0 }} className="no-print">
-                  {["Project Overview","Zone Alerts","Development Standards","Zoning & Density","Permit Roadmap",
+                  {["Project Overview","Parcel Survey","Zone Alerts","Development Standards","Zoning & Density","Permit Roadmap",
                     "Fee Summary","Timeline","Next Steps"].map(sec => (
                     <a key={sec}
                       href={"#sec-"+sec.toLowerCase().replace(/[^a-z0-9]+/g,"-")}
@@ -1687,19 +1935,14 @@ ${bodyHtml}
 
                 {/* Report body */}
                 <div style={{ padding:"28px 28px 0" }}>
-                  <ReportMarkdown text={result} jurisdiction={jurisdiction} />
+                  <ReportMarkdown text={result} jurisdiction={jurisdiction} parcel={parcel} />
                 </div>
 
-                {/* Acronym legend */}
-                <div style={{ padding:"0 28px" }} className="no-print">
-                  <AcronymLegend jurisdiction={jurisdiction} />
-                </div>
-
-                {/* Listo Summary box */}
+                {/* References & Legal */}
                 <div style={{ margin:"24px 28px 0", background:T.black,
                   borderRadius:10, padding:"20px 24px" }}>
                   <div style={{ fontSize:10, color:T.orange, fontFamily:"monospace",
-                    letterSpacing:"0.12em", marginBottom:10 }}>LISTO SUMMARY</div>
+                    letterSpacing:"0.12em", marginBottom:10 }}>REFERENCES & LEGAL</div>
                   <p style={{ fontSize:14, color:T.cream, lineHeight:1.8, margin:0 }}>
                     AI-generated guidance based on publicly available{" "}
                     {jurisdiction?.name || "LA"} permit data. Always verify with{" "}
@@ -1708,7 +1951,16 @@ ${bodyHtml}
                       <a href={jurisdiction.applyUrl || jurisdiction.agencyUrl} target="_blank"
                         style={{ color:T.lime }}>{(jurisdiction.applyUrl || jurisdiction.agencyUrl).replace("https://","")}</a>
                     ) : "ladbs.org"}) before proceeding.
-                    This is not legal advice.
+                    This is not legal advice. Listo makes no warranties regarding accuracy or completeness.
+                  </p>
+                  <p style={{ fontSize:11, color:"#ffffff55", lineHeight:1.6, margin:"10px 0 0" }}>
+                    Parcel data sourced from publicly available City of Los Angeles (ZIMAS ArcGIS), LA County
+                    Assessor, and Census/Nominatim geocoding databases. Data is provided "as is" and may not
+                    reflect recent changes. ZIMAS terms of use at zimas.lacity.org.
+                  </p>
+                  <div style={{ borderTop:"1px solid #ffffff15", marginTop:14, paddingTop:14 }}>
+                    <AcronymLegend jurisdiction={jurisdiction} />
+                  </div>
                   </p>
                 </div>
 
