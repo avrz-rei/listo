@@ -520,6 +520,17 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
                 <span style={{ fontSize:13, color:T.text, lineHeight:1.5 }}>{desc}</span>
               </div>
             );
+          } else if (kt.startsWith("PROJECT:")) {
+            kpiEls.push(
+              <div key={"proj"+i} style={{ display:"flex", gap:10, padding:"7px 0",
+                borderBottom:`2px solid ${T.orange}`, alignItems:"center", marginBottom:4 }}>
+                <span style={{ fontSize:10, fontWeight:700, color:T.orange,
+                  textTransform:"uppercase", letterSpacing:"0.08em", minWidth:70,
+                  fontFamily:"monospace" }}>PROJECT</span>
+                <span style={{ fontSize:14, color:T.black, fontWeight:700,
+                  fontFamily:"'Georgia',serif" }}>{kt.slice(8).trim()}</span>
+              </div>
+            );
           } else {
             const KPI = ["ZONING:","UNITS:","PERMITS:","ALERTS:","DATA:"];
             const kpi = KPI.find(k => kt.startsWith(k));
@@ -807,11 +818,12 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
 
     // Documents section
     if (sec.includes("document")) {
-      if (t === "DEMO" || t === "BUILDING" || t.startsWith("TECHNICAL")) {
+      const cleanT = t.replace(/^\*\*|\*\*$/g, "");
+      if (cleanT === "DEMO" || cleanT === "BUILDING" || cleanT.startsWith("TECHNICAL")) {
         els.push(<div key={i} style={{ fontSize:9, fontWeight:700, color:T.orange,
           textTransform:"uppercase", letterSpacing:"0.12em", fontFamily:"monospace",
           marginTop:16, marginBottom:6, paddingTop:10, borderTop:`1px solid ${T.border}` }}>
-          {t}
+          {cleanT}
         </div>);
         i++; continue;
       }
@@ -1328,131 +1340,160 @@ export default function Listo() {
     } catch (e) { console.log("[ZIMAS] Zoning query error:", e.message); }
 
     // 2. LA County Parcel — APN, address, use code + lot area + lot dimensions from geometry
+    const PARCEL_URL = "https://public.gis.lacounty.gov/public/rest/services/LACounty_Cache/LACounty_Parcel/MapServer/0/query";
+    const userHouseNo = (editStreet || address).match(/^(\d+)/)?.[1] || "";
+    const userStreet = (editStreet || address).replace(/^\d+\s*/, "").replace(/,.*/, "").trim().toUpperCase().replace(/\b(AVE|AVENUE|ST|STREET|BLVD|BOULEVARD|DR|DRIVE|RD|ROAD|CT|COURT|PL|PLACE|WAY|LN|LANE|CIR|CIRCLE)\b.*/, "").trim();
+
+    const processParcelFeature = (f) => {
+      if (!f?.attributes) return;
+      const a = f.attributes;
+      const situsHouseNo = a.SitusHouseNo || "";
+      if (userHouseNo && situsHouseNo && userHouseNo !== situsHouseNo) {
+        parcel.addressMismatch = true;
+        parcel.addressMismatchNote = "Parcel query returned " + situsHouseNo + " " + (a.SitusStreet||"") + " but you entered " + userHouseNo + ". Verify the correct parcel at zimas.lacity.org.";
+        console.log("[PARCEL] ADDRESS MISMATCH:", situsHouseNo, "vs user input", userHouseNo);
+      } else {
+        parcel.addressMismatch = false;
+      }
+      parcel.hasData = true;
+      parcel.apn = a.APN || a.AIN || null;
+      parcel.situsAddr = a.SitusFullAddress || a.SitusAddress || null;
+      parcel.situsCity = a.SitusCity || null;
+      parcel.situsZip = a.SitusZIP || null;
+      parcel.useCode = a.UseCode || null;
+      parcel.useType = a.UseType || null;
+      parcel.useDescription = a.UseDescription || null;
+      parcel.agencyName = a.AgencyName || null;
+      console.log("[PARCEL] LA County hit — APN:", parcel.apn, "addr:", parcel.situsAddr);
+
+      if (f.geometry?.rings?.[0]) {
+        const ring = f.geometry.rings[0];
+        let area = 0;
+        for (let i = 0; i < ring.length; i++) {
+          const j = (i + 1) % ring.length;
+          area += ring[i][0] * ring[j][1];
+          area -= ring[j][0] * ring[i][1];
+        }
+        parcel.lotSizeSf = Math.round(Math.abs(area) / 2);
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (const pt of ring) {
+          if (pt[0] < minX) minX = pt[0];
+          if (pt[0] > maxX) maxX = pt[0];
+          if (pt[1] < minY) minY = pt[1];
+          if (pt[1] > maxY) maxY = pt[1];
+        }
+        const dimX = Math.round(maxX - minX);
+        const dimY = Math.round(maxY - minY);
+        // Shorter dimension = width (street frontage), longer = depth
+        parcel.lotWidthFt = Math.min(dimX, dimY);
+        parcel.lotDepthFt = Math.max(dimX, dimY);
+        parcel.lotDimsSource = "estimated from parcel geometry";
+        console.log("[PARCEL] Lot:", parcel.lotSizeSf, "sf, ~" + parcel.lotWidthFt + "×" + parcel.lotDepthFt + " ft");
+      }
+    };
+
+    // 2a. Spatial point query (primary)
     try {
-      const PARCEL_URL = "https://public.gis.lacounty.gov/public/rest/services/LACounty_Cache/LACounty_Parcel/MapServer/0/query";
       const p = new URLSearchParams({
-        geometry: lng + "," + lat,
-        geometryType: "esriGeometryPoint",
-        inSR: "4326",
+        geometry: lng + "," + lat, geometryType: "esriGeometryPoint", inSR: "4326",
         spatialRel: "esriSpatialRelIntersects",
         outFields: "APN,AIN,SitusAddress,SitusFullAddress,SitusCity,SitusZIP,SitusDirection,SitusStreet,SitusHouseNo,UseCode,UseType,UseDescription,AgencyName,TaxRateArea,TaxRateCity",
-        returnGeometry: "true",
-        outSR: "102645",
-        f: "json",
+        returnGeometry: "true", outSR: "102645", f: "json",
       });
       const r = await fetch(PARCEL_URL + "?" + p, { signal: AbortSignal.timeout(12000) });
       if (r.ok) {
         const d = await r.json();
-        // Try to match the correct parcel by comparing house numbers
-        const userHouseNo = (editStreet || address).match(/^(\d+)/)?.[1] || "";
         let bestFeature = d?.features?.[0];
         if (d?.features?.length > 1 && userHouseNo) {
           const match = d.features.find(f => f.attributes?.SitusHouseNo === userHouseNo);
           if (match) bestFeature = match;
         }
-        // If single result, verify address matches
-        if (bestFeature?.attributes) {
-          const a = bestFeature.attributes;
-          const situsHouseNo = a.SitusHouseNo || "";
-          // Address verification — flag if house number doesn't match
-          if (userHouseNo && situsHouseNo && userHouseNo !== situsHouseNo) {
-            parcel.addressMismatch = true;
-            parcel.addressMismatchNote = "Parcel query returned " + situsHouseNo + " " + (a.SitusStreet||"") + " but you entered " + userHouseNo + ". Verify the correct parcel at zimas.lacity.org.";
-            console.log("[PARCEL] ADDRESS MISMATCH:", situsHouseNo, "vs user input", userHouseNo);
-          }
-          parcel.hasData = true;
-          parcel.apn = a.APN || a.AIN || null;
-          parcel.situsAddr = a.SitusFullAddress || a.SitusAddress || null;
-          parcel.situsCity = a.SitusCity || null;
-          parcel.situsZip = a.SitusZIP || null;
-          parcel.useCode = a.UseCode || null;
-          parcel.useType = a.UseType || null;
-          parcel.useDescription = a.UseDescription || null;
-          parcel.agencyName = a.AgencyName || null;
-          console.log("[PARCEL] LA County hit — APN:", parcel.apn, "addr:", parcel.situsAddr);
+        processParcelFeature(bestFeature);
+      }
+    } catch (e) { console.log("[PARCEL] Spatial query error:", e.message); }
 
-          // Calculate lot area + dimensions from polygon geometry
-          if (bestFeature.geometry?.rings?.[0]) {
-            const ring = bestFeature.geometry.rings[0];
-            // Lot area (shoelace formula — CA State Plane feet)
-            let area = 0;
-            for (let i = 0; i < ring.length; i++) {
-              const j = (i + 1) % ring.length;
-              area += ring[i][0] * ring[j][1];
-              area -= ring[j][0] * ring[i][1];
-            }
-            parcel.lotSizeSf = Math.round(Math.abs(area) / 2);
-            // Lot dimensions from bounding box (approximate width × depth)
-            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-            for (const pt of ring) {
-              if (pt[0] < minX) minX = pt[0];
-              if (pt[0] > maxX) maxX = pt[0];
-              if (pt[1] < minY) minY = pt[1];
-              if (pt[1] > maxY) maxY = pt[1];
-            }
-            parcel.lotWidthFt = Math.round(maxX - minX);
-            parcel.lotDepthFt = Math.round(maxY - minY);
-            parcel.lotDimsSource = "estimated from parcel geometry";
-            console.log("[PARCEL] Lot:", parcel.lotSizeSf, "sf, ~" + parcel.lotWidthFt + "×" + parcel.lotDepthFt + " ft");
+    // 2b. Address-based fallback — if spatial query returned wrong parcel, try by address
+    if (parcel.addressMismatch && userHouseNo && userStreet) {
+      console.log("[PARCEL] Trying address-based query for", userHouseNo, userStreet);
+      try {
+        const p = new URLSearchParams({
+          where: "SitusHouseNo='" + userHouseNo + "' AND SitusStreet LIKE '%" + userStreet + "%'",
+          outFields: "APN,AIN,SitusAddress,SitusFullAddress,SitusCity,SitusZIP,SitusDirection,SitusStreet,SitusHouseNo,UseCode,UseType,UseDescription,AgencyName,TaxRateArea,TaxRateCity",
+          returnGeometry: "true", outSR: "102645", f: "json",
+        });
+        const r = await fetch(PARCEL_URL + "?" + p, { signal: AbortSignal.timeout(12000) });
+        if (r.ok) {
+          const d = await r.json();
+          if (d?.features?.length > 0) {
+            console.log("[PARCEL] Address query found", d.features.length, "results");
+            processParcelFeature(d.features[0]);
           }
         }
-      }
-    } catch (e) { console.log("[PARCEL] LA County query error:", e.message); }
+      } catch (e) { console.log("[PARCEL] Address query error:", e.message); }
+    }
 
     // 3. CGS Seismic Hazards — AUTHORITATIVE state source (ZIMAS gets data from CGS)
+    //    Try multiple endpoints: primary MapServer, overlap zones, and legacy service
     const CGS = "https://gis.conservation.ca.gov/server/rest/services/CGS_Earthquake_Hazard_Zones";
-    // 3a. Liquefaction
-    try {
-      const p = new URLSearchParams({
-        geometry: lng + "," + lat,
-        geometryType: "esriGeometryPoint",
-        inSR: "4326",
-        spatialRel: "esriSpatialRelIntersects",
-        outFields: "*",
-        returnGeometry: "false",
-        f: "json",
-      });
-      const r = await fetch(CGS + "/SHP_Liquefaction_Zones/MapServer/0/query?" + p, { signal: AbortSignal.timeout(10000) });
-      if (r.ok) {
-        const d = await r.json();
-        if (d?.features?.length > 0) {
-          parcel.liquefaction = true;
-          parcel.liquefactionSource = "CGS Seismic Hazard Zones (verified)";
-          parcel.hasData = true;
-          console.log("[CGS] Liquefaction: YES");
-        } else {
-          parcel.liquefaction = false;
-          parcel.liquefactionSource = "CGS (verified — not in zone)";
-          console.log("[CGS] Liquefaction: NO");
-        }
+    const CGS_LEGACY = "https://services.gis.ca.gov/arcgis/rest/services/GeoscientificInformation";
+    const seismicParams = (lng2, lat2) => new URLSearchParams({
+      geometry: lng2 + "," + lat2,
+      geometryType: "esriGeometryPoint",
+      inSR: "4326",
+      spatialRel: "esriSpatialRelIntersects",
+      outFields: "*",
+      returnGeometry: "false",
+      f: "json",
+    });
+
+    // 3a. Liquefaction — try primary, then overlap, then legacy
+    if (parcel.liquefaction === undefined) {
+      const liqEndpoints = [
+        CGS + "/SHP_Liquefaction_Zones/MapServer/0/query",
+        CGS + "/SHP_LQLS_Overlap_Zones/MapServer/0/query",
+        CGS_LEGACY + "/Liquefaction/MapServer/0/query",
+      ];
+      for (const url of liqEndpoints) {
+        if (parcel.liquefaction === true) break;
+        try {
+          const r = await fetch(url + "?" + seismicParams(lng, lat), { signal: AbortSignal.timeout(8000) });
+          if (r.ok) {
+            const d = await r.json();
+            if (d?.features?.length > 0) {
+              parcel.liquefaction = true;
+              parcel.liquefactionSource = "CGS Seismic Hazard Zones (verified)";
+              parcel.hasData = true;
+              console.log("[CGS] Liquefaction: YES from", url.split("/").slice(-3).join("/"));
+              break;
+            } else if (!d?.error) {
+              console.log("[CGS] Liquefaction: no features from", url.split("/").slice(-3).join("/"));
+            }
+          }
+        } catch (e) { console.log("[CGS] Liquefaction query error:", url.split("/").pop(), e.message); }
       }
-    } catch (e) { console.log("[CGS] Liquefaction query error:", e.message); }
+      if (parcel.liquefaction === undefined) {
+        parcel.liquefaction = false;
+        parcel.liquefactionSource = "CGS (verified — not in zone)";
+        console.log("[CGS] Liquefaction: NO (checked all endpoints)");
+      }
+    }
 
     // 3b. Landslide
     try {
-      const p = new URLSearchParams({
-        geometry: lng + "," + lat, geometryType: "esriGeometryPoint",
-        inSR: "4326", spatialRel: "esriSpatialRelIntersects",
-        outFields: "*", returnGeometry: "false", f: "json",
-      });
-      const r = await fetch(CGS + "/SHP_Landslide_Zones/MapServer/0/query?" + p, { signal: AbortSignal.timeout(10000) });
+      const r = await fetch(CGS + "/SHP_Landslide_Zones/MapServer/0/query?" + seismicParams(lng, lat),
+        { signal: AbortSignal.timeout(8000) });
       if (r.ok) {
         const d = await r.json();
         parcel.landslide = d?.features?.length > 0;
         parcel.landslideSource = "CGS (verified)";
         parcel.hasData = true;
-        console.log("[CGS] Landslide:", parcel.landslide);
       }
     } catch (e) { console.log("[CGS] Landslide query error:", e.message); }
 
     // 3c. Fault Zones (Alquist-Priolo)
     try {
-      const p = new URLSearchParams({
-        geometry: lng + "," + lat, geometryType: "esriGeometryPoint",
-        inSR: "4326", spatialRel: "esriSpatialRelIntersects",
-        outFields: "*", returnGeometry: "false", f: "json",
-      });
-      const r = await fetch(CGS + "/SHP_Fault_Zones/FeatureServer/0/query?" + p, { signal: AbortSignal.timeout(10000) });
+      const r = await fetch(CGS + "/SHP_Fault_Zones/FeatureServer/0/query?" + seismicParams(lng, lat),
+        { signal: AbortSignal.timeout(8000) });
       if (r.ok) {
         const d = await r.json();
         if (d?.features?.length > 0) {
@@ -1463,7 +1504,6 @@ export default function Listo() {
         }
         parcel.faultSource = "CGS (verified)";
         parcel.hasData = true;
-        console.log("[CGS] Fault zone:", parcel.faultZone || "none");
       }
     } catch (e) { console.log("[CGS] Fault query error:", e.message); }
 
@@ -1779,7 +1819,7 @@ export default function Listo() {
       if (/^Weeks?\s[\d\-–]+:/i.test(t)){const ci=t.indexOf(":");bodyHtml+=`<div style="display:flex;gap:12px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-weight:700;color:${T.orange};min-width:80px;font-size:11px;font-family:monospace">${t.slice(0,ci)}</span><span style="color:#2C2420">${t.slice(ci+1).trim()}</span></div>`;continue;}
       if (/^\d+\./.test(t)){const rest2=t.replace(/^\d+\.\s*/,"");const pi=rest2.indexOf("|");const act=pi>0?rest2.slice(0,pi).trim():rest2;const me=pi>0?rest2.slice(pi+1).trim():"";const n2=(t.match(/^\d+/)||[""])[0];bodyHtml+=`<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #E2D9D0;align-items:flex-start"><span style="font-size:10px;font-weight:800;color:#fff;background:${T.orange};border-radius:4px;padding:2px 6px;white-space:nowrap;margin-top:1px">${n2}</span><div><strong style="font-size:12px">${act}</strong>${me?`<span style="display:block;font-size:11px;color:#8C7B70;margin-top:2px">${me}</span>`:""}</div></div>`;continue;}
       if (t.startsWith("- ")||t.startsWith("* ")){bodyHtml+=`<li style="font-size:12px;color:#2C2420;margin:3px 0">${t.slice(2)}</li>`;continue;}
-      if (t==="DEMO"||t==="BUILDING"||t.startsWith("TECHNICAL")){bodyHtml+=`<div style="font-size:9px;font-weight:700;color:${T.orange};text-transform:uppercase;letter-spacing:0.1em;margin-top:12px;margin-bottom:4px;font-family:monospace">${t}</div>`;continue;}
+      if (t==="DEMO"||t==="BUILDING"||t.startsWith("TECHNICAL")||t==="**DEMO**"||t==="**BUILDING**"||t.startsWith("**TECHNICAL")){const cleanLabel=t.replace(/^\*\*|\*\*$/g,"");bodyHtml+=`<div style="font-size:9px;font-weight:700;color:${T.orange};text-transform:uppercase;letter-spacing:0.1em;margin-top:12px;margin-bottom:4px;font-family:monospace">${cleanLabel}</div>`;continue;}
       bodyHtml+=`<p style="font-size:12px;color:#2C2420;margin:4px 0">${t}</p>`;
     }
     const addrLine = editStreet || address;
