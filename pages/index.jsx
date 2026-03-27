@@ -271,8 +271,11 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
       padding:"6px 0", borderBottom:"1px solid #F3F4F6", gap:8 }}>
       <span style={{ fontSize:12, color:"#374151", fontWeight: bold ? 600 : 400 }}>{label}</span>
       {typeof value === "string" || typeof value === "number" ? (
-        <span style={{ fontSize:12, fontWeight:600, color: bold ? T.black : "#374151",
-          textAlign:"right", flex:"0 0 auto" }}>{value} <Badge yes={true} value={value} /></span>
+        <div style={{ display:"flex", alignItems:"center", gap:6, flex:"0 0 auto" }}>
+          <span style={{ fontSize:12, fontWeight:600, color: bold ? T.black : "#374151" }}>{value}</span>
+          <span style={{ fontSize:9, fontWeight:600, padding:"2px 6px", borderRadius:3,
+            background:"#D1FAE5", color:"#065F46", fontFamily:"monospace" }}>VERIFIED</span>
+        </div>
       ) : value !== undefined && value !== null ? (
         <Badge yes={value} value={value} flagged={flagged} />
       ) : (
@@ -860,8 +863,7 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
       i++; continue;
     }
 
-    // Legal notice — skip rendering here (rendered separately as Listo Summary style)
-    if (sec.includes("legal")) { i++; continue; }
+    // Legal notice — render as normal section (last in report)
 
     // Critical path callout
     if (t.startsWith("CRITICAL PATH:")) {
@@ -1170,13 +1172,16 @@ export default function Listo() {
       );
       if (r.ok) {
         const d = await r.json();
-        if (d?.[0]) return {
-          address: d[0].display_name,
-          city: "Los Angeles", zip: "",
-          lat: parseFloat(d[0].lat),
-          lng: parseFloat(d[0].lon),
-          source: "Nominatim",
-        };
+        if (d?.[0]) {
+          const zipMatch = d[0].display_name.match(/\b(\d{5})\b/);
+          return {
+            address: d[0].display_name,
+            city: "Los Angeles", zip: zipMatch ? zipMatch[1] : "",
+            lat: parseFloat(d[0].lat),
+            lng: parseFloat(d[0].lon),
+            source: "Nominatim",
+          };
+        }
       }
     } catch (e) {}
     return null;
@@ -1366,11 +1371,20 @@ export default function Listo() {
         return;
       }
 
+      // Auto-populate ZIP from geocode if user didn't enter one
+      if (!editZip && geo.zip) {
+        setEditZip(geo.zip);
+      }
+
       // Step 2-4: Query ZIMAS directly from browser (bypasses Vercel timeout)
       let parcelData = null;
       if (geo.lat && geo.lng) {
         parcelData = await queryZIMASFromBrowser(geo.lng, geo.lat);
         nextStep(); nextStep();
+        // Auto-populate ZIP from parcel if still missing
+        if (!editZip && parcelData?.situsZip) {
+          setEditZip(parcelData.situsZip);
+        }
       }
 
       // Step 5: Send to server for Claude analysis
@@ -1422,12 +1436,78 @@ export default function Listo() {
     const date = now.toLocaleDateString("en-US", { year:"numeric",month:"long",day:"numeric" });
     const dateSlug = now.toISOString().slice(0,10);
     const addrSlug = (editStreet||address).replace(/[^a-zA-Z0-9]+/g,"-").slice(0,40);
+
+    // Build parcel survey cards HTML
+    let parcelHtml = "";
+    if (parcel?.hasData) {
+      const vBadge = (val) => val !== undefined && val !== null
+        ? `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#D1FAE5;color:#065F46;font-family:monospace">VERIFIED</span>`
+        : `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#FEF3C7;color:#92400E;font-family:monospace">NOT VERIFIED</span>`;
+      const pRow = (label, val) => `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F3F4F6;font-size:11px"><span>${label}</span><span style="font-weight:600">${val !== null && val !== undefined ? val + " " + vBadge(val) : vBadge(null)}</span></div>`;
+      const flagBadge = (val, flagged) => val ? `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:${flagged?"#FEE2E2;color:#991B1B":"#D1FAE5;color:#065F46"};font-family:monospace">${typeof val === "string" ? val : "YES"}</span>` : `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#F3F4F6;color:#6B7280;font-family:monospace">NO</span>`;
+      const hRow = (label, val, flagged) => `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #F3F4F6;font-size:11px"><span>${label}</span>${val !== undefined && val !== null ? flagBadge(val, flagged) : vBadge(null)}</div>`;
+
+      parcelHtml = `
+        <div style="border:1px solid #E5E7EB;border-left:4px solid ${T.orange};border-radius:8px;margin:8px 0;overflow:hidden">
+          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:${T.orange};text-transform:uppercase;letter-spacing:0.08em;font-family:monospace">PARCEL IDENTIFICATION</div>
+          <div style="padding:6px 14px">
+            ${pRow("Address", parcel.situsAddr || null)}
+            ${pRow("APN", parcel.apn || null)}
+            ${pRow("Zoning", parcel.zoning || null)}
+            ${pRow("Lot Size", parcel.lotSizeSf ? parcel.lotSizeSf.toLocaleString() + " sf" : null)}
+            ${pRow("Year Built", parcel.yearBuilt || null)}
+            ${pRow("Existing Building", parcel.existingBuildingSqft ? parcel.existingBuildingSqft + " sf" : null)}
+            ${pRow("Units", parcel.existingUnits || null)}
+            ${pRow("Use Code", parcel.useDescription || parcel.useCode || null)}
+          </div>
+        </div>
+        ${parcel.lotSizeSf > 0 ? `<div style="background:#1A1714;border-radius:8px;padding:10px 16px;margin:8px 0;display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:9px;color:${T.orange};font-family:monospace;letter-spacing:0.1em">DENSITY</div><div style="font-size:14px;font-weight:700;color:white;font-family:Georgia,serif">${parcel.lotSizeSf.toLocaleString()} sf ÷ 800 = ${Math.floor(parcel.lotSizeSf/800)} units by-right</div></div>
+          ${parcel.toc ? `<div style="background:${T.orange}20;border:1px solid ${T.orange}40;border-radius:4px;padding:3px 8px"><div style="font-size:8px;color:${T.orange};font-family:monospace">TOC</div><div style="font-size:12px;font-weight:700;color:${T.orange}">${parcel.toc}</div></div>` : ""}
+        </div>` : ""}
+        <div style="border:1px solid #E5E7EB;border-left:4px solid #DC2626;border-radius:8px;margin:8px 0;overflow:hidden">
+          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#DC2626;text-transform:uppercase;letter-spacing:0.08em;font-family:monospace">HAZARDS & ENVIRONMENTAL</div>
+          <div style="padding:6px 14px;display:grid;grid-template-columns:1fr 1fr;gap:0 14px">
+            ${hRow("Coastal Zone", parcel.coastalZone === "Yes" ? (parcel.coastalZoneType || "Yes") : parcel.coastalZone === "No" ? false : null, parcel.coastalZone === "Yes")}
+            ${hRow("Fire Hazard Zone", parcel.fireHazard, false)}
+            ${hRow("Liquefaction", parcel.liquefaction, parcel.liquefaction === true)}
+            ${hRow("Landslide", parcel.landslide, parcel.landslide === true)}
+            ${hRow("Hillside Area", parcel.hillside, false)}
+            ${hRow("Special Grading", parcel.specialGrading, false)}
+            ${hRow("Sea Level Rise", parcel.seaLevelRise, parcel.seaLevelRise === true)}
+            ${hRow("Tsunami Hazard", parcel.tsunami, parcel.tsunami === true)}
+          </div>
+        </div>
+        <div style="border:1px solid #E5E7EB;border-left:4px solid #7C3AED;border-radius:8px;margin:8px 0;overflow:hidden">
+          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:0.08em;font-family:monospace">HOUSING</div>
+          <div style="padding:6px 14px">
+            ${hRow("RSO", parcel.rso, false)}
+            ${hRow("TOC", parcel.toc || null, false)}
+            ${hRow("HE Replacement Required", null, false)}
+            ${hRow("Just Cause Eviction (JCO)", null, false)}
+          </div>
+        </div>`;
+    }
+
+    // Build report body from Claude's markdown
     const lines = result.split("\n");
     let bodyHtml = "", pdfSec = "";
     for (const raw of lines) {
       const t = raw.trim();
       if (!t) { bodyHtml += "<br>"; continue; }
-      if (t.startsWith("## ")) { pdfSec = t.slice(3).toLowerCase(); bodyHtml += `<h2>${pdfSec.toUpperCase()}</h2>`; continue; }
+      if (t.startsWith("## ")) {
+        pdfSec = t.slice(3).toLowerCase();
+        bodyHtml += `<h2>${pdfSec.toUpperCase()}</h2>`;
+        // Insert parcel cards after Parcel Survey header
+        if (pdfSec.includes("parcel survey") && parcelHtml) {
+          bodyHtml += parcelHtml;
+          // Skip Claude's text for this section
+          continue;
+        }
+        continue;
+      }
+      // Skip Claude's parcel survey text (replaced by cards above)
+      if (pdfSec.includes("parcel survey")) continue;
       if (t.startsWith("### ")) { bodyHtml += `<h3>${t.slice(4)}</h3>`; continue; }
       if (t.startsWith("VERDICT:")) {
         const pts = t.slice(8).trim().split("|");
@@ -1436,12 +1516,22 @@ export default function Listo() {
         bodyHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:${c}15;border:2px solid ${c};border-radius:8px;margin:8px 0"><span style="font-size:10px;font-weight:800;color:#fff;background:${c};border-radius:4px;padding:2px 10px">${w}</span><span style="font-size:12px;color:#2C2420">${d}</span></div>`;
         continue;
       }
-      if (t.includes("|") && /^(CRITICAL|CAUTION|INFO|CLEAR)\s*\|/.test(t)) {
+      // Zone Alerts with ACTION REQUIRED/CAUTION/NOTE
+      if (t.includes("|") && /^(ACTION REQUIRED|CRITICAL|CAUTION|NOTE|INFO|CLEAR)\s*\|/.test(t)) {
         const pts=t.split("|").map(p=>p.trim());
-        const [sev,name2,dollar]=pts;
-        const cs={CRITICAL:["#FEF2F2","#b91c1c"],CAUTION:["#FFFBEB","#d97706"],INFO:["#EFF6FF","#2563eb"],CLEAR:["#F0FDF4","#16a34a"]};
+        const [sev,name2,dollar,time]=pts;
+        const displayLabel = sev === "CRITICAL" ? "ACTION REQUIRED" : sev === "INFO" ? "NOTE" : sev;
+        const cs={"ACTION REQUIRED":["#FEF2F2","#b91c1c"],CRITICAL:["#FEF2F2","#b91c1c"],CAUTION:["#FFFBEB","#d97706"],NOTE:["#EFF6FF","#2563eb"],INFO:["#EFF6FF","#2563eb"],CLEAR:["#F0FDF4","#16a34a"]};
         const [bg,bc]=cs[sev]||["#F9FAFB","#6B7280"];
-        bodyHtml += `<div style="padding:8px 12px;margin:6px 0;border-radius:6px;border-left:3px solid ${bc};background:${bg}"><span style="font-size:9px;font-weight:800;color:#fff;background:${bc};border-radius:3px;padding:1px 6px;margin-right:8px">${sev}</span><strong>${name2}</strong>${dollar?` <span style="color:#6B7280;font-size:11px">· ${dollar}</span>`:""}</div>`;
+        bodyHtml += `<div style="padding:8px 12px;margin:6px 0;border-radius:6px;border-left:3px solid ${bc};background:${bg}"><span style="font-size:9px;font-weight:800;color:#fff;background:${bc};border-radius:3px;padding:1px 6px;margin-right:8px">${displayLabel}</span><strong>${name2||""}</strong>${dollar?` <span style="color:#6B7280;font-size:11px">· ${dollar}</span>`:""}${time?` <span style="color:#6B7280;font-size:11px">· ${time}</span>`:""}</div>`;
+        continue;
+      }
+      // KPI lines
+      const KPI = ["ZONING:","UNITS:","PERMITS:","ALERTS:","DATA:"];
+      const kpi = KPI.find(k => t.startsWith(k));
+      if (kpi && pdfSec.includes("project overview")) {
+        const kLabel = kpi.slice(0,-1), val = t.slice(kpi.length).trim();
+        bodyHtml += `<div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:10px;font-weight:700;color:#8C7B70;text-transform:uppercase;letter-spacing:0.08em;min-width:70px;font-family:monospace">${kLabel}</span><span style="color:#2C2420">${val}</span></div>`;
         continue;
       }
       if (t.includes("|") && t.split("|").length >= 3) {
@@ -1458,25 +1548,30 @@ export default function Listo() {
         if(ds&&(ds.toUpperCase().includes("YES")||ds.toUpperCase().includes("NO")||ds.toUpperCase().includes("REQ"))){
           bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="color:#1A1714;flex:1">${dn}</span><span style="color:#8C7B70;min-width:120px">${dw}</span><span style="font-size:9px;font-weight:700;color:#fff;background:${req?"#b91c1c":"#16a34a"};border-radius:3px;padding:1px 6px">STAMP:${req?" REQ":" NOT REQ"}</span></div>`;
         } else {
-          bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid ${isT?T.orange:"#E2D9D0"};font-size:12px${isT?";font-weight:700;color:"+T.orange:""}"><span style="flex:1">${dn}</span>${dw&&!isT?`<span style="color:#8C7B70;min-width:100px">${dw}</span>`:""}<span>${ds}</span></div>`;
+          bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid ${isT?T.orange:"#E2D9D0"};font-size:12px${isT?";font-weight:700;color:"+T.orange:""}"><span style="flex:1">${dn}</span>${dw&&!isT?`<span style="color:#8C7B70;min-width:100px">${dw}</span>`:""}<span>${ds||""}</span></div>`;
         }
         continue;
       }
+      if (/^EXEMPTION:/i.test(t)){const rest=t.slice(10).trim();const pts=rest.split("|").map(p=>p.trim());bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:9px;font-weight:700;color:#fff;background:${T.orange};border-radius:3px;padding:1px 6px;margin-top:1px">EXEMPT</span><span style="flex:1">${pts[0]||""}</span><span style="color:${T.orange};font-weight:600">${pts[1]||""}</span><span style="color:#8C7B70;font-size:11px">${pts[2]||""}</span></div>`;continue;}
+      if (/^(ENCROACHMENT|GRADING:|BASEMENT:|FIRE SPRINKLERS:|OFFSET PLAN)/i.test(t)){const ci=t.indexOf(" ");const lbl=t.slice(0,ci>0&&ci<25?ci:t.indexOf(":")).replace(":","");bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:9px;font-weight:700;color:#8C7B70;font-family:monospace;min-width:100px;padding-top:1px">${lbl}</span><span style="color:#2C2420">${t.slice(lbl.length+1).trim()}</span></div>`;continue;}
+      if (/^CRITICAL PATH:/i.test(t)){bodyHtml+=`<div style="padding:8px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;margin:8px 0;display:flex;gap:8px;align-items:center"><span style="font-size:10px;font-weight:700;color:#2563eb;font-family:monospace">CRITICAL PATH</span><span style="font-size:13px;color:#1d4ed8">${t.slice(14).trim()}</span></div>`;continue;}
+      if (/^(DENSITY MATH|TOC|MAX BUILDOUT|EXISTING|BEST CASE|WORST CASE)/i.test(t)){const ci=t.indexOf(":")||t.indexOf(" ");const lbl=t.slice(0,ci).trim();const val=t.slice(ci+1).trim();bodyHtml+=`<div style="padding:6px 12px;margin:4px 0;background:#F9FAFB;border-radius:6px;border-left:3px solid ${T.orange}"><span style="font-size:9px;font-weight:700;color:${T.orange};font-family:monospace;margin-right:8px">${lbl}</span><span style="font-size:13px;color:#1A1714;font-weight:600">${val}</span></div>`;continue;}
       if (/^Weeks?\s[\d\-–]+:/i.test(t)){const ci=t.indexOf(":");bodyHtml+=`<div style="display:flex;gap:12px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-weight:700;color:${T.orange};min-width:80px;font-size:11px;font-family:monospace">${t.slice(0,ci)}</span><span style="color:#2C2420">${t.slice(ci+1).trim()}</span></div>`;continue;}
       if (/^\d+\./.test(t)){const rest2=t.replace(/^\d+\.\s*/,"");const pi=rest2.indexOf("|");const act=pi>0?rest2.slice(0,pi).trim():rest2;const me=pi>0?rest2.slice(pi+1).trim():"";const n2=(t.match(/^\d+/)||[""])[0];bodyHtml+=`<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #E2D9D0;align-items:flex-start"><span style="font-size:10px;font-weight:800;color:#fff;background:${T.orange};border-radius:4px;padding:2px 6px;white-space:nowrap;margin-top:1px">${n2}</span><div><strong style="font-size:12px">${act}</strong>${me?`<span style="display:block;font-size:11px;color:#8C7B70;margin-top:2px">${me}</span>`:""}</div></div>`;continue;}
       if (t.startsWith("- ")||t.startsWith("* ")){bodyHtml+=`<li style="font-size:12px;color:#2C2420;margin:3px 0">${t.slice(2)}</li>`;continue;}
       if (t==="DEMO"||t==="BUILDING"||t.startsWith("TECHNICAL")){bodyHtml+=`<div style="font-size:9px;font-weight:700;color:${T.orange};text-transform:uppercase;letter-spacing:0.1em;margin-top:12px;margin-bottom:4px;font-family:monospace">${t}</div>`;continue;}
-      // Skip legal notice — rendered separately as footer disclaimer
-      if (pdfSec==="legal notice") continue;
       bodyHtml+=`<p style="font-size:12px;color:#2C2420;margin:4px 0">${t}</p>`;
     }
+    const addrLine = editStreet || address;
+    const parcelMeta = [label, date, parcel?.hasData ? "ZIMAS verified" : "ZIP estimates", jurisdiction?.short].filter(Boolean).join(" · ");
+    const parcelInfo = [parcel?.zoning, parcel?.lotSizeSf ? parcel.lotSizeSf.toLocaleString() + " sf" : null, parcel?.apn ? "APN " + parcel.apn : null].filter(Boolean).join(" · ");
     const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Listo_${addrSlug}_${dateSlug}</title>
-<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:32px;color:#1A1714;font-size:13px;line-height:1.65;counter-reset:page}.header{border-bottom:3px solid ${T.orange};padding-bottom:14px;margin-bottom:20px}.brand{font-size:20px;font-weight:700;color:#1A1714;font-family:Georgia,serif}.brand span{color:${T.orange}}.address-bar{background:${T.orange};color:#1A1714;padding:12px 16px;border-radius:6px;margin:12px 0}.addr-main{font-size:14px;font-weight:700;color:#1A1714;font-family:Georgia,serif}.addr-sub{font-size:11px;color:#2C2420;margin-top:2px;opacity:0.85}h2{font-size:14px;font-weight:700;color:${T.orange};font-family:Georgia,serif;border-bottom:1px solid ${T.orange}30;padding-bottom:4px;margin:18px 0 10px;text-transform:uppercase;letter-spacing:0.05em}h3{font-size:12px;font-weight:700;color:#2C2420;margin:12px 0 6px;background:#F0EBE3;padding:3px 8px;border-radius:4px}ul{padding-left:18px;margin:6px 0}.disclaimer{margin-top:20px;padding:10px 12px;background:#FAF7F2;border:1px solid #E2D9D0;border-radius:6px;font-size:11px;color:#8C7B70;line-height:1.6;font-style:italic}.footer{margin-top:16px;font-size:10px;color:#A8A29C;text-align:center;border-top:1px solid #E2D9D0;padding-top:12px}@media print{body{padding:20px}h2{page-break-before:auto}@page{margin:20mm;@bottom-right{content:"Page " counter(page);font-size:9px;color:#8C7B70;font-family:Arial,sans-serif}}}</style>
+<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:32px;color:#1A1714;font-size:13px;line-height:1.65;counter-reset:page}.header{border-bottom:3px solid ${T.orange};padding-bottom:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}.brand{font-size:20px;font-weight:700;color:#1A1714;font-family:Georgia,serif}.brand span{color:${T.orange}}.meta{font-size:10px;color:#8C7B70;text-align:right;font-family:monospace}.address-bar{background:${T.orange};color:white;padding:14px 18px;border-radius:8px;margin:12px 0}.addr-main{font-size:16px;font-weight:700;font-family:Georgia,serif}.addr-sub{font-size:11px;margin-top:3px;opacity:0.8}.addr-info{font-size:11px;margin-top:2px;opacity:0.7}h2{font-size:14px;font-weight:700;color:${T.orange};font-family:Georgia,serif;border-bottom:2px solid ${T.orange}30;padding-bottom:4px;margin:22px 0 10px;text-transform:uppercase;letter-spacing:0.05em}h3{font-size:12px;font-weight:700;color:#2C2420;margin:12px 0 6px;background:#F0EBE3;padding:3px 8px;border-radius:4px}ul{padding-left:18px;margin:6px 0}.footer{margin-top:24px;font-size:10px;color:#A8A29C;text-align:center;border-top:1px solid #E2D9D0;padding-top:12px}.data-src{margin-top:12px;padding:8px 12px;background:#FAF7F2;border-radius:6px;font-size:10px;color:#8C7B70;text-align:center}@media print{body{padding:20px}h2{page-break-before:auto}@page{margin:20mm;@bottom-right{content:"Page " counter(page);font-size:9px;color:#8C7B70;font-family:Arial,sans-serif}}}</style>
 </head><body>
-<div class="header"><div class="brand">listo<span>.</span></div></div>
-<div class="address-bar"><div class="addr-main">${editStreet||address}</div><div class="addr-sub">${label} · ${date}${parcel?" · "+parcel.source:" · ZIP estimates"}${jurisdiction?" · "+jurisdiction.short:""}</div></div>
+<div class="header"><div class="brand">listo<span>.</span></div><div class="meta">PERMIT ANALYSIS REPORT<br>${date}</div></div>
+<div class="address-bar"><div class="addr-main">${addrLine}</div><div class="addr-sub">${parcelMeta}</div>${parcelInfo ? `<div class="addr-info">${parcelInfo}</div>` : ""}</div>
 ${bodyHtml}
-<div class="disclaimer">AI-generated guidance based on publicly available LA permit data. Always verify with your jurisdiction before submitting. This is not legal advice. Listo makes no warranties regarding accuracy or completeness.</div>
+<div class="data-src">Data sourced from City of Los Angeles ZIMAS (ArcGIS), LA County Assessor, and Census/Nominatim geocoding. Data provided "as is" per ZIMAS terms at zimas.lacity.org.</div>
 <div class="footer">listo.zone · Not affiliated with the City of Los Angeles, Santa Monica, Beverly Hills, Malibu, or LADBS</div>
 </body></html>`;
     const win=window.open("","_blank","width=900,height=700");
@@ -1938,28 +2033,12 @@ ${bodyHtml}
                   <ReportMarkdown text={result} jurisdiction={jurisdiction} parcel={parcel} />
                 </div>
 
-                {/* References & Legal */}
+                {/* Listo footer */}
                 <div style={{ margin:"24px 28px 0", background:T.black,
-                  borderRadius:10, padding:"20px 24px" }}>
-                  <div style={{ fontSize:10, color:T.orange, fontFamily:"monospace",
-                    letterSpacing:"0.12em", marginBottom:10 }}>REFERENCES & LEGAL</div>
-                  <p style={{ fontSize:14, color:T.cream, lineHeight:1.8, margin:0 }}>
-                    AI-generated guidance based on publicly available{" "}
-                    {jurisdiction?.name || "LA"} permit data. Always verify with{" "}
-                    <strong style={{ color:T.lime }}>{jurisdiction?.agency || "LADBS"}</strong>{" "}
-                    ({jurisdiction?.applyUrl || jurisdiction?.agencyUrl ? (
-                      <a href={jurisdiction.applyUrl || jurisdiction.agencyUrl} target="_blank"
-                        style={{ color:T.lime }}>{(jurisdiction.applyUrl || jurisdiction.agencyUrl).replace("https://","")}</a>
-                    ) : "ladbs.org"}) before proceeding.
-                    This is not legal advice. Listo makes no warranties regarding accuracy or completeness.
-                  </p>
-                  <p style={{ fontSize:11, color:"#ffffff55", lineHeight:1.6, margin:"10px 0 0" }}>
-                    Parcel data sourced from publicly available City of Los Angeles (ZIMAS ArcGIS), LA County
-                    Assessor, and Census/Nominatim geocoding databases. Data is provided "as is" and may not
-                    reflect recent changes. ZIMAS terms of use at zimas.lacity.org.
-                  </p>
-                  <div style={{ borderTop:"1px solid #ffffff15", marginTop:14, paddingTop:14 }}>
-                    <AcronymLegend jurisdiction={jurisdiction} />
+                  borderRadius:10, padding:"16px 24px", textAlign:"center" }}>
+                  <div style={{ fontSize:10, color:"#ffffff55", lineHeight:1.6, margin:0 }}>
+                    Data sourced from City of Los Angeles ZIMAS (ArcGIS), LA County Assessor,
+                    and Census/Nominatim geocoding. Data provided "as is" per ZIMAS terms at zimas.lacity.org.
                   </div>
                 </div>
 
