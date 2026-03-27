@@ -1,19 +1,69 @@
 /**
- * Listo API — /api/analyze  (v5 — client-side ZIMAS architecture)
+ * Listo API — /api/analyze  (v7 — security + LAMC tables)
  *
  * The browser queries ZIMAS directly (public ArcGIS API, no key needed).
  * This endpoint receives the pre-fetched parcel data + calls Claude.
  *
- * v5 changes:
- * - Server no longer queries ZIMAS (Vercel→ZIMAS times out / services stopped)
- * - Browser passes geocode + parcel data in request body
- * - Full survey report checklist in Claude prompt per architect spec
+ * Security:
+ * - CORS restricted to listo.zone
+ * - Rate limiting: 10 requests per IP per minute
+ * - Input sanitization: strips control chars, limits length
  */
 
+// ── Rate limiter (in-memory, resets on cold start) ───────────────────────
+const rateLimits = new Map();
+const RATE_LIMIT = 10;      // max requests
+const RATE_WINDOW = 60000;  // per 60 seconds
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = rateLimits.get(ip);
+  if (!entry || now - entry.start > RATE_WINDOW) {
+    rateLimits.set(ip, { start: now, count: 1 });
+    return true;
+  }
+  entry.count++;
+  if (entry.count > RATE_LIMIT) return false;
+  return true;
+}
+
+// ── Input sanitizer ──────────────────────────────────────────────────────
+function sanitize(str, maxLen = 500) {
+  if (typeof str !== "string") return "";
+  return str
+    .replace(/[\x00-\x1F\x7F]/g, "")  // strip control chars
+    .replace(/<[^>]*>/g, "")            // strip HTML tags
+    .slice(0, maxLen)
+    .trim();
+}
+
 export default async function handler(req, res) {
+  // CORS — restrict to listo.zone in production
+  const origin = req.headers?.origin || "";
+  const allowed = ["https://listo.zone", "https://www.listo.zone", "http://localhost:3000"];
+  if (origin && !allowed.some(a => origin.startsWith(a))) {
+    return res.status(403).json({ error: "Origin not allowed" });
+  }
+  res.setHeader("Access-Control-Allow-Origin", origin || "https://listo.zone");
+  res.setHeader("Access-Control-Allow-Methods", "POST");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { address, projectType, projectDetails, jurisdiction, geocode, parcel } = req.body;
+  // Rate limiting
+  const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown";
+  if (!checkRateLimit(ip)) {
+    return res.status(429).json({ error: "Rate limit exceeded. Try again in a minute." });
+  }
+
+  // Sanitize inputs
+  const address = sanitize(req.body?.address, 200);
+  const projectType = sanitize(req.body?.projectType, 100);
+  const projectDetails = sanitize(req.body?.projectDetails || "", 1000);
+  const jurisdiction = sanitize(req.body?.jurisdiction || "city-of-la", 50);
+  const geocode = req.body?.geocode || null;
+  const parcel = req.body?.parcel || null;
+
   if (!address || !projectType) return res.status(400).json({ error: "Address and project type required" });
 
   const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
@@ -111,6 +161,8 @@ function buildSystem(jurisdictionKey) {
     "═══════════════════════════════════════════════════════════════════════════",
     "LAMC REFERENCE TABLES — USE THESE FOR DEVELOPMENT STANDARDS",
     "These tables are the authoritative source. Do NOT use general knowledge.",
+    "Last updated: March 2026. Verify current code at library.municode.com/ca/los_angeles.",
+    "In the report, state: 'LAMC standards as of March 2026 — verify current code before submitting.'",
     "═══════════════════════════════════════════════════════════════════════════",
     "",
     "FAR BY ZONE + HEIGHT DISTRICT (LAMC 12.21.1):",
