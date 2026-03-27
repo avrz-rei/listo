@@ -305,12 +305,27 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
 
   return (
     <div style={{ marginTop:4 }}>
+      {/* Address mismatch warning */}
+      {parcel.addressMismatch && (
+        <div style={{ background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:10,
+          padding:"12px 16px", marginBottom:12, display:"flex", gap:10, alignItems:"flex-start" }}>
+          <span style={{ fontSize:16 }}>⚠️</span>
+          <div>
+            <div style={{ fontSize:12, fontWeight:700, color:"#991B1B", marginBottom:2 }}>Address Mismatch</div>
+            <div style={{ fontSize:11, color:"#7F1D1D", lineHeight:1.5 }}>{parcel.addressMismatchNote}</div>
+          </div>
+        </div>
+      )}
+
       {/* Key Identification — hero card */}
       <Card title="Parcel Identification" color={T.orange}>
         <Row label="Address" value={parcel.situsAddr || parcel.address || null} bold />
         <Row label="APN" value={parcel.apn || null} bold />
         <Row label="Zoning" value={parcel.zoning || null} bold />
         <Row label="Lot Size" value={parcel.lotSizeSf ? parcel.lotSizeSf.toLocaleString() + " sf" : null} bold />
+        {parcel.lotWidthFt && parcel.lotDepthFt && (
+          <Row label="Lot Dimensions" value={"~" + parcel.lotWidthFt + " ft × ~" + parcel.lotDepthFt + " ft (est.)"} />
+        )}
         <Row label="Year Built" value={parcel.yearBuilt || null} />
         <Row label="Existing Building" value={parcel.existingBuildingSqft ? parcel.existingBuildingSqft + " sf" : null} />
         <Row label="Units" value={parcel.existingUnits || null} />
@@ -349,15 +364,15 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
         <HazardGrid items={[
           ["Coastal Zone", parcel.coastalZone === "Yes" ? parcel.coastalZoneType || "Yes" : parcel.coastalZone === "No" ? false : null, parcel.coastalZone === "Yes"],
           ["Very High Fire Hazard Zone", parcel.fireHazard, false],
-          ["Liquefaction", parcel.liquefaction, parcel.liquefaction === true],
-          ["Landslide", parcel.landslide, parcel.landslide === true],
+          ["Liquefaction (CGS)", parcel.liquefaction, parcel.liquefaction === true],
+          ["Landslide (CGS)", parcel.landslide, parcel.landslide === true],
+          ["Alquist-Priolo Fault", parcel.alquistPriolo, parcel.alquistPriolo === true],
           ["Hillside Area", parcel.hillside, false],
           ["Special Grading", parcel.specialGrading, false],
           ["Sea Level Rise", parcel.seaLevelRise, parcel.seaLevelRise === true],
           ["Tsunami Hazard", parcel.tsunami, parcel.tsunami === true],
           ["Flood Zone", parcel.floodZone ? parcel.floodZone : parcel.floodZone === undefined ? null : false, false],
           ["Methane Hazard", parcel.methane ? parcel.methane : parcel.methane === undefined ? null : false, !!parcel.methane],
-          ["Fault Zone", parcel.faultZone || null, !!parcel.faultZone],
           ["Airport Hazard", null, false],
         ]} />
       </Card>
@@ -649,7 +664,8 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
           if (!rt || rt.startsWith("##") || rt.startsWith("EXEMPTION:") ||
               rt.startsWith("ENCROACHMENT") || rt.startsWith("GRADING:") ||
               rt.startsWith("BASEMENT:") || rt.startsWith("FIRE SPRINKLERS:") ||
-              rt.startsWith("OFFSET PLAN")) break;
+              rt.startsWith("OFFSET PLAN") || rt.startsWith("SWIMMING POOL:") ||
+              rt.startsWith("PARKING STALLS:") || rt.startsWith("Analysis as of")) break;
           if (rt.includes("|") && rt.split("|").length >= 2) {
             const cells = rt.split("|").map(p=>p.trim());
             const [std, maxA, prop, lamc] = cells;
@@ -684,10 +700,11 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
         </div>);
         i++; continue;
       }
-      // Technical spec rows: ENCROACHMENT PLANE, GRADING, BASEMENT, FIRE SPRINKLERS, OFFSET PLAN BREAK
+      // Technical spec rows: ENCROACHMENT, GRADING, BASEMENT, FIRE SPRINKLERS, OFFSET, POOL, PARKING
       if (t.startsWith("ENCROACHMENT PLANE:") || t.startsWith("GRADING:") ||
           t.startsWith("BASEMENT:") || t.startsWith("FIRE SPRINKLERS:") ||
-          t.startsWith("OFFSET PLAN BREAK:")) {
+          t.startsWith("OFFSET PLAN BREAK:") || t.startsWith("SWIMMING POOL:") ||
+          t.startsWith("PARKING STALLS:")) {
         const colonIdx = t.indexOf(":");
         const label = t.slice(0, colonIdx);
         const val = t.slice(colonIdx+1).trim();
@@ -699,10 +716,43 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
         </div>);
         i++; continue;
       }
+      // "Analysis as of" date stamp
+      if (t.toLowerCase().startsWith("analysis as of") || t.toLowerCase().startsWith("lamc standards")) {
+        els.push(<div key={i} style={{ fontSize:11, color:T.muted, fontStyle:"italic",
+          padding:"8px 0", marginTop:4 }}>{renderInline(t)}</div>);
+        i++; continue;
+      }
     }
 
-    // Density / zoning metric cards
-    if (sec.includes("zoning") && !sec.includes("alert")) {
+    // Development Opportunity metric cards
+    if (sec.includes("opportunity") || (sec.includes("zoning") && !sec.includes("alert"))) {
+      if (t.startsWith("USES PERMITTED:")) {
+        els.push(<div key={i} style={{ background:T.warmGray, border:`1px solid ${T.border}`,
+          borderRadius:6, padding:"10px 14px", marginBottom:8, marginTop:8 }}>
+          <div style={{ fontSize:9, fontWeight:700, color:T.orange, letterSpacing:"0.1em",
+            fontFamily:"monospace", marginBottom:4 }}>USES PERMITTED</div>
+          <div style={{ fontSize:13, color:T.text, lineHeight:1.6 }}>{renderInline(t.slice(15).trim())}</div>
+        </div>);
+        i++; continue;
+      }
+      if (t.startsWith("BUILDABLE AREA:")) {
+        els.push(<div key={i} style={{ background:T.warmGray, border:`1px solid ${T.border}`,
+          borderRadius:6, padding:"8px 12px", marginBottom:6, display:"flex", gap:8 }}>
+          <span style={{ fontSize:9, fontWeight:700, color:T.muted, letterSpacing:"0.1em",
+            fontFamily:"monospace" }}>BUILDABLE</span>
+          <span style={{ fontSize:13, color:T.text }}>{t.slice(15).trim()}</span>
+        </div>);
+        i++; continue;
+      }
+      if (t.startsWith("MAX FLOOR AREA:")) {
+        els.push(<div key={i} style={{ background:T.warmGray, border:`1px solid ${T.border}`,
+          borderRadius:6, padding:"8px 12px", marginBottom:6, display:"flex", gap:8 }}>
+          <span style={{ fontSize:9, fontWeight:700, color:T.orange, letterSpacing:"0.1em",
+            fontFamily:"monospace" }}>MAX FLOOR</span>
+          <span style={{ fontSize:13, color:T.text, fontWeight:600 }}>{t.slice(15).trim()}</span>
+        </div>);
+        i++; continue;
+      }
       if (t.startsWith("DENSITY MATH:")) {
         els.push(<div key={i} style={{ background:"#F0FDF4", border:`2px solid ${T.green}`,
           borderRadius:8, padding:"14px 16px", marginBottom:10, marginTop:8 }}>
@@ -861,6 +911,66 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
         </div>
       </div>);
       i++; continue;
+    }
+
+    // Definitions section — render as compact term/definition pairs
+    if (sec.includes("definition")) {
+      if (t.includes(":")) {
+        const ci = t.indexOf(":");
+        const term = t.slice(0, ci).trim();
+        const def = t.slice(ci + 1).trim();
+        els.push(<div key={i} style={{ padding:"6px 0", borderBottom:`1px solid ${T.border}`,
+          display:"flex", gap:10, alignItems:"flex-start" }}>
+          <span style={{ fontSize:10, fontWeight:700, color:T.orange, fontFamily:"monospace",
+            minWidth:90, flexShrink:0, paddingTop:2 }}>{term}</span>
+          <span style={{ fontSize:12, color:T.muted, lineHeight:1.5 }}>{renderInline(def)}</span>
+        </div>);
+        i++; continue;
+      }
+    }
+
+    // Terms & Data Sources section — render as compact grid
+    if (sec.includes("terms")) {
+      if (t.includes("|") && (t.includes(":") || t.includes("("))) {
+        const items = t.split("|").map(s => s.trim()).filter(Boolean);
+        els.push(<div key={i} style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>
+          {items.map((item, idx) => {
+            const ci = item.indexOf(":");
+            if (ci > 0) {
+              const abbr = item.slice(0, ci).trim();
+              const full = item.slice(ci + 1).trim();
+              return <span key={idx} style={{ fontSize:10, padding:"3px 8px", background:T.warmGray,
+                border:`1px solid ${T.border}`, borderRadius:4, lineHeight:1.4 }}>
+                <strong style={{ color:T.orange }}>{abbr}</strong>
+                <span style={{ color:T.muted }}> {full}</span>
+              </span>;
+            }
+            return <span key={idx} style={{ fontSize:10, color:T.muted, padding:"3px 8px",
+              background:T.warmGray, border:`1px solid ${T.border}`, borderRadius:4 }}>{item}</span>;
+          })}
+        </div>);
+        i++; continue;
+      }
+      // Data sources line
+      if (t.toLowerCase().startsWith("data source")) {
+        const sources = t.slice(t.indexOf(":") + 1).trim().split("|").map(s => s.trim()).filter(Boolean);
+        els.push(<div key={i} style={{ marginTop:8 }}>
+          <div style={{ fontSize:9, color:T.muted, fontFamily:"monospace", letterSpacing:"0.08em",
+            marginBottom:6 }}>DATA SOURCES</div>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+            {sources.map((s, si) => {
+              const urlMatch = s.match(/\(([^)]+)\)/);
+              const label = s.replace(/\([^)]+\)/, "").trim();
+              return <a key={si} href={urlMatch ? (urlMatch[1].startsWith("http") ? urlMatch[1] : "https://" + urlMatch[1]) : "#"}
+                target="_blank" style={{ fontSize:10, color:T.orange, textDecoration:"none",
+                border:`1px solid ${T.orange}30`, borderRadius:4, padding:"3px 8px" }}>
+                {label}
+              </a>;
+            })}
+          </div>
+        </div>);
+        i++; continue;
+      }
     }
 
     // Legal notice — render as normal section (last in report)
@@ -1027,6 +1137,7 @@ export default function Listo() {
   const [stage, setStage]           = useState("input");
   const [parsed, setParsed]         = useState(null);
   const [editZip, setEditZip]       = useState("");
+  const [zipDetecting, setZipDetecting] = useState(false);
   const [editStreet, setEditStreet] = useState("");
   const [jurisdiction, setJurisdiction] = useState(null);
   const [result, setResult]         = useState(null);
@@ -1063,16 +1174,18 @@ export default function Listo() {
     track("address_submitted", { zip:p.zip, project_type:projectType });
     setStage("confirm");
 
-    // Run geocoder in background to populate ZIP if not in the address string
-    if (!p.zip) {
+    if (p.zip) {
+      setEditZip(p.zip);
+    } else {
+      setEditZip("");
+      setZipDetecting(true);
       try {
         const geo = await geocodeAddress(address);
         if (geo?.zip && geo.zip.length === 5) {
           setEditZip(geo.zip);
         }
       } catch (e) { console.log("[GEOCODE] Background geocode failed:", e.message); }
-    } else {
-      setEditZip(p.zip);
+      setZipDetecting(false);
     }
   };
 
@@ -1214,7 +1327,7 @@ export default function Listo() {
       }
     } catch (e) { console.log("[ZIMAS] Zoning query error:", e.message); }
 
-    // 2. LA County Parcel — APN, address, use code + lot area from geometry
+    // 2. LA County Parcel — APN, address, use code + lot area + lot dimensions from geometry
     try {
       const PARCEL_URL = "https://public.gis.lacounty.gov/public/rest/services/LACounty_Cache/LACounty_Parcel/MapServer/0/query";
       const p = new URLSearchParams({
@@ -1230,9 +1343,23 @@ export default function Listo() {
       const r = await fetch(PARCEL_URL + "?" + p, { signal: AbortSignal.timeout(12000) });
       if (r.ok) {
         const d = await r.json();
-        const f = d?.features?.[0];
-        if (f?.attributes) {
-          const a = f.attributes;
+        // Try to match the correct parcel by comparing house numbers
+        const userHouseNo = (editStreet || address).match(/^(\d+)/)?.[1] || "";
+        let bestFeature = d?.features?.[0];
+        if (d?.features?.length > 1 && userHouseNo) {
+          const match = d.features.find(f => f.attributes?.SitusHouseNo === userHouseNo);
+          if (match) bestFeature = match;
+        }
+        // If single result, verify address matches
+        if (bestFeature?.attributes) {
+          const a = bestFeature.attributes;
+          const situsHouseNo = a.SitusHouseNo || "";
+          // Address verification — flag if house number doesn't match
+          if (userHouseNo && situsHouseNo && userHouseNo !== situsHouseNo) {
+            parcel.addressMismatch = true;
+            parcel.addressMismatchNote = "Parcel query returned " + situsHouseNo + " " + (a.SitusStreet||"") + " but you entered " + userHouseNo + ". Verify the correct parcel at zimas.lacity.org.";
+            console.log("[PARCEL] ADDRESS MISMATCH:", situsHouseNo, "vs user input", userHouseNo);
+          }
           parcel.hasData = true;
           parcel.apn = a.APN || a.AIN || null;
           parcel.situsAddr = a.SitusFullAddress || a.SitusAddress || null;
@@ -1244,9 +1371,10 @@ export default function Listo() {
           parcel.agencyName = a.AgencyName || null;
           console.log("[PARCEL] LA County hit — APN:", parcel.apn, "addr:", parcel.situsAddr);
 
-          // Calculate lot area from polygon geometry (CA State Plane feet → sq ft)
-          if (f.geometry?.rings?.[0]) {
-            const ring = f.geometry.rings[0];
+          // Calculate lot area + dimensions from polygon geometry
+          if (bestFeature.geometry?.rings?.[0]) {
+            const ring = bestFeature.geometry.rings[0];
+            // Lot area (shoelace formula — CA State Plane feet)
             let area = 0;
             for (let i = 0; i < ring.length; i++) {
               const j = (i + 1) % ring.length;
@@ -1254,13 +1382,92 @@ export default function Listo() {
               area -= ring[j][0] * ring[i][1];
             }
             parcel.lotSizeSf = Math.round(Math.abs(area) / 2);
-            console.log("[PARCEL] Calculated lot area:", parcel.lotSizeSf, "sf");
+            // Lot dimensions from bounding box (approximate width × depth)
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            for (const pt of ring) {
+              if (pt[0] < minX) minX = pt[0];
+              if (pt[0] > maxX) maxX = pt[0];
+              if (pt[1] < minY) minY = pt[1];
+              if (pt[1] > maxY) maxY = pt[1];
+            }
+            parcel.lotWidthFt = Math.round(maxX - minX);
+            parcel.lotDepthFt = Math.round(maxY - minY);
+            parcel.lotDimsSource = "estimated from parcel geometry";
+            console.log("[PARCEL] Lot:", parcel.lotSizeSf, "sf, ~" + parcel.lotWidthFt + "×" + parcel.lotDepthFt + " ft");
           }
         }
       }
     } catch (e) { console.log("[PARCEL] LA County query error:", e.message); }
 
-    // 3. Legend layers — TOC, liquefaction, hazards, overlays
+    // 3. CGS Seismic Hazards — AUTHORITATIVE state source (ZIMAS gets data from CGS)
+    const CGS = "https://gis.conservation.ca.gov/server/rest/services/CGS_Earthquake_Hazard_Zones";
+    // 3a. Liquefaction
+    try {
+      const p = new URLSearchParams({
+        geometry: lng + "," + lat,
+        geometryType: "esriGeometryPoint",
+        inSR: "4326",
+        spatialRel: "esriSpatialRelIntersects",
+        outFields: "*",
+        returnGeometry: "false",
+        f: "json",
+      });
+      const r = await fetch(CGS + "/SHP_Liquefaction_Zones/MapServer/0/query?" + p, { signal: AbortSignal.timeout(10000) });
+      if (r.ok) {
+        const d = await r.json();
+        if (d?.features?.length > 0) {
+          parcel.liquefaction = true;
+          parcel.liquefactionSource = "CGS Seismic Hazard Zones (verified)";
+          parcel.hasData = true;
+          console.log("[CGS] Liquefaction: YES");
+        } else {
+          parcel.liquefaction = false;
+          parcel.liquefactionSource = "CGS (verified — not in zone)";
+          console.log("[CGS] Liquefaction: NO");
+        }
+      }
+    } catch (e) { console.log("[CGS] Liquefaction query error:", e.message); }
+
+    // 3b. Landslide
+    try {
+      const p = new URLSearchParams({
+        geometry: lng + "," + lat, geometryType: "esriGeometryPoint",
+        inSR: "4326", spatialRel: "esriSpatialRelIntersects",
+        outFields: "*", returnGeometry: "false", f: "json",
+      });
+      const r = await fetch(CGS + "/SHP_Landslide_Zones/MapServer/0/query?" + p, { signal: AbortSignal.timeout(10000) });
+      if (r.ok) {
+        const d = await r.json();
+        parcel.landslide = d?.features?.length > 0;
+        parcel.landslideSource = "CGS (verified)";
+        parcel.hasData = true;
+        console.log("[CGS] Landslide:", parcel.landslide);
+      }
+    } catch (e) { console.log("[CGS] Landslide query error:", e.message); }
+
+    // 3c. Fault Zones (Alquist-Priolo)
+    try {
+      const p = new URLSearchParams({
+        geometry: lng + "," + lat, geometryType: "esriGeometryPoint",
+        inSR: "4326", spatialRel: "esriSpatialRelIntersects",
+        outFields: "*", returnGeometry: "false", f: "json",
+      });
+      const r = await fetch(CGS + "/SHP_Fault_Zones/FeatureServer/0/query?" + p, { signal: AbortSignal.timeout(10000) });
+      if (r.ok) {
+        const d = await r.json();
+        if (d?.features?.length > 0) {
+          parcel.faultZone = d.features[0].attributes?.FaultName || "Alquist-Priolo Fault Zone";
+          parcel.alquistPriolo = true;
+        } else {
+          parcel.alquistPriolo = false;
+        }
+        parcel.faultSource = "CGS (verified)";
+        parcel.hasData = true;
+        console.log("[CGS] Fault zone:", parcel.faultZone || "none");
+      }
+    } catch (e) { console.log("[CGS] Fault query error:", e.message); }
+
+    // 4. Legend layers — TOC, hazards, overlays (ZIMAS)
     try {
       const results = await zimasIdentify("zma/legend", lng, lat);
       for (const r of results) {
@@ -1566,7 +1773,7 @@ export default function Listo() {
         continue;
       }
       if (/^EXEMPTION:/i.test(t)){const rest=t.slice(10).trim();const pts=rest.split("|").map(p=>p.trim());bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:9px;font-weight:700;color:#fff;background:${T.orange};border-radius:3px;padding:1px 6px;margin-top:1px">EXEMPT</span><span style="flex:1">${pts[0]||""}</span><span style="color:${T.orange};font-weight:600">${pts[1]||""}</span><span style="color:#8C7B70;font-size:11px">${pts[2]||""}</span></div>`;continue;}
-      if (/^(ENCROACHMENT|GRADING:|BASEMENT:|FIRE SPRINKLERS:|OFFSET PLAN)/i.test(t)){const ci=t.indexOf(" ");const lbl=t.slice(0,ci>0&&ci<25?ci:t.indexOf(":")).replace(":","");bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:9px;font-weight:700;color:#8C7B70;font-family:monospace;min-width:100px;padding-top:1px">${lbl}</span><span style="color:#2C2420">${t.slice(lbl.length+1).trim()}</span></div>`;continue;}
+      if (/^(ENCROACHMENT|GRADING:|BASEMENT:|FIRE SPRINKLERS:|OFFSET PLAN|SWIMMING POOL:|PARKING STALLS:)/i.test(t)){const ci=t.indexOf(":");const lbl=t.slice(0,ci).trim();bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:9px;font-weight:700;color:#8C7B70;font-family:monospace;min-width:120px;padding-top:1px">${lbl}</span><span style="color:#2C2420">${t.slice(ci+1).trim()}</span></div>`;continue;}
       if (/^CRITICAL PATH:/i.test(t)){bodyHtml+=`<div style="padding:8px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;margin:8px 0;display:flex;gap:8px;align-items:center"><span style="font-size:10px;font-weight:700;color:#2563eb;font-family:monospace">CRITICAL PATH</span><span style="font-size:13px;color:#1d4ed8">${t.slice(14).trim()}</span></div>`;continue;}
       if (/^(DENSITY MATH|TOC|MAX BUILDOUT|EXISTING|BEST CASE|WORST CASE)/i.test(t)){const ci=t.indexOf(":")||t.indexOf(" ");const lbl=t.slice(0,ci).trim();const val=t.slice(ci+1).trim();bodyHtml+=`<div style="padding:6px 12px;margin:4px 0;background:#F9FAFB;border-radius:6px;border-left:3px solid ${T.orange}"><span style="font-size:9px;font-weight:700;color:${T.orange};font-family:monospace;margin-right:8px">${lbl}</span><span style="font-size:13px;color:#1A1714;font-weight:600">${val}</span></div>`;continue;}
       if (/^Weeks?\s[\d\-–]+:/i.test(t)){const ci=t.indexOf(":");bodyHtml+=`<div style="display:flex;gap:12px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-weight:700;color:${T.orange};min-width:80px;font-size:11px;font-family:monospace">${t.slice(0,ci)}</span><span style="color:#2C2420">${t.slice(ci+1).trim()}</span></div>`;continue;}
@@ -1865,16 +2072,17 @@ ${bodyHtml}
                       textTransform:"none", letterSpacing:0 }}>— double-check this</span>
                   </label>
                   <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-                    <input style={{ width:120, border:`2px solid ${editZip.length === 5 ? T.orange : T.red}`,
+                    <input style={{ width:120, border:`2px solid ${editZip.length === 5 ? T.orange : zipDetecting ? T.muted : T.red}`,
                       borderRadius:8, padding:"11px 14px", fontSize:22,
-                      fontWeight:700, color: editZip.length === 5 ? T.orange : T.red, letterSpacing:"0.12em",
+                      fontWeight:700, color: editZip.length === 5 ? T.orange : zipDetecting ? T.muted : T.red, letterSpacing:"0.12em",
                       textAlign:"center", fontFamily:"'DM Sans',sans-serif" }}
                       type="text" maxLength={5} value={editZip}
                       onChange={e=>setEditZip(e.target.value.replace(/\D/g,"").slice(0,5))}
-                      placeholder="90045" />
+                      placeholder={zipDetecting ? "···" : "ZIP"} />
                     {editZip.length === 5 && <JurisdictionBadge jurisdiction={jurisdiction} />}
+                    {zipDetecting && <span style={{ fontSize:12, color:T.muted, fontStyle:"italic" }}>Detecting ZIP...</span>}
                   </div>
-                  {!editZip && (
+                  {!editZip && !zipDetecting && (
                     <div style={{ marginTop:8, fontSize:12, color:T.red,
                       fontFamily:"'DM Sans',sans-serif" }}>
                       ⚠ ZIP not detected from your address — enter it manually above. It determines zoning, permits, and fees.
@@ -2025,9 +2233,9 @@ ${bodyHtml}
                 <div style={{ borderBottom:`1px solid ${T.border}`,
                   padding:"10px 28px 8px", display:"flex", flexWrap:"wrap",
                   gap:6 }} className="no-print">
-                  {["Overview","Survey","Alerts","Standards","Density","Permits",
-                    "Fees","Timeline","Next Steps"].map((sec, idx) => {
-                    const fullNames = ["Project Overview","Parcel Survey","Zone Alerts","Development Standards","Zoning & Density","Permit Roadmap","Fee Summary","Timeline","Next Steps"];
+                  {["Overview","Opportunity","Standards","Survey","Alerts","Permits",
+                    "Fees","Timeline","Steps","Terms","Legal"].map((sec, idx) => {
+                    const fullNames = ["Project Overview","Development Opportunity","Development Standards","Parcel Survey","Zone Alerts","Permit Roadmap","Fee Summary","Timeline","Next Steps","Terms & Data Sources","Legal Notice"];
                     return (
                     <a key={sec}
                       href={"#sec-"+fullNames[idx].toLowerCase().replace(/[^a-z0-9]+/g,"-")}
