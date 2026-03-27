@@ -1961,7 +1961,6 @@ ${bodyHtml}
                   <div style={{ borderTop:"1px solid #ffffff15", marginTop:14, paddingTop:14 }}>
                     <AcronymLegend jurisdiction={jurisdiction} />
                   </div>
-                  </p>
                 </div>
 
                 {/* CTAs — Share + PDF */}
