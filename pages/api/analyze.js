@@ -453,6 +453,7 @@ function buildSystem(jurisdictionKey) {
     "## Next Steps",
     "Max 7. First 3 actionable THIS WEEK.",
     "[N]. [Action] | [Who] | [Cost]",
+    "  COST RULE: Only show costs from official/permit sources. For professional services (architect, engineer, consultant), write 'varies' — do NOT estimate professional fees.",
     "",
     "## Definitions",
     "BUILDABLE AREA: All portions of a lot within the proper zone, excluding required yard spaces and building line setbacks. For FAR calculations, use the buildable area of a one-story building. (LAMC 12.03)",
@@ -508,7 +509,14 @@ function buildMessage(rawAddr, geocode, parcel, projectType, details, jurisdicti
     if (parcel.generalPlanLandUse) lines.push("General Plan Land Use: " + parcel.generalPlanLandUse);
     if (parcel.communityPlan) lines.push("Community Plan: " + parcel.communityPlan);
     if (parcel.specificPlan) lines.push("Specific Plan: " + parcel.specificPlan);
+    if (parcel.specificPlans?.length) lines.push("Specific Plans: " + parcel.specificPlans.join(", ") + " (VERIFIED — ZIMAS)");
     if (parcel.heightDistrict) lines.push("Height District: " + parcel.heightDistrict);
+
+    // ZI codes from ZIMAS
+    if (parcel.ziCodes?.length) {
+      lines.push("Zoning Information (ZI) codes:");
+      for (const zi of parcel.ziCodes) lines.push("  " + zi + " (VERIFIED — ZIMAS)");
+    }
 
     // Density
     if (parcel.lotSizeSf > 0) {
@@ -523,6 +531,12 @@ function buildMessage(rawAddr, geocode, parcel, projectType, details, jurisdicti
       lines.push("RSO: NOT VERIFIED — check at hcidla.lacity.org");
     }
 
+    // JCO, HE Replacement, AB 2097, AB 2334
+    if (parcel.jco !== undefined) lines.push("Just Cause Eviction (JCO): " + (parcel.jco ? "YES" : "No") + " (VERIFIED — ZIMAS)");
+    if (parcel.heReplacement !== undefined) lines.push("Housing Element Replacement Required: " + (parcel.heReplacement ? "YES — demolition triggers replacement housing requirements" : "No") + " (VERIFIED — ZIMAS)");
+    if (parcel.ab2097 !== undefined) lines.push("AB 2097 (near Major Transit Stop): " + (parcel.ab2097 ? "YES — parking minimums may be reduced" : "No") + " (VERIFIED — ZIMAS)");
+    if (parcel.ab2334 !== undefined) lines.push("AB 2334 (Very Low VMT Area): " + (parcel.ab2334 ? "YES" : "No") + " (VERIFIED — ZIMAS)");
+
     // Overlays from ZIMAS identify results
     if (parcel.coastalZone) lines.push("Coastal Zone: " + parcel.coastalZone + " (VERIFIED)");
     if (parcel.coastalZoneType) lines.push("Coastal Zone Type: " + parcel.coastalZoneType + " (VERIFIED)");
@@ -536,6 +550,9 @@ function buildMessage(rawAddr, geocode, parcel, projectType, details, jurisdicti
     if (parcel.floodZone) lines.push("Flood Zone: " + parcel.floodZone + " (VERIFIED)");
     if (parcel.methane) lines.push("Methane Hazard: " + parcel.methane + " (VERIFIED)");
     if (parcel.seaLevelRise !== undefined) lines.push("Sea Level Rise Area: " + (parcel.seaLevelRise ? "YES" : "No") + " (VERIFIED)");
+    if (parcel.tsunami !== undefined) lines.push("Tsunami Hazard: " + (parcel.tsunami ? "YES" : "No") + " (VERIFIED — ZIMAS)");
+    if (parcel.airportHazard) lines.push("Airport Hazard: " + parcel.airportHazard + " (VERIFIED — ZIMAS)");
+    if (parcel.faultName) lines.push("Nearest Fault: " + parcel.faultName + " (" + (parcel.faultDistKm || "?") + " km) (VERIFIED — ZIMAS)");
     if (parcel.faultZone) lines.push("Fault Zone: " + parcel.faultZone + " (VERIFIED)");
 
     // Raw overlay layers from identify (catch-all for anything we might miss)
