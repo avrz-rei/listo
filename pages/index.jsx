@@ -1590,9 +1590,10 @@ export default function Listo() {
     const streetPart = userAddr.replace(/^\d+\s*/, "").replace(/,.*/, "").replace(/\b(ave|avenue|st|street|blvd|boulevard|dr|drive|rd|road|ct|court|pl|place|way|ln|lane|cir|circle)\b.*/i, "").trim();
     if (houseNo && streetPart) {
       try {
-        console.log("[ZIMAS-PROXY] Calling /api/zimas for", houseNo, streetPart);
-        const zr = await fetch("/api/zimas?houseNumber=" + encodeURIComponent(houseNo) + "&streetName=" + encodeURIComponent(streetPart),
-          { signal: AbortSignal.timeout(22000) });
+        console.log("[ZIMAS-PROXY] Calling Cloudflare Worker for", houseNo, streetPart);
+        const ZIMAS_PROXY = "https://zimas-proxy.listo.workers.dev";
+        const zr = await fetch(ZIMAS_PROXY + "?houseNumber=" + encodeURIComponent(houseNo) + "&streetName=" + encodeURIComponent(streetPart),
+          { signal: AbortSignal.timeout(15000) });
         if (zr.ok) {
           const zd = await zr.json();
           if (zd && !zd.error) {
