@@ -1281,47 +1281,29 @@ export default function Listo() {
     const m = normalized.match(/^(\d+)\s+(?!([NSEW])\s)(.+)/i);
     if (m) { for (const dir of ["W","E","N","S"]) variants.push(m[1]+" "+dir+" "+m[3]); }
 
-    // Try Census first
-    for (const v of variants) {
+    // Nominatim primary geocoder (Census is CORS-blocked from browser)
+    for (const v of [addr, ...variants]) {
       try {
-        const p = new URLSearchParams({ address: v, benchmark: "Public_AR_Current", format: "json" });
-        const r = await fetch("https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?" + p);
+        const q = encodeURIComponent(v + ", Los Angeles, CA");
+        const r = await fetch(
+          "https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=us",
+          { headers: { "User-Agent": "Listo/1.0 (listo.zone)" }, signal: AbortSignal.timeout(6000) }
+        );
         if (r.ok) {
           const d = await r.json();
-          const match = d?.result?.addressMatches?.[0];
-          if (match) return {
-            address: match.matchedAddress,
-            city: match.addressComponents?.city || "",
-            zip: match.addressComponents?.zip || "",
-            lat: match.coordinates?.y,
-            lng: match.coordinates?.x,
-            source: "Census",
-          };
+          if (d?.[0]) {
+            const zipMatch = d[0].display_name.match(/\b(\d{5})\b/);
+            return {
+              address: d[0].display_name,
+              city: "Los Angeles", zip: zipMatch ? zipMatch[1] : "",
+              lat: parseFloat(d[0].lat),
+              lng: parseFloat(d[0].lon),
+              source: "Nominatim",
+            };
+          }
         }
       } catch (e) {}
     }
-
-    // Nominatim fallback
-    try {
-      const q = encodeURIComponent(addr + ", Los Angeles, CA");
-      const r = await fetch(
-        "https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=us",
-        { headers: { "User-Agent": "Listo/1.0 (listo.zone)" } }
-      );
-      if (r.ok) {
-        const d = await r.json();
-        if (d?.[0]) {
-          const zipMatch = d[0].display_name.match(/\b(\d{5})\b/);
-          return {
-            address: d[0].display_name,
-            city: "Los Angeles", zip: zipMatch ? zipMatch[1] : "",
-            lat: parseFloat(d[0].lat),
-            lng: parseFloat(d[0].lon),
-            source: "Nominatim",
-          };
-        }
-      }
-    } catch (e) {}
     return null;
   };
 
@@ -1384,11 +1366,17 @@ export default function Listo() {
         }
         const dimX = Math.round(maxX - minX);
         const dimY = Math.round(maxY - minY);
-        // Shorter dimension = width (street frontage), longer = depth
-        parcel.lotWidthFt = Math.min(dimX, dimY);
-        parcel.lotDepthFt = Math.max(dimX, dimY);
-        parcel.lotDimsSource = "estimated from parcel geometry";
-        console.log("[PARCEL] Lot:", parcel.lotSizeSf, "sf, ~" + parcel.lotWidthFt + "×" + parcel.lotDepthFt + " ft");
+        // Validate: if bounding box area > 1.4× lot area, lot is rotated and dims are unreliable
+        const bboxArea = dimX * dimY;
+        if (bboxArea <= parcel.lotSizeSf * 1.4) {
+          // Shorter dimension = width (street frontage), longer = depth
+          parcel.lotWidthFt = Math.min(dimX, dimY);
+          parcel.lotDepthFt = Math.max(dimX, dimY);
+          parcel.lotDimsSource = "estimated from parcel geometry";
+          console.log("[PARCEL] Lot:", parcel.lotSizeSf, "sf, ~" + parcel.lotWidthFt + "×" + parcel.lotDepthFt + " ft");
+        } else {
+          console.log("[PARCEL] Lot:", parcel.lotSizeSf, "sf, bbox " + dimX + "×" + dimY + " too large (rotated lot) — skipping dims");
+        }
       }
     };
 
