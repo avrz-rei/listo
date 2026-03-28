@@ -75,28 +75,32 @@ export default async function handler(req) {
   }
 
   try {
+    const t0 = Date.now();
+    
     // Step 1: Address search → get PIN
     const searchUrl = `https://zimas.lacity.org/ajaxSearchResults.aspx?search=address&HouseNumber=${cleanHouse}&StreetName=${encodeURIComponent(cleanStreet)}`;
-    const searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(10000) });
+    const searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(8000) });
     if (!searchRes.ok) {
-      return new Response(JSON.stringify({ error: "ZIMAS search failed", status: searchRes.status }), { status: 502, headers });
+      return new Response(JSON.stringify({ error: "ZIMAS search failed", status: searchRes.status, ms: Date.now() - t0 }), { status: 502, headers });
     }
     const searchText = await searchRes.text();
+    const t1 = Date.now();
 
     const pinMatch = searchText.match(/navigateDataToPin\('([^']+)',\s*'([^']+)'\)/);
     if (!pinMatch) {
-      return new Response(JSON.stringify({ error: "Address not found in ZIMAS", raw: searchText.slice(0, 200) }), { status: 404, headers });
+      return new Response(JSON.stringify({ error: "Address not found in ZIMAS", raw: searchText.slice(0, 200), ms: Date.now() - t0 }), { status: 404, headers });
     }
     const pin = pinMatch[1];
     const zimasAddress = pinMatch[2];
 
     // Step 2: Full parcel data
     const dataUrl = `https://zimas.lacity.org/map.aspx?pin=${encodeURIComponent(pin)}&ajax=yes&address=${encodeURIComponent(zimasAddress)}`;
-    const dataRes = await fetch(dataUrl, { signal: AbortSignal.timeout(15000) });
+    const dataRes = await fetch(dataUrl, { signal: AbortSignal.timeout(12000) });
     if (!dataRes.ok) {
-      return new Response(JSON.stringify({ error: "ZIMAS data fetch failed", status: dataRes.status }), { status: 502, headers });
+      return new Response(JSON.stringify({ error: "ZIMAS data fetch failed", status: dataRes.status, searchMs: t1 - t0, totalMs: Date.now() - t0 }), { status: 502, headers });
     }
     const d = await dataRes.text();
+    const t2 = Date.now();
 
     // Parse all fields
     const lotAreaMatch = d.match(/Lot\/Parcel Area \(Calculated\)[^<]*<\/[^>]+>\s*<\/td>\s*<td[^>]*>([\d,. ]+)\(sq ft\)/i);
@@ -184,6 +188,7 @@ export default async function handler(req) {
       alquistPriolo: alquistMatch ? !/^No/i.test(alquistMatch[1].trim()) : null,
     };
 
+    result._timing = { searchMs: t1 - t0, dataMs: t2 - t1, totalMs: Date.now() - t0 };
     return new Response(JSON.stringify(result), { status: 200, headers });
   } catch (e) {
     const status = (e.name === "TimeoutError" || e.message?.includes("timeout")) ? 504 : 500;
