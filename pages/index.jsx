@@ -353,10 +353,10 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
 
       {/* Housing */}
       <Card title="Housing" color="#7C3AED">
-        <Row label="RSO (Rent Stabilization)" value={parcel.rso} />
+        <Row label="RSO (Rent Stabilization)" value={parcel.rso !== undefined ? (parcel.rso ? "Yes" : "No") : null} />
         <Row label="TOC (Transit Oriented Communities)" value={parcel.toc || null} />
-        <Row label="HE Replacement Required" value={null} />
-        <Row label="Just Cause Eviction (JCO)" value={null} />
+        <Row label="HE Replacement Required" value={parcel.heReplacement !== undefined ? (parcel.heReplacement ? "Yes" : "No") : null} flagged={parcel.heReplacement === true} />
+        <Row label="Just Cause Eviction (JCO)" value={parcel.jco !== undefined ? (parcel.jco ? "Yes" : "No") : null} />
       </Card>
 
       {/* Hazards & Environmental */}
@@ -1596,10 +1596,73 @@ export default function Listo() {
       parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 800 = " + parcel.unitsByRight + " units";
     }
 
+    // 6. ZIMAS internal API proxy — fills in year built, units, sqft, RSO, JCO, TOC, ZI codes, etc.
+    const userAddr = editStreet || address || "";
+    const houseNo = userAddr.match(/^(\d+)/)?.[1] || "";
+    const streetPart = userAddr.replace(/^\d+\s*/, "").replace(/,.*/, "").replace(/\b(ave|avenue|st|street|blvd|boulevard|dr|drive|rd|road|ct|court|pl|place|way|ln|lane|cir|circle)\b.*/i, "").trim();
+    if (houseNo && streetPart) {
+      try {
+        console.log("[ZIMAS-PROXY] Calling /api/zimas for", houseNo, streetPart);
+        const zr = await fetch("/api/zimas?houseNumber=" + encodeURIComponent(houseNo) + "&streetName=" + encodeURIComponent(streetPart),
+          { signal: AbortSignal.timeout(15000) });
+        if (zr.ok) {
+          const zd = await zr.json();
+          if (zd && !zd.error) {
+            console.log("[ZIMAS-PROXY] Got data:", JSON.stringify(zd).slice(0, 300));
+            // Merge ZIMAS data — ZIMAS is authoritative, overrides other sources
+            if (zd.apn) { parcel.apn = zd.apn; parcel.apnSource = "ZIMAS (verified)"; }
+            if (zd.zoning) { parcel.zoning = zd.zoning; parcel.zoningSource = "ZIMAS internal API (verified)"; }
+            if (zd.lotAreaSf) { parcel.lotSizeSf = zd.lotAreaSf; parcel.lotSizeSource = "ZIMAS (verified)"; }
+            if (zd.yearBuilt) { parcel.yearBuilt = zd.yearBuilt; }
+            if (zd.existingUnits) { parcel.existingUnits = zd.existingUnits; }
+            if (zd.existingSqft) { parcel.existingBuildingSqft = zd.existingSqft; }
+            if (zd.existingBedrooms) { parcel.existingBedrooms = zd.existingBedrooms; }
+            if (zd.existingBathrooms) { parcel.existingBathrooms = zd.existingBathrooms; }
+            if (zd.toc) { parcel.toc = zd.toc; }
+            if (zd.rso !== null) { parcel.rso = zd.rso; }
+            if (zd.jco !== null) { parcel.jco = zd.jco; }
+            if (zd.heReplacement !== null) { parcel.heReplacement = zd.heReplacement; }
+            if (zd.generalPlan) { parcel.generalPlanLandUse = zd.generalPlan; }
+            if (zd.specificPlans?.length) { parcel.specificPlans = zd.specificPlans; }
+            if (zd.ziCodes?.length) { parcel.ziCodes = zd.ziCodes; }
+            if (zd.ab2097 !== null) { parcel.ab2097 = zd.ab2097; }
+            if (zd.ab2334 !== null) { parcel.ab2334 = zd.ab2334; }
+            // Hazards — ZIMAS is authoritative
+            if (zd.liquefaction !== null) { parcel.liquefaction = zd.liquefaction; parcel.liquefactionSource = "ZIMAS (verified)"; }
+            if (zd.landslide !== null) { parcel.landslide = zd.landslide; parcel.landslideSource = "ZIMAS (verified)"; }
+            if (zd.tsunami !== null) { parcel.tsunami = zd.tsunami; }
+            if (zd.seaLevelRise !== null) { parcel.seaLevelRise = zd.seaLevelRise; }
+            if (zd.fireHazard !== null) { parcel.fireHazard = zd.fireHazard; }
+            if (zd.floodZone) { parcel.floodZone = zd.floodZone; }
+            if (zd.methane) { parcel.methane = zd.methane; }
+            if (zd.specialGrading !== null) { parcel.specialGrading = zd.specialGrading; }
+            if (zd.airportHazard) { parcel.airportHazard = zd.airportHazard; }
+            if (zd.faultName) { parcel.faultName = zd.faultName; parcel.faultDistKm = zd.faultDistKm; }
+            if (zd.alquistPriolo !== null) { parcel.alquistPriolo = zd.alquistPriolo; }
+            if (zd.coastalZones?.length) {
+              parcel.coastalZone = "Yes";
+              parcel.coastalZoneType = zd.coastalZones.join(", ");
+            }
+            if (zd.hillside !== null) { parcel.hillside = zd.hillside; }
+            if (zd.useCode) { parcel.useDescription = zd.useCode; }
+            if (zd.address) { parcel.zimasAddress = zd.address; }
+            parcel.source = "ZIMAS";
+            parcel.hasData = true;
+            // Recalculate density with ZIMAS lot size
+            if (parcel.lotSizeSf > 0) {
+              parcel.unitsByRight = Math.floor(parcel.lotSizeSf / 800);
+              parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 800 = " + parcel.unitsByRight + " units";
+            }
+          }
+        }
+      } catch (e) { console.log("[ZIMAS-PROXY] Error:", e.message); }
+    }
+
     console.log("[ZIMAS] FINAL:", JSON.stringify({
       zoning: parcel.zoning, apn: parcel.apn, lot: parcel.lotSizeSf,
       coastal: parcel.coastalZone, toc: parcel.toc, liq: parcel.liquefaction,
-      overlays: parcel.overlayLayers.length
+      rso: parcel.rso, jco: parcel.jco, yearBuilt: parcel.yearBuilt,
+      ziCodes: parcel.ziCodes?.length, overlays: parcel.overlayLayers.length
     }));
 
     return parcel;
@@ -1741,10 +1804,10 @@ export default function Listo() {
         <div style="border:1px solid #E5E7EB;border-left:4px solid #7C3AED;border-radius:8px;margin:8px 0;overflow:hidden">
           <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:0.08em;font-family:monospace">HOUSING</div>
           <div style="padding:6px 14px">
-            ${hRow("RSO", parcel.rso, false)}
+            ${hRow("RSO", parcel.rso !== undefined ? (parcel.rso ? "Yes" : "No") : null, false)}
             ${hRow("TOC", parcel.toc || null, false)}
-            ${hRow("HE Replacement Required", null, false)}
-            ${hRow("Just Cause Eviction (JCO)", null, false)}
+            ${hRow("HE Replacement Required", parcel.heReplacement !== undefined ? (parcel.heReplacement ? "Yes" : "No") : null, parcel.heReplacement === true)}
+            ${hRow("Just Cause Eviction (JCO)", parcel.jco !== undefined ? (parcel.jco ? "Yes" : "No") : null, false)}
           </div>
         </div>`;
     }
