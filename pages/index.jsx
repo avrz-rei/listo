@@ -1592,11 +1592,12 @@ export default function Listo() {
       try {
         console.log("[ZIMAS-PROXY] Calling /api/zimas for", houseNo, streetPart);
         const zr = await fetch("/api/zimas?houseNumber=" + encodeURIComponent(houseNo) + "&streetName=" + encodeURIComponent(streetPart),
-          { signal: AbortSignal.timeout(15000) });
+          { signal: AbortSignal.timeout(22000) });
         if (zr.ok) {
           const zd = await zr.json();
           if (zd && !zd.error) {
             console.log("[ZIMAS-PROXY] Got data:", JSON.stringify(zd).slice(0, 300));
+            if (zd._timing) console.log("[ZIMAS-PROXY] Timing:", zd._timing);
             // Merge ZIMAS data — ZIMAS is authoritative, overrides other sources
             if (zd.apn) { parcel.apn = zd.apn; parcel.apnSource = "ZIMAS (verified)"; }
             if (zd.zoning) { parcel.zoning = zd.zoning; parcel.zoningSource = "ZIMAS internal API (verified)"; }
@@ -1642,8 +1643,19 @@ export default function Listo() {
               parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 800 = " + parcel.unitsByRight + " units";
             }
           }
+        } else {
+          try {
+            const errBody = await zr.json();
+            console.log("[ZIMAS-PROXY] HTTP", zr.status, "—", errBody.error || "unknown", errBody.searchMs ? "search:" + errBody.searchMs + "ms" : "");
+          } catch (_) { console.log("[ZIMAS-PROXY] HTTP", zr.status); }
         }
-      } catch (e) { console.log("[ZIMAS-PROXY] Error:", e.message); }
+      } catch (e) {
+        if (e.name === "TimeoutError" || e.message?.includes("timed out")) {
+          console.log("[ZIMAS-PROXY] Browser timeout (22s) — ZIMAS server may be slow. Fields will show NOT VERIFIED.");
+        } else {
+          console.log("[ZIMAS-PROXY] Error:", e.message);
+        }
+      }
     }
 
     console.log("[ZIMAS] FINAL:", JSON.stringify({
