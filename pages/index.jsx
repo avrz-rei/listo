@@ -367,6 +367,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
           ["Liquefaction (CGS)", parcel.liquefaction, parcel.liquefaction === true],
           ["Landslide (CGS)", parcel.landslide, parcel.landslide === true],
           ["Alquist-Priolo Fault", parcel.alquistPriolo, parcel.alquistPriolo === true],
+          ["Prelim. Fault Rupture Study", parcel.prelimFaultRupture, parcel.prelimFaultRupture === true],
           ["Hillside Area", parcel.hillside, false],
           ["Special Grading", parcel.specialGrading, false],
           ["Sea Level Rise", parcel.seaLevelRise, parcel.seaLevelRise === true],
@@ -381,6 +382,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
       <Card title="Planning & Zoning Overlays" color="#2563EB">
         <Row label="Specific Plan" value={parcel.specificPlan || null} />
         <Row label="HPOZ (Historic Preservation)" value={parcel.hpoz === true ? "Yes" : parcel.hpoz === false ? "No" : null} />
+        <Row label="CDO (Community Design Overlay)" value={parcel.cdo === true ? "Yes" : parcel.cdo === false ? "No" : null} />
         <Row label="General Plan Land Use" value={parcel.generalPlanLandUse || null} />
         <Row label="Community Plan" value={parcel.communityPlan || null} />
         {parcel.ziCodes?.length > 0 && (
@@ -1340,14 +1342,21 @@ export default function Listo() {
     const userHouseNo = (editStreet || address).match(/^(\d+)/)?.[1] || "";
     const userStreet = (editStreet || address).replace(/^\d+\s*/, "").replace(/,.*/, "").trim().toUpperCase().replace(/\b(AVE|AVENUE|ST|STREET|BLVD|BOULEVARD|DR|DRIVE|RD|ROAD|CT|COURT|PL|PLACE|WAY|LN|LANE|CIR|CIRCLE)\b.*/, "").trim();
 
-    const processParcelFeature = (f) => {
+    const processParcelFeature = (f, isAddressFallback) => {
       if (!f?.attributes) return;
       const a = f.attributes;
       const situsHouseNo = a.SitusHouseNo || "";
       if (userHouseNo && situsHouseNo && userHouseNo !== situsHouseNo) {
+        if (!isAddressFallback) {
+          // Spatial query returned wrong parcel — don't store any data, just flag for address fallback
+          parcel.addressMismatch = true;
+          console.log("[PARCEL] ADDRESS MISMATCH:", situsHouseNo, "vs user input", userHouseNo, "— skipping, will try address query");
+          return;
+        }
+        // Even address fallback returned wrong number — store with warning
         parcel.addressMismatch = true;
         parcel.addressMismatchNote = "Parcel query returned " + situsHouseNo + " " + (a.SitusStreet||"") + " but you entered " + userHouseNo + ". Verify the correct parcel at zimas.lacity.org.";
-        console.log("[PARCEL] ADDRESS MISMATCH:", situsHouseNo, "vs user input", userHouseNo);
+        console.log("[PARCEL] ADDRESS MISMATCH (address query):", situsHouseNo, "vs user input", userHouseNo);
       } else {
         parcel.addressMismatch = false;
       }
@@ -1410,7 +1419,7 @@ export default function Listo() {
           const match = d.features.find(f => f.attributes?.SitusHouseNo === userHouseNo);
           if (match) bestFeature = match;
         }
-        processParcelFeature(bestFeature);
+        processParcelFeature(bestFeature, false);
       }
     } catch (e) { console.log("[PARCEL] Spatial query error:", e.message); }
 
@@ -1428,7 +1437,7 @@ export default function Listo() {
           const d = await r.json();
           if (d?.features?.length > 0) {
             console.log("[PARCEL] Address query found", d.features.length, "results");
-            processParcelFeature(d.features[0]);
+            processParcelFeature(d.features[0], true);
           }
         }
       } catch (e) { console.log("[PARCEL] Address query error:", e.message); }
@@ -1634,6 +1643,8 @@ export default function Listo() {
             if (zd.ab2334 !== null) { parcel.ab2334 = zd.ab2334; }
             // HPOZ — ZIMAS returns in Planning tab
             if (zd.hpoz !== undefined && zd.hpoz !== null) { parcel.hpoz = zd.hpoz; }
+            if (zd.cdo !== undefined && zd.cdo !== null) { parcel.cdo = zd.cdo; }
+            if (zd.prelimFaultRupture !== undefined && zd.prelimFaultRupture !== null) { parcel.prelimFaultRupture = zd.prelimFaultRupture; }
             // Hazards — ZIMAS is authoritative
             if (zd.liquefaction !== null) { parcel.liquefaction = zd.liquefaction; parcel.liquefactionSource = "ZIMAS (verified)"; }
             if (zd.landslide !== null) { parcel.landslide = zd.landslide; parcel.landslideSource = "ZIMAS (verified)"; }
