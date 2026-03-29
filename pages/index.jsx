@@ -1593,7 +1593,7 @@ export default function Listo() {
         console.log("[ZIMAS-PROXY] Calling Cloudflare Worker for", houseNo, streetPart);
         const ZIMAS_PROXY = "https://zimas-proxy.listo.workers.dev";
         const zr = await fetch(ZIMAS_PROXY + "?houseNumber=" + encodeURIComponent(houseNo) + "&streetName=" + encodeURIComponent(streetPart),
-          { signal: AbortSignal.timeout(15000) });
+          { signal: AbortSignal.timeout(25000) });
         if (zr.ok) {
           const zd = await zr.json();
           if (zd && !zd.error) {
@@ -1652,7 +1652,7 @@ export default function Listo() {
         }
       } catch (e) {
         if (e.name === "TimeoutError" || e.message?.includes("timed out")) {
-          console.log("[ZIMAS-PROXY] Browser timeout (22s) — ZIMAS server may be slow. Fields will show NOT VERIFIED.");
+          console.log("[ZIMAS-PROXY] Browser timeout (25s) — ZIMAS server may be slow. Fields will show NOT VERIFIED.");
         } else {
           console.log("[ZIMAS-PROXY] Error:", e.message);
         }
