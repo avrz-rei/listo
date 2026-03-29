@@ -358,6 +358,52 @@ function buildSystem(jurisdictionKey) {
     "",
     "═══════════════════════════════════════════════════════════════════════════",
     "",
+    "LADBS FEE SCHEDULE REFERENCE (as of March 2026 — verify at ladbs.org):",
+    "Building Permit fee = based on project valuation. Typical ranges:",
+    "  SFD new construction: $8,000–$20,000 (plan check + permit + inspection)",
+    "  Multi-family (2-5 units): $12,000–$30,000",
+    "  ADU: $3,000–$8,000",
+    "  Addition/Remodel: $2,000–$12,000 depending on scope",
+    "  Demolition: $1,500–$3,500",
+    "Coastal Development Permit (CDP): $2,000–$8,000 (City Planning)",
+    "Grading Permit (if >250 cy): $2,000–$5,000 (BOE)",
+    "Trade Permits (electrical/plumbing/mechanical): $300–$1,500 each",
+    "School fee (residential): ~$4.79/sf new construction (LAUSD)",
+    "LADBS Technology Surcharge: 6% of permit fee",
+    "LADBS Systems Development Surcharge: 6% of permit fee",
+    "Plan check fee: typically 80-85% of building permit fee",
+    "NOTE: Use these ranges as basis for fee estimates. Always state 'based on LADBS fee schedule as of March 2026.'",
+    "",
+    "LADBS PROCESSING TIMES REFERENCE (as of March 2026 — verify at ladbs.org):",
+    "  Plan Check — New SFD: 8–16 weeks",
+    "  Plan Check — Multi-family: 12–20 weeks",
+    "  Plan Check — ADU: 4–8 weeks (expedited track available)",
+    "  Plan Check — Addition/Remodel: 6–12 weeks",
+    "  Plan Check — Demolition: 2–4 weeks",
+    "  OTC (Over the Counter) permits: 1–2 weeks",
+    "  Coastal Development Permit: 6–16 weeks (concurrent with building permit)",
+    "  Geotech review: 4–8 weeks",
+    "  Grading permit: 4–8 weeks",
+    "NOTE: Processing times are estimates based on LADBS published averages. Actual times vary.",
+    "",
+    "CBC DOCUMENT STAMP REQUIREMENTS:",
+    "  Architectural Plans (site, floor, elevations, sections): Licensed Architect STAMP REQUIRED (BPC §5536)",
+    "  Structural Plans + Calculations: Licensed Structural Engineer STAMP REQUIRED (BPC §6731)",
+    "  Foundation Plans: Licensed Structural or Civil Engineer STAMP REQUIRED",
+    "  MEP Plans: Licensed Engineer in respective discipline STAMP REQUIRED",
+    "  Title 24 Energy Compliance: Licensed Architect or Engineer STAMP REQUIRED",
+    "  Geotechnical Report: Licensed Geotechnical Engineer STAMP REQUIRED (BPC §6735)",
+    "  Soils Report: Licensed Geotechnical Engineer STAMP REQUIRED",
+    "  Structural Calculations: Licensed Structural Engineer STAMP REQUIRED",
+    "  Demolition Plans: Licensed Architect STAMP REQUIRED",
+    "  Landscape Plans: Landscape Architect — stamp NOT required for residential",
+    "  Coastal Development Permit Application: No stamp required (planning document)",
+    "  Environmental Assessment: No stamp required (consultant report)",
+    "  Survey/Plot Plan: Licensed Land Surveyor or Civil Engineer STAMP REQUIRED",
+    "NOTE: CBC = California Building Code. BPC = Business and Professions Code.",
+    "",
+    "═══════════════════════════════════════════════════════════════════════════",
+    "",
     "OUTPUT — ## sections in this exact order:",
     "",
     "## Project Overview",
@@ -506,10 +552,11 @@ function buildMessage(rawAddr, geocode, parcel, projectType, details, jurisdicti
     if (parcel.useCode) lines.push("Use Code: " + parcel.useCode + (parcel.useDescription ? " — " + parcel.useDescription : ""));
     if (parcel.useType) lines.push("Use Type: " + parcel.useType);
     if (parcel.agencyName) lines.push("Agency: " + parcel.agencyName);
-    if (parcel.generalPlanLandUse) lines.push("General Plan Land Use: " + parcel.generalPlanLandUse);
-    if (parcel.communityPlan) lines.push("Community Plan: " + parcel.communityPlan);
+    if (parcel.generalPlanLandUse) lines.push("General Plan Land Use: " + parcel.generalPlanLandUse + " (VERIFIED — ZIMAS)");
+    if (parcel.communityPlan) lines.push("Community Plan: " + parcel.communityPlan + " (VERIFIED — ZIMAS)");
     if (parcel.specificPlan) lines.push("Specific Plan: " + parcel.specificPlan);
     if (parcel.specificPlans?.length) lines.push("Specific Plans: " + parcel.specificPlans.join(", ") + " (VERIFIED — ZIMAS)");
+    if (parcel.hpoz !== undefined) lines.push("HPOZ (Historic Preservation): " + (parcel.hpoz ? "YES" : "No") + " (VERIFIED — ZIMAS)");
     if (parcel.heightDistrict) lines.push("Height District: " + parcel.heightDistrict);
 
     // ZI codes from ZIMAS
@@ -548,10 +595,10 @@ function buildMessage(rawAddr, geocode, parcel, projectType, details, jurisdicti
     if (parcel.specialGrading !== undefined) lines.push("Special Grading: " + (parcel.specialGrading ? "YES" : "No") + " (VERIFIED)");
     if (parcel.fireHazard !== undefined) lines.push("Very High Fire Hazard Severity Zone: " + (parcel.fireHazard ? "YES" : "No") + " (VERIFIED)");
     if (parcel.floodZone) lines.push("Flood Zone: " + parcel.floodZone + " (VERIFIED)");
-    if (parcel.methane) lines.push("Methane Hazard: " + parcel.methane + " (VERIFIED)");
+    if (parcel.methane !== undefined) lines.push("Methane Hazard: " + (parcel.methane && parcel.methane !== false ? parcel.methane : "None") + " (VERIFIED — ZIMAS)");
     if (parcel.seaLevelRise !== undefined) lines.push("Sea Level Rise Area: " + (parcel.seaLevelRise ? "YES" : "No") + " (VERIFIED)");
     if (parcel.tsunami !== undefined) lines.push("Tsunami Hazard: " + (parcel.tsunami ? "YES" : "No") + " (VERIFIED — ZIMAS)");
-    if (parcel.airportHazard) lines.push("Airport Hazard: " + parcel.airportHazard + " (VERIFIED — ZIMAS)");
+    if (parcel.airportHazard !== undefined) lines.push("Airport Hazard: " + (parcel.airportHazard && parcel.airportHazard !== false ? parcel.airportHazard : "None") + " (VERIFIED — ZIMAS)");
     if (parcel.faultName) lines.push("Nearest Fault: " + parcel.faultName + " (" + (parcel.faultDistKm || "?") + " km) (VERIFIED — ZIMAS)");
     if (parcel.faultZone) lines.push("Fault Zone: " + parcel.faultZone + " (VERIFIED)");
 
