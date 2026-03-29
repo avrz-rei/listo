@@ -1,0 +1,125 @@
+# .github/workflows/code-check.yml
+# Runs on 1st of each month — checks LAMC key sections and LADBS fee schedule for changes
+# Creates a GitHub Issue if changes detected
+
+name: Monthly Code & Fee Check
+
+on:
+  schedule:
+    - cron: '0 10 1 * *'  # 1st of each month at 10am UTC
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  check-lamc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check LAMC key sections for changes
+        id: lamc
+        run: |
+          mkdir -p .code-snapshots
+          CHANGED=""
+          
+          # Key LAMC sections to monitor
+          SECTIONS=(
+            "https://library.municode.com/ca/los_angeles/codes/code_of_ordinances?nodeId=CHIVDINGS_ART2SPDINGS_S12.08R2TWFADWZO"
+            "https://library.municode.com/ca/los_angeles/codes/code_of_ordinances?nodeId=CHIVDINGS_ART2SPDINGS_S12.09R3MUTWDWZO"
+            "https://library.municode.com/ca/los_angeles/codes/code_of_ordinances?nodeId=CHIVDINGS_ART2SPDINGS_S12.21.1GERE"
+            "https://library.municode.com/ca/los_angeles/codes/code_of_ordinances?nodeId=CHIVDINGS_ART2SPDINGS_S12.22GEPRRE"
+          )
+          NAMES=("12.08-R2" "12.09-R3" "12.21.1-General" "12.22-Provisions")
+          
+          for i in "${!SECTIONS[@]}"; do
+            URL="${SECTIONS[$i]}"
+            NAME="${NAMES[$i]}"
+            SNAPSHOT=".code-snapshots/lamc-${NAME}.md5"
+            
+            # Fetch page content, extract text, compute hash
+            HASH=$(curl -s "$URL" | grep -o '<div[^>]*class="chunk-content"[^>]*>.*</div>' | md5sum | cut -d' ' -f1 2>/dev/null || echo "fetch-failed")
+            
+            if [ -f "$SNAPSHOT" ]; then
+              OLD_HASH=$(cat "$SNAPSHOT")
+              if [ "$HASH" != "$OLD_HASH" ] && [ "$HASH" != "fetch-failed" ]; then
+                CHANGED="${CHANGED}LAMC ${NAME} may have changed\n"
+                echo "$HASH" > "$SNAPSHOT"
+              fi
+            else
+              # First run — save baseline
+              if [ "$HASH" != "fetch-failed" ]; then
+                echo "$HASH" > "$SNAPSHOT"
+              fi
+            fi
+          done
+          
+          echo "lamc_changed<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Check LADBS fee schedule page
+        id: ladbs
+        run: |
+          mkdir -p .code-snapshots
+          
+          # Check LADBS fee schedule page for updates
+          HASH=$(curl -s "https://www.ladbs.org/services/getting-started/fees" | md5sum | cut -d' ' -f1 2>/dev/null || echo "fetch-failed")
+          SNAPSHOT=".code-snapshots/ladbs-fees.md5"
+          LADBS_CHANGED=""
+          
+          if [ -f "$SNAPSHOT" ]; then
+            OLD_HASH=$(cat "$SNAPSHOT")
+            if [ "$HASH" != "$OLD_HASH" ] && [ "$HASH" != "fetch-failed" ]; then
+              LADBS_CHANGED="LADBS fee schedule page may have changed"
+              echo "$HASH" > "$SNAPSHOT"
+            fi
+          else
+            if [ "$HASH" != "fetch-failed" ]; then
+              echo "$HASH" > "$SNAPSHOT"
+            fi
+          fi
+          
+          echo "ladbs_changed=$LADBS_CHANGED" >> $GITHUB_OUTPUT
+
+      - name: Commit updated snapshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .code-snapshots/
+          git diff --staged --quiet || git commit -m "chore: update code check snapshots [skip ci]"
+          git push || true
+
+      - name: Create issue if changes detected
+        if: steps.lamc.outputs.lamc_changed != '' || steps.ladbs.outputs.ladbs_changed != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const lamcChanges = `${{ steps.lamc.outputs.lamc_changed }}`.trim();
+            const ladbsChanges = `${{ steps.ladbs.outputs.ladbs_changed }}`.trim();
+            
+            let body = '## Monthly Code & Fee Check\n\n';
+            body += 'The automated monthly check detected potential changes:\n\n';
+            
+            if (lamcChanges) {
+              body += '### LAMC Changes\n';
+              body += lamcChanges.split('\n').filter(l => l).map(l => `- ⚠️ ${l}`).join('\n');
+              body += '\n\n**Action:** Review the affected LAMC sections and update the reference tables in `pages/api/analyze.js` if needed.\n\n';
+            }
+            
+            if (ladbsChanges) {
+              body += '### LADBS Fee Schedule\n';
+              body += `- ⚠️ ${ladbsChanges}\n`;
+              body += '\n**Action:** Check [ladbs.org/services/getting-started/fees](https://www.ladbs.org/services/getting-started/fees) and update fee ranges in `pages/api/analyze.js` if needed.\n\n';
+            }
+            
+            body += '### After updating:\n';
+            body += '1. Update the `LAMC_LAST_UPDATED` date in analyze.js\n';
+            body += '2. Update the fee schedule date stamp\n';
+            body += '3. Test with 622 Woodlawn Ave, Venice 90291\n';
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔔 Code/Fee Check: Changes detected (${new Date().toISOString().slice(0,7)})`,
+              body: body,
+              labels: ['maintenance', 'data-update']
+            });
