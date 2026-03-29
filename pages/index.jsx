@@ -372,17 +372,31 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
           ["Sea Level Rise", parcel.seaLevelRise, parcel.seaLevelRise === true],
           ["Tsunami Hazard", parcel.tsunami, parcel.tsunami === true],
           ["Flood Zone", parcel.floodZone ? parcel.floodZone : parcel.floodZone === undefined ? null : false, false],
-          ["Methane Hazard", parcel.methane ? parcel.methane : parcel.methane === undefined ? null : false, !!parcel.methane],
-          ["Airport Hazard", null, false],
+          ["Methane Hazard", parcel.methane === false ? false : parcel.methane || null, !!parcel.methane && parcel.methane !== false],
+          ["Airport Hazard", parcel.airportHazard === false ? false : parcel.airportHazard || null, !!parcel.airportHazard && parcel.airportHazard !== false],
         ]} />
       </Card>
 
       {/* Planning & Zoning Overlays */}
       <Card title="Planning & Zoning Overlays" color="#2563EB">
         <Row label="Specific Plan" value={parcel.specificPlan || null} />
-        <Row label="HPOZ (Historic Preservation)" value={parcel.hpoz || (parcel.hpoz === undefined ? null : false)} />
+        <Row label="HPOZ (Historic Preservation)" value={parcel.hpoz === true ? "Yes" : parcel.hpoz === false ? "No" : null} />
         <Row label="General Plan Land Use" value={parcel.generalPlanLandUse || null} />
         <Row label="Community Plan" value={parcel.communityPlan || null} />
+        {parcel.ziCodes?.length > 0 && (
+          <div style={{ marginTop:8 }}>
+            <div style={{ fontSize:10, color:T.muted, fontFamily:"monospace", marginBottom:4,
+              letterSpacing:"0.08em" }}>ZONING INFORMATION ({parcel.ziCodes.length})</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+              {parcel.ziCodes.map((zi,i) => (
+                <span key={i} style={{ fontSize:10, background:"#EFF6FF", color:"#1E40AF",
+                  border:"1px solid #BFDBFE", borderRadius:4, padding:"3px 8px" }}>
+                  {zi}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         {parcel.overlayLayers?.length > 0 && (
           <div style={{ marginTop:8 }}>
             <div style={{ fontSize:10, color:T.muted, fontFamily:"monospace", marginBottom:4,
@@ -399,19 +413,19 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
         )}
       </Card>
 
-      {/* Manual entry prompt for missing data */}
-      {(!parcel.yearBuilt || !parcel.existingUnits || !parcel.lotSizeSf) && (
+      {/* Manual entry prompt — only show if ZIMAS proxy didn't fill in the data */}
+      {(!parcel.yearBuilt && !parcel.existingUnits && !parcel.toc) && (
         <div style={{ background:"#FFFBEB", border:"1px solid #FDE68A", borderRadius:10,
           padding:"14px 18px", marginBottom:12 }}>
           <div style={{ fontSize:11, fontWeight:700, color:"#92400E", marginBottom:4 }}>
-            Missing parcel data — verify at zimas.lacity.org
+            Some parcel data unavailable — ZIMAS may be slow
           </div>
           <div style={{ fontSize:12, color:"#78350F", lineHeight:1.6 }}>
-            {!parcel.lotSizeSf && "Lot size · "}{!parcel.yearBuilt && "Year built · "}{!parcel.existingUnits && "Unit count · "}
-            These fields are needed for complete development standards analysis. Visit{" "}
+            Year built, unit count, TOC, RSO, and other fields could not be loaded automatically.
+            Visit{" "}
             <a href="https://zimas.lacity.org" target="_blank" style={{ color:"#B45309", fontWeight:600 }}>
               zimas.lacity.org
-            </a> and search by address to find the missing data.
+            </a> to verify missing data. Try running the report again — ZIMAS response times vary.
           </div>
         </div>
       )}
@@ -1613,10 +1627,13 @@ export default function Listo() {
             if (zd.jco !== null) { parcel.jco = zd.jco; }
             if (zd.heReplacement !== null) { parcel.heReplacement = zd.heReplacement; }
             if (zd.generalPlan) { parcel.generalPlanLandUse = zd.generalPlan; }
-            if (zd.specificPlans?.length) { parcel.specificPlans = zd.specificPlans; }
+            if (zd.communityPlan) { parcel.communityPlan = zd.communityPlan; }
+            if (zd.specificPlans?.length) { parcel.specificPlans = zd.specificPlans; parcel.specificPlan = zd.specificPlans.join(", "); }
             if (zd.ziCodes?.length) { parcel.ziCodes = zd.ziCodes; }
             if (zd.ab2097 !== null) { parcel.ab2097 = zd.ab2097; }
             if (zd.ab2334 !== null) { parcel.ab2334 = zd.ab2334; }
+            // HPOZ — ZIMAS returns in Planning tab
+            if (zd.hpoz !== undefined && zd.hpoz !== null) { parcel.hpoz = zd.hpoz; }
             // Hazards — ZIMAS is authoritative
             if (zd.liquefaction !== null) { parcel.liquefaction = zd.liquefaction; parcel.liquefactionSource = "ZIMAS (verified)"; }
             if (zd.landslide !== null) { parcel.landslide = zd.landslide; parcel.landslideSource = "ZIMAS (verified)"; }
@@ -1624,9 +1641,10 @@ export default function Listo() {
             if (zd.seaLevelRise !== null) { parcel.seaLevelRise = zd.seaLevelRise; }
             if (zd.fireHazard !== null) { parcel.fireHazard = zd.fireHazard; }
             if (zd.floodZone) { parcel.floodZone = zd.floodZone; }
-            if (zd.methane) { parcel.methane = zd.methane; }
+            // Methane/Airport: null from ZIMAS means confirmed "None" — set false instead of leaving undefined
+            parcel.methane = zd.methane || false;
+            parcel.airportHazard = zd.airportHazard || false;
             if (zd.specialGrading !== null) { parcel.specialGrading = zd.specialGrading; }
-            if (zd.airportHazard) { parcel.airportHazard = zd.airportHazard; }
             if (zd.faultName) { parcel.faultName = zd.faultName; parcel.faultDistKm = zd.faultDistKm; }
             if (zd.alquistPriolo !== null) { parcel.alquistPriolo = zd.alquistPriolo; }
             if (zd.coastalZones?.length) {
@@ -1800,6 +1818,19 @@ export default function Listo() {
             ${hRow("Special Grading", parcel.specialGrading, false)}
             ${hRow("Sea Level Rise", parcel.seaLevelRise, parcel.seaLevelRise === true)}
             ${hRow("Tsunami Hazard", parcel.tsunami, parcel.tsunami === true)}
+            ${hRow("Flood Zone", parcel.floodZone ? parcel.floodZone : parcel.floodZone === undefined ? null : false, false)}
+            ${hRow("Methane Hazard", parcel.methane === false ? false : parcel.methane || null, !!parcel.methane && parcel.methane !== false)}
+            ${hRow("Airport Hazard", parcel.airportHazard === false ? false : parcel.airportHazard || null, !!parcel.airportHazard && parcel.airportHazard !== false)}
+          </div>
+        </div>
+        <div style="border:1px solid #E5E7EB;border-left:4px solid #2563EB;border-radius:8px;margin:8px 0;overflow:hidden">
+          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#2563EB;text-transform:uppercase;letter-spacing:0.08em;font-family:monospace">PLANNING & ZONING</div>
+          <div style="padding:6px 14px">
+            ${pRow("Specific Plan", parcel.specificPlan || null)}
+            ${pRow("HPOZ", parcel.hpoz === true ? "Yes" : parcel.hpoz === false ? "No" : null)}
+            ${pRow("General Plan", parcel.generalPlanLandUse || null)}
+            ${pRow("Community Plan", parcel.communityPlan || null)}
+            ${parcel.ziCodes?.length ? '<div style="margin-top:6px"><div style="font-size:9px;color:#8C7B70;font-family:monospace;margin-bottom:3px">ZONING INFORMATION (' + parcel.ziCodes.length + ')</div>' + parcel.ziCodes.map(zi => '<div style="font-size:9px;color:#1E40AF;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:3px;padding:2px 6px;margin:2px 0">' + zi + '</div>').join('') + '</div>' : ''}
           </div>
         </div>
         <div style="border:1px solid #E5E7EB;border-left:4px solid #7C3AED;border-radius:8px;margin:8px 0;overflow:hidden">
@@ -1884,6 +1915,36 @@ export default function Listo() {
       if (/^\d+\./.test(t)){const rest2=t.replace(/^\d+\.\s*/,"");const pi=rest2.indexOf("|");const act=pi>0?rest2.slice(0,pi).trim():rest2;const me=pi>0?rest2.slice(pi+1).trim():"";const n2=(t.match(/^\d+/)||[""])[0];bodyHtml+=`<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #E2D9D0;align-items:flex-start"><span style="font-size:10px;font-weight:800;color:#fff;background:${T.orange};border-radius:4px;padding:2px 6px;white-space:nowrap;margin-top:1px">${n2}</span><div><strong style="font-size:12px">${act}</strong>${me?`<span style="display:block;font-size:11px;color:#8C7B70;margin-top:2px">${me}</span>`:""}</div></div>`;continue;}
       if (t.startsWith("- ")||t.startsWith("* ")){bodyHtml+=`<li style="font-size:12px;color:#2C2420;margin:3px 0">${t.slice(2)}</li>`;continue;}
       if (t==="DEMO"||t==="BUILDING"||t.startsWith("TECHNICAL")||t==="**DEMO**"||t==="**BUILDING**"||t.startsWith("**TECHNICAL")){const cleanLabel=t.replace(/^\*\*|\*\*$/g,"");bodyHtml+=`<div style="font-size:9px;font-weight:700;color:${T.orange};text-transform:uppercase;letter-spacing:0.1em;margin-top:12px;margin-bottom:4px;font-family:monospace">${cleanLabel}</div>`;continue;}
+      // Terms & Data Sources — render acronyms as compact tags, data sources as links
+      if (pdfSec.includes("terms")) {
+        if (t.includes("|") && (t.includes(":") || t.includes("("))) {
+          const items = t.split("|").map(s => s.trim()).filter(Boolean);
+          const isDataSources = t.toLowerCase().startsWith("data source");
+          if (isDataSources) {
+            bodyHtml += `<div style="font-size:9px;color:#8C7B70;font-family:monospace;letter-spacing:0.08em;margin:8px 0 4px">DATA SOURCES</div><div style="display:flex;flex-wrap:wrap;gap:4px">`;
+            for (const s of items) {
+              const urlMatch = s.match(/\(([^)]+)\)/);
+              const label = s.replace(/\([^)]+\)/, "").replace(/^data sources?:?\s*/i, "").trim();
+              if (label) bodyHtml += `<span style="font-size:9px;color:${T.orange};border:1px solid ${T.orange}30;border-radius:3px;padding:2px 6px">${label}</span>`;
+            }
+            bodyHtml += `</div>`;
+          } else {
+            bodyHtml += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin:4px 0">`;
+            for (const item of items) {
+              const ci = item.indexOf(":");
+              if (ci > 0) {
+                const abbr = item.slice(0, ci).trim();
+                const full = item.slice(ci + 1).trim();
+                bodyHtml += `<span style="font-size:9px;padding:2px 6px;background:#F0EBE3;border:1px solid #E2D9D0;border-radius:3px"><strong style="color:${T.orange}">${abbr}</strong> <span style="color:#8C7B70">${full}</span></span>`;
+              } else {
+                bodyHtml += `<span style="font-size:9px;padding:2px 6px;background:#F0EBE3;border:1px solid #E2D9D0;border-radius:3px;color:#8C7B70">${item}</span>`;
+              }
+            }
+            bodyHtml += `</div>`;
+          }
+          continue;
+        }
+      }
       bodyHtml+=`<p style="font-size:12px;color:#2C2420;margin:4px 0">${t}</p>`;
     }
     const addrLine = editStreet || address;
