@@ -550,8 +550,10 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
         // Skip to end of deal summary KPI lines, then render score cards
         const kpiEls = [];
         while (i < lines.length && !lines[i].trim().startsWith("## ")) {
-          const kt = lines[i].trim();
-          if (!kt) { i++; continue; }
+          const ktRaw = lines[i].trim();
+          if (!ktRaw) { i++; continue; }
+          // Strip bold markers (**) so "**VERDICT**: ..." matches "VERDICT:"
+          const kt = ktRaw.replace(/\*\*/g, "");
           if (kt.startsWith("VERDICT:")) {
             const pts = kt.slice(8).trim().split("|").map(p=>p.trim());
             const word = pts[0], desc = pts[1]||"";
@@ -1690,7 +1692,8 @@ export default function Listo() {
     // 6. ZIMAS internal API proxy — fills in year built, units, sqft, RSO, JCO, TOC, ZI codes, etc.
     const userAddr = editStreet || address || "";
     const houseNo = userAddr.match(/^(\d+)/)?.[1] || "";
-    const streetPart = userAddr.replace(/^\d+\s*/, "").replace(/,.*/, "").replace(/\b(ave|avenue|st|street|blvd|boulevard|dr|drive|rd|road|ct|court|pl|place|way|ln|lane|cir|circle)\b.*/i, "").trim();
+    const streetPart = userAddr.replace(/^\d+\s*/, "").replace(/,.*/, "").replace(/\b(ave|avenue|st|street|blvd|boulevard|dr|drive|rd|road|ct|court|pl|place|way|ln|lane|cir|circle)\b.*/i, "").trim()
+      .replace(/^(N|S|E|W|NE|NW|SE|SW)\s+/i, ""); // Strip directional prefix — ZIMAS handles it internally
     if (houseNo && streetPart) {
       try {
         console.log("[ZIMAS-PROXY] Calling Cloudflare Worker for", houseNo, streetPart);
