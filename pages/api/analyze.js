@@ -464,6 +464,24 @@ function buildSystem(jurisdictionKey) {
     "  - For SB 79: specify which tier standards apply (use AB 2097/ZI-2452 as proxy)",
     "  - State 'Eligibility is preliminary — verify with planning consultant' for each",
     "  - These state laws OVERRIDE conflicting local (LAMC) standards",
+    "  - Date stamp: 'State housing law data current as of April 2026. CA legislative session runs Jan-Oct; laws typically effective Jan 1 or July 1.'",
+    "",
+    "═══════════════════════════════════════════════════════════════════════════",
+    "",
+    "CODE CONTRADICTION HANDLING:",
+    "State laws (SB 79, SB 684, AB 2097, etc.) can override local LAMC standards.",
+    "LAMC itself contains exceptions (e.g., height limits with hillside exceptions, setback rules with prevailing setback overrides).",
+    "When you detect a conflict between two applicable rules:",
+    "  1. State BOTH the local standard AND the state/exception override",
+    "  2. Note which takes precedence and cite the code section",
+    "  3. If precedence is unclear, state: 'These provisions may conflict — verify with LADBS or City Planning which standard applies to your specific project.'",
+    "  4. NEVER silently apply only one rule when two conflict — always disclose both",
+    "Examples of common contradictions:",
+    "  - LAMC parking minimums vs AB 2097 parking elimination (AB 2097 overrides if within ½ mile of transit)",
+    "  - LAMC R2 height 45 ft vs SB 79 height 55-95 ft (SB 79 overrides for eligible TOD projects after July 2026)",
+    "  - BMO/RFA FAR limits vs base zone FAR (BMO may be more restrictive — flag both)",
+    "  - Hillside grading limits vs standard grading (hillside rules are more restrictive — state both)",
+    "  - Local inclusionary requirements vs SB 79 inclusionary (whichever is stricter applies)",
     "",
     "═══════════════════════════════════════════════════════════════════════════",
     "",
@@ -479,21 +497,33 @@ function buildSystem(jurisdictionKey) {
     "PROJECT: [exact project type as entered by user — e.g. New Home Construction, ADU, Remodel]",
     "VERDICT: [GO|CAUTION|COMPLEX] | [one sentence facts only]",
     "ZONING: [exact code] | [permitted uses 6 words]",
-    "UNITS: [N] by-right ([lot sf] sf / 800 = [N]) | TOC: [eligibility]",
+    "UNITS: Use the DENSITY BY ZONE table — R1 = 1 unit/lot, R2/R3 = lot/800, R4 = lot/400, RD = 2 units/lot, R5 = no limit. Do NOT default to lot/800 for R1 zones.",
     "PERMITS: $[low]-$[high] | [N]-[N] week critical path",
     "ALERTS: [N] action-required | [N] caution | [N] informational",
     "DATA: [Verified — ZIMAS | Estimated — ZIP knowledge]",
     "",
     "## Development Opportunity",
     "USES PERMITTED: [explicit LAMC citation — e.g. LAMC 12.09.A: Any use in R1, plus two-family dwelling or two SFDs]",
-    "DENSITY MATH: [lot sf] sf / [density factor] = [N] units by-right",
+    "DENSITY MATH: Use the DENSITY BY ZONE table above. R1 = '1 unit per lot (LAMC 12.07)'. R2/R3 = '[lot sf] / 800 = [N] units'. Do NOT calculate lot/800 for R1/RS/RE zones.",
     "BUILDABLE AREA: [lot sf] - [setback areas sf] = [buildable sf] (LAMC 12.03 definition)",
     "  CRITICAL: If lot dimensions (width × depth) are provided — even estimated — you MUST calculate the buildable area. Show the arithmetic:",
-    "  Buildable Area = (lot width - side yards) × (lot depth - front yard - rear yard)",
+    "  Buildable Area = (lot width - total side yards) × (lot depth - front yard - rear yard)",
     "  Then: Max Floor Area = FAR × Buildable Area",
-    "  Label as 'estimated' if using estimated dimensions. Do NOT punt with 'requires surveyed dimensions.'",
+    "  Label as 'estimated' if using estimated dimensions.",
+    "",
+    "  SETBACK ACCURACY RULES:",
+    "  - Side yards: If lot width < 50 ft, use 10% of lot width (min 3 ft) per LAMC 12.08 C.2 — NOT the default 5 ft.",
+    "    Example: 40 ft wide lot → 10% = 4 ft side yard each side, not 5 ft.",
+    "  - Front yard: Code says '20% of lot depth, max 20 ft, OR prevailing setback if 40%+ of block is consistent.'",
+    "    Listo CANNOT determine prevailing setback — this requires a survey of neighboring lots.",
+    "    ALWAYS calculate the code default (20% of depth, max 20 ft) AND add:",
+    "    'NOTE: Actual front setback may be smaller if the prevailing (average) setback of the block is less. A prevailing setback survey should be conducted before design.'",
+    "  - Rear yard: 15 ft OR 20% of lot depth, whichever is GREATER, min 10 ft. Show both calculations.",
+    "",
     "MAX FLOOR AREA: [FAR multiplier] × [buildable sf] = [max sf] (LAMC 12.21.1)",
     "TOC BONUS: [result — tier + bonus % + affordable requirement] | ADU: [N ADUs + N JADUs]",
+    "  R1 lots: 1 ADU + 1 JADU",
+    "  R2+ lots: 2 ADUs + 1 JADU minimum",
     "MAX BUILDOUT: [N] total units (primary + ADU + JADU)",
     "EXISTING STRUCTURE: [year, units, sqft, RSO status — VERIFIED or NOT VERIFIED]",
     "",
@@ -668,10 +698,11 @@ function buildMessage(rawAddr, geocode, parcel, projectType, details, jurisdicti
       for (const zi of parcel.ziCodes) lines.push("  " + zi + " (VERIFIED — ZIMAS)");
     }
 
-    // Density
-    if (parcel.lotSizeSf > 0) {
-      const units = Math.floor(parcel.lotSizeSf / 800);
-      lines.push("Density: " + parcel.lotSizeSf.toLocaleString() + " sf / 800 = " + units + " units by-right (VERIFIED — use exactly)");
+    // Density — use zone-aware calculation from browser
+    if (parcel.densityCalc) {
+      lines.push("Density: " + parcel.densityCalc + " (VERIFIED — use exactly)");
+    } else if (parcel.lotSizeSf > 0) {
+      lines.push("Density: Lot area " + parcel.lotSizeSf.toLocaleString() + " sf — check DENSITY BY ZONE table above for correct calculation");
     }
 
     // RSO
