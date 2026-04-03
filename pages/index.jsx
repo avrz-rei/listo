@@ -150,7 +150,17 @@ function getLabel(v) { return allFlat.find(p => p.value === v)?.label || v; }
 // ── Address parser ────────────────────────────────────────────────────────
 function parseAddress(raw) {
   const s = raw.trim();
-  const zip = (s.match(/\b(\d{5})\b/) || [])[1] || "";
+  // Extract ZIP: must appear after comma, state, or "CA" — not a house number at the start
+  // Try explicit patterns first: "CA 90xxx", ", 9xxxx", trailing 5-digit
+  let zip = "";
+  const zipAfterState = s.match(/\bCA\s+(\d{5})\b/i);
+  const zipAfterComma = s.match(/,\s*(\d{5})\b/);
+  const zipStandalone = s.match(/\s(\d{5})$/); // trailing 5 digits at end of string
+  if (zipAfterState) zip = zipAfterState[1];
+  else if (zipAfterComma) zip = zipAfterComma[1];
+  else if (zipStandalone) zip = zipStandalone[1];
+  // Validate: LA area ZIPs start with 9 (90xxx-93xxx)
+  if (zip && !/^9[0-3]/.test(zip)) zip = "";
   const HOODS = ["Pacific Palisades","Playa Del Rey","Playa del Rey","Marina del Rey","Venice",
     "Westchester","Brentwood","Bel Air","Westwood","Mar Vista","Silver Lake","Echo Park",
     "Hancock Park","Los Feliz","Hollywood Hills","Laurel Canyon","North Hollywood","Sherman Oaks",
@@ -332,14 +342,34 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
         <Row label="Use Code" value={parcel.useDescription || parcel.useCode || null} />
       </Card>
 
-      {/* Density — only if lot size is known */}
-      {parcel.lotSizeSf > 0 && (
+      {/* Density — zone-aware calculation */}
+      {parcel.lotSizeSf > 0 && (() => {
+        const z = (parcel.zoning || "").toUpperCase();
+        let densityText, unitCount;
+        if (/^R1|^RS|^RE/.test(z)) {
+          unitCount = 1;
+          densityText = "1 unit per lot (R1 zone) + ADU/JADU";
+        } else if (/^RD/.test(z)) {
+          unitCount = 2;
+          densityText = "2 units per lot (RD zone)";
+        } else if (/^R4/.test(z)) {
+          unitCount = Math.floor(parcel.lotSizeSf / 400);
+          densityText = parcel.lotSizeSf.toLocaleString() + " sf ÷ 400 = " + unitCount + " units by-right";
+        } else if (/^R5/.test(z)) {
+          unitCount = null;
+          densityText = "No density limit (R5 zone — FAR controls)";
+        } else {
+          // R2, R3, C zones default to 800 sf
+          unitCount = Math.floor(parcel.lotSizeSf / 800);
+          densityText = parcel.lotSizeSf.toLocaleString() + " sf ÷ 800 = " + unitCount + " units by-right";
+        }
+        return (
         <div style={{ background:"#1A1714", borderRadius:10, padding:"14px 18px", marginBottom:12,
           display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 }}>
           <div>
             <div style={{ fontSize:10, color:T.orange, fontFamily:"monospace", letterSpacing:"0.1em" }}>DENSITY</div>
             <div style={{ fontSize:16, fontWeight:700, color:"white", fontFamily:"Georgia,serif", marginTop:2 }}>
-              {parcel.lotSizeSf.toLocaleString()} sf ÷ 800 = {Math.floor(parcel.lotSizeSf/800)} units by-right
+              {densityText}
             </div>
           </div>
           {parcel.toc && (
@@ -348,8 +378,8 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
               <div style={{ fontSize:14, fontWeight:700, color:T.orange }}>{parcel.toc}</div>
             </div>
           )}
-        </div>
-      )}
+        </div>);
+      })()}
 
       {/* Housing */}
       <Card title="Housing" color="#7C3AED">
@@ -1181,9 +1211,12 @@ export default function Listo() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     (function(c,a,r){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-    const s=document.createElement("script");s.async=1;s.src=r;document.head.appendChild(s);
+    const s=document.createElement("script");s.async=1;s.src=r;
+    s.onload = () => console.log("[POSTHOG] Script loaded");
+    s.onerror = () => console.log("[POSTHOG] Script blocked — ad blocker or network issue");
+    document.head.appendChild(s);
     })(window,"posthog","https://us-assets.i.posthog.com/static/array.js");
-    window.posthog("init", POSTHOG_KEY, { api_host:"https://us.i.posthog.com", person_profiles:"identified_only" });
+    window.posthog("init", POSTHOG_KEY, { api_host:"https://us.i.posthog.com", person_profiles:"always" });
     track("page_view");
   }, []);
 
@@ -1308,10 +1341,14 @@ export default function Listo() {
         if (r.ok) {
           const d = await r.json();
           if (d?.[0]) {
-            const zipMatch = d[0].display_name.match(/\b(\d{5})\b/);
+            // Extract ZIP from display_name — match after state abbreviation or near end, not house number
+            const dn = d[0].display_name;
+            const zipStateMatch = dn.match(/\bCA\s+(\d{5})\b/i) || dn.match(/California[,\s]+(\d{5})\b/);
+            const zipEndMatch = dn.match(/(\d{5}),?\s*(?:USA|United States)\s*$/i);
+            const zipVal = (zipStateMatch || zipEndMatch || [])[1] || "";
             return {
-              address: d[0].display_name,
-              city: "Los Angeles", zip: zipMatch ? zipMatch[1] : "",
+              address: dn,
+              city: "Los Angeles", zip: /^9[0-3]/.test(zipVal) ? zipVal : "",
               lat: parseFloat(d[0].lat),
               lng: parseFloat(d[0].lon),
               source: "Nominatim",
@@ -1320,6 +1357,34 @@ export default function Listo() {
         }
       } catch (e) {}
     }
+
+    // Structured query fallback — helps Nominatim find addresses it misses with free-form
+    try {
+      const houseNum = addr.match(/^(\d+)/)?.[1] || "";
+      const streetOnly = addr.replace(/^\d+\s*/, "").replace(/,.*/, "").trim();
+      if (houseNum && streetOnly) {
+        const structuredUrl = "https://nominatim.openstreetmap.org/search?" + new URLSearchParams({
+          street: houseNum + " " + streetOnly, city: "Los Angeles", state: "CA", country: "US",
+          format: "json", limit: "1",
+        });
+        const r = await fetch(structuredUrl,
+          { headers: { "User-Agent": "Listo/1.0 (listo.zone)" }, signal: AbortSignal.timeout(6000) });
+        if (r.ok) {
+          const d = await r.json();
+          if (d?.[0]) {
+            const dn = d[0].display_name;
+            const zipStateMatch = dn.match(/\bCA\s+(\d{5})\b/i) || dn.match(/California[,\s]+(\d{5})\b/);
+            const zipEndMatch = dn.match(/(\d{5}),?\s*(?:USA|United States)\s*$/i);
+            const zipVal = (zipStateMatch || zipEndMatch || [])[1] || "";
+            return {
+              address: dn,
+              city: "Los Angeles", zip: /^9[0-3]/.test(zipVal) ? zipVal : "",
+              lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon), source: "Nominatim (structured)",
+            };
+          }
+        }
+      }
+    } catch (e) {}
     return null;
   };
 
@@ -1601,10 +1666,25 @@ export default function Listo() {
     if (parcel.fireHazard === undefined) parcel.fireHazard = false;
     if (parcel.seaLevelRise === undefined) parcel.seaLevelRise = false;
 
-    // Density calculation if we have lot size
+    // Density calculation — zone-aware
     if (parcel.lotSizeSf > 0) {
-      parcel.unitsByRight = Math.floor(parcel.lotSizeSf / 800);
-      parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 800 = " + parcel.unitsByRight + " units";
+      const z = (parcel.zoning || "").toUpperCase();
+      if (/^R1|^RS|^RE/.test(z)) {
+        parcel.unitsByRight = 1;
+        parcel.densityCalc = "1 unit per lot (R1 zone)";
+      } else if (/^RD/.test(z)) {
+        parcel.unitsByRight = 2;
+        parcel.densityCalc = "2 units per lot (RD zone)";
+      } else if (/^R4/.test(z)) {
+        parcel.unitsByRight = Math.floor(parcel.lotSizeSf / 400);
+        parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 400 = " + parcel.unitsByRight + " units";
+      } else if (/^R5/.test(z)) {
+        parcel.unitsByRight = null;
+        parcel.densityCalc = "No density limit (R5 — FAR controls)";
+      } else {
+        parcel.unitsByRight = Math.floor(parcel.lotSizeSf / 800);
+        parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 800 = " + parcel.unitsByRight + " units";
+      }
     }
 
     // 6. ZIMAS internal API proxy — fills in year built, units, sqft, RSO, JCO, TOC, ZI codes, etc.
@@ -1667,10 +1747,25 @@ export default function Listo() {
             if (zd.address) { parcel.zimasAddress = zd.address; }
             parcel.source = "ZIMAS";
             parcel.hasData = true;
-            // Recalculate density with ZIMAS lot size
+            // Recalculate density with ZIMAS lot size — zone-aware
             if (parcel.lotSizeSf > 0) {
-              parcel.unitsByRight = Math.floor(parcel.lotSizeSf / 800);
-              parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 800 = " + parcel.unitsByRight + " units";
+              const z2 = (parcel.zoning || "").toUpperCase();
+              if (/^R1|^RS|^RE/.test(z2)) {
+                parcel.unitsByRight = 1;
+                parcel.densityCalc = "1 unit per lot (R1 zone)";
+              } else if (/^RD/.test(z2)) {
+                parcel.unitsByRight = 2;
+                parcel.densityCalc = "2 units per lot (RD zone)";
+              } else if (/^R4/.test(z2)) {
+                parcel.unitsByRight = Math.floor(parcel.lotSizeSf / 400);
+                parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 400 = " + parcel.unitsByRight + " units";
+              } else if (/^R5/.test(z2)) {
+                parcel.unitsByRight = null;
+                parcel.densityCalc = "No density limit (R5 — FAR controls)";
+              } else {
+                parcel.unitsByRight = Math.floor(parcel.lotSizeSf / 800);
+                parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 800 = " + parcel.unitsByRight + " units";
+              }
             }
           }
         } else {
@@ -1719,7 +1814,7 @@ export default function Listo() {
       nextStep();
 
       if (!geo) {
-        setError("Could not geocode this address. Try adding a ZIP code or 'Los Angeles, CA'.");
+        setError("Could not locate this address. Check the street name spelling and try including the ZIP code (e.g., '1540 W Wildwood Dr 90041').");
         setLoading(false);
         return;
       }
@@ -1962,7 +2057,7 @@ export default function Listo() {
     const parcelMeta = [label, date, parcel?.hasData ? "ZIMAS verified" : "ZIP estimates", jurisdiction?.short].filter(Boolean).join(" · ");
     const parcelInfo = [parcel?.zoning, parcel?.lotSizeSf ? parcel.lotSizeSf.toLocaleString() + " sf" : null, parcel?.apn ? "APN " + parcel.apn : null].filter(Boolean).join(" · ");
     const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Listo_${addrSlug}_${dateSlug}</title>
-<style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:32px;color:#1A1714;font-size:13px;line-height:1.65;counter-reset:page}.header{border-bottom:3px solid ${T.orange};padding-bottom:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}.brand{font-size:20px;font-weight:700;color:#1A1714;font-family:Georgia,serif}.brand span{color:${T.orange}}.meta{font-size:10px;color:#8C7B70;text-align:right;font-family:monospace}.address-bar{background:${T.orange};color:white;padding:14px 18px;border-radius:8px;margin:12px 0}.addr-main{font-size:16px;font-weight:700;font-family:Georgia,serif}.addr-sub{font-size:11px;margin-top:3px;opacity:0.8}.addr-info{font-size:11px;margin-top:2px;opacity:0.7}h2{font-size:14px;font-weight:700;color:${T.orange};font-family:Georgia,serif;border-bottom:2px solid ${T.orange}30;padding-bottom:4px;margin:22px 0 10px;text-transform:uppercase;letter-spacing:0.05em}h3{font-size:12px;font-weight:700;color:#2C2420;margin:12px 0 6px;background:#F0EBE3;padding:3px 8px;border-radius:4px}ul{padding-left:18px;margin:6px 0}.footer{margin-top:24px;font-size:10px;color:#A8A29C;text-align:center;border-top:1px solid #E2D9D0;padding-top:12px}.data-src{margin-top:12px;padding:8px 12px;background:#FAF7F2;border-radius:6px;font-size:10px;color:#8C7B70;text-align:center}@media print{body{padding:20px}h2{page-break-before:auto}@page{margin:20mm;@bottom-right{content:"Page " counter(page);font-size:9px;color:#8C7B70;font-family:Arial,sans-serif}}}</style>
+<style>*{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:32px;color:#1A1714;font-size:13px;line-height:1.65;counter-reset:page}.header{border-bottom:3px solid ${T.orange};padding-bottom:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}.brand{font-size:20px;font-weight:700;color:#1A1714;font-family:Georgia,serif}.brand span{color:${T.orange}}.meta{font-size:10px;color:#8C7B70;text-align:right;font-family:monospace}.address-bar{background:${T.orange};color:white;padding:14px 18px;border-radius:8px;margin:12px 0}.addr-main{font-size:16px;font-weight:700;font-family:Georgia,serif}.addr-sub{font-size:11px;margin-top:3px;opacity:0.8}.addr-info{font-size:11px;margin-top:2px;opacity:0.7}h2{font-size:14px;font-weight:700;color:${T.orange};font-family:Georgia,serif;border-bottom:2px solid ${T.orange}30;padding-bottom:4px;margin:22px 0 10px;text-transform:uppercase;letter-spacing:0.05em}h3{font-size:12px;font-weight:700;color:#2C2420;margin:12px 0 6px;background:#F0EBE3;padding:3px 8px;border-radius:4px}ul{padding-left:18px;margin:6px 0}.footer{margin-top:24px;font-size:10px;color:#A8A29C;text-align:center;border-top:1px solid #E2D9D0;padding-top:12px}.data-src{margin-top:12px;padding:8px 12px;background:#FAF7F2;border-radius:6px;font-size:10px;color:#8C7B70;text-align:center}@media print{body{padding:20px}h2{page-break-before:auto}@page{margin:20mm;@bottom-right{content:"Page " counter(page);font-size:9px;color:#8C7B70;font-family:Arial,sans-serif}}}</style>
 </head><body>
 <div class="header"><div class="brand">listo<span>.</span></div><div class="meta">PERMIT ANALYSIS REPORT<br>${date}</div></div>
 <div class="address-bar"><div class="addr-main">${addrLine}</div><div class="addr-sub">${parcelMeta}</div>${parcelInfo ? `<div class="addr-info">${parcelInfo}</div>` : ""}</div>
