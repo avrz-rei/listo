@@ -372,7 +372,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
               {densityText}
             </div>
           </div>
-          {parcel.toc && (
+          {parcel.toc && parcel.toc !== "None" && (
             <div style={{ background:T.orange+"20", border:`1px solid ${T.orange}40`, borderRadius:6, padding:"4px 12px" }}>
               <div style={{ fontSize:9, color:T.orange, fontFamily:"monospace" }}>TOC</div>
               <div style={{ fontSize:14, fontWeight:700, color:T.orange }}>{parcel.toc}</div>
@@ -464,7 +464,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
       )}
 
       {/* Manual entry prompt — only show if ZIMAS proxy didn't fill in the data */}
-      {(!parcel.yearBuilt && !parcel.existingUnits && !parcel.toc) && (
+      {(!parcel.yearBuilt && !parcel.existingUnits && parcel.toc === undefined) && (
         <div style={{ background:"#FFFBEB", border:"1px solid #FDE68A", borderRadius:10,
           padding:"14px 18px", marginBottom:12 }}>
           <div style={{ fontSize:11, fontWeight:700, color:"#92400E", marginBottom:4 }}>
@@ -495,7 +495,7 @@ function renderInline(text) {
 function ReportMarkdown({ text, jurisdiction, parcel }) {
   const lines = text.split("\n");
   const els = [];
-  let i = 0, lk = 0, sec = "";
+  let i = 0, lk = 0, sec = "", subsec = "";
   let scoreCards = null;
 
   // Extract score cards from Deal Summary for the header
@@ -551,6 +551,7 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
     // Section headers
     if (t.startsWith("## ")) {
       sec = t.slice(3).toLowerCase();
+      subsec = ""; // reset subsection
       const id = "sec-" + sec.replace(/[^a-z0-9]+/g,"-").replace(/-+$/,"");
       els.push(
         <div key={"h2"+i} id={id} style={{ marginTop:28, marginBottom:12, scrollMarginTop:80,
@@ -631,13 +632,24 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
     }
 
     if (t.startsWith("### ")) {
+      subsec = t.slice(4).toLowerCase();
       els.push(<h3 key={i} style={{ fontSize:13, fontWeight:700, color:T.black,
         margin:"14px 0 8px", background:T.warmGray, padding:"4px 10px", borderRadius:4 }}>
         {renderInline(t.slice(4))}
       </h3>);
       i++; continue;
     }
+    if (t.startsWith("#### ")) {
+      els.push(<h3 key={i} style={{ fontSize:12, fontWeight:700, color:T.orange,
+        margin:"10px 0 6px", fontFamily:"monospace", letterSpacing:"0.05em" }}>
+        {t.slice(5)}
+      </h3>);
+      i++; continue;
+    }
     if (!t || t === "---") { els.push(<div key={i} style={{ height:"5px" }} />); i++; continue; }
+
+    // Helper: check if current section or subsection matches
+    const inSec = (s) => sec.includes(s) || subsec.includes(s);
 
     // Zone Alerts — render as Flag components
     if (sec.includes("alert") && t.includes("|") && t.split("|").length >= 2) {
@@ -686,7 +698,7 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
     }
 
     // Permit roadmap cards
-    if ((sec.includes("roadmap")||sec.includes("permit roadmap")) && t.includes("|") && t.split("|").length >= 3) {
+    if ((inSec("roadmap")||inSec("road map")||inSec("permit")) && t.includes("|") && t.split("|").length >= 3) {
       const [name,type,agency,time,cost] = t.split("|").map(p=>p.trim());
       const isOTC = (type||"").toUpperCase()==="OTC";
       const isSpecial = (type||"").toUpperCase().includes("SPECIAL");
@@ -715,7 +727,7 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
     }
 
     // Development Standards section — pipe-delimited table + EXEMPTION rows
-    if (sec.includes("development standards")) {
+    if (inSec("development standards")) {
       if (t.startsWith("ZONING:") && !t.includes("DENSITY")) {
         els.push(<div key={i} style={{ fontSize:13, fontWeight:600, color:T.text,
           marginBottom:12, paddingBottom:8, borderBottom:`1px solid ${T.border}` }}>
@@ -883,7 +895,7 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
     }
 
     // Documents section
-    if (sec.includes("document")) {
+    if (inSec("document")) {
       const cleanT = t.replace(/^\*\*|\*\*$/g, "");
       if (cleanT === "DEMO" || cleanT === "BUILDING" || cleanT.startsWith("TECHNICAL")) {
         els.push(<div key={i} style={{ fontSize:9, fontWeight:700, color:T.orange,
@@ -918,7 +930,7 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
     }
 
     // Fee rows
-    if (sec.includes("fee") && t.includes("|")) {
+    if (inSec("fee") && t.includes("|")) {
       const [name, basis, range] = t.split("|").map(p=>p.trim());
       const isTotal = (name||"").toUpperCase().includes("TOTAL");
       els.push(<div key={i} style={{ display:"flex", gap:8, padding:"7px 0",
@@ -936,14 +948,14 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
     }
 
     // Fee excludes / notes
-    if (sec.includes("fee") && (t.startsWith("EXCLUDES:") || t.startsWith("Note:"))) {
+    if (inSec("fee") && (t.startsWith("EXCLUDES:") || t.startsWith("Note:"))) {
       els.push(<p key={i} style={{ fontSize:11, color:T.muted, lineHeight:1.6,
         marginTop:8, fontStyle:"italic" }}>{renderInline(t)}</p>);
       i++; continue;
     }
 
     // Timeline
-    if (sec.includes("timeline")) {
+    if (inSec("timeline")) {
       const wm = t.match(/^(Weeks?\s[\d\-–]+)\s*:\s*(.+)$/i);
       if (wm) {
         els.push(<div key={i} style={{ display:"flex", gap:12, padding:"7px 0",
@@ -992,7 +1004,7 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
     }
 
     // Definitions section — render as compact term/definition pairs
-    if (sec.includes("definition")) {
+    if (inSec("definition")) {
       if (t.includes(":")) {
         const ci = t.indexOf(":");
         const term = t.slice(0, ci).trim();
@@ -1008,7 +1020,7 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
     }
 
     // Terms & Data Sources section — render as compact grid
-    if (sec.includes("terms")) {
+    if (inSec("terms")) {
       if (t.includes("|") && (t.includes(":") || t.includes("("))) {
         const items = t.split("|").map(s => s.trim()).filter(Boolean);
         els.push(<div key={i} style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>
@@ -1738,13 +1750,14 @@ export default function Listo() {
             if (zd.existingSqft) { parcel.existingBuildingSqft = zd.existingSqft; }
             if (zd.existingBedrooms) { parcel.existingBedrooms = zd.existingBedrooms; }
             if (zd.existingBathrooms) { parcel.existingBathrooms = zd.existingBathrooms; }
-            if (zd.toc) { parcel.toc = zd.toc; }
+            if (zd.toc) { parcel.toc = zd.toc; } else { parcel.toc = "None"; parcel.tocVerified = true; }
             if (zd.rso !== null) { parcel.rso = zd.rso; }
             if (zd.jco !== null) { parcel.jco = zd.jco; }
             if (zd.heReplacement !== null) { parcel.heReplacement = zd.heReplacement; }
             if (zd.generalPlan) { parcel.generalPlanLandUse = zd.generalPlan; }
             if (zd.communityPlan) { parcel.communityPlan = zd.communityPlan; }
             if (zd.specificPlans?.length) { parcel.specificPlans = zd.specificPlans; parcel.specificPlan = zd.specificPlans.join(", "); }
+            else { parcel.specificPlan = "None"; parcel.specificPlanVerified = true; }
             if (zd.ziCodes?.length) { parcel.ziCodes = zd.ziCodes; }
             if (zd.ab2097 !== null) { parcel.ab2097 = zd.ab2097; }
             if (zd.ab2334 !== null) { parcel.ab2334 = zd.ab2334; }
@@ -1980,24 +1993,26 @@ export default function Listo() {
 
     // Build report body from Claude's markdown
     const lines = result.split("\n");
-    let bodyHtml = "", pdfSec = "";
+    let bodyHtml = "", pdfSec = "", pdfSubsec = "";
+    const inPdfSec = (s) => pdfSec.includes(s) || pdfSubsec.includes(s);
     for (const raw of lines) {
-      const t = raw.trim();
+      const t = raw.trim().replace(/\*\*/g, ""); // strip bold markers
       if (!t) { bodyHtml += "<br>"; continue; }
       if (t.startsWith("## ")) {
         pdfSec = t.slice(3).toLowerCase();
+        pdfSubsec = "";
         bodyHtml += `<h2>${pdfSec.toUpperCase()}</h2>`;
         // Insert parcel cards after Parcel Survey header
         if (pdfSec.includes("parcel survey") && parcelHtml) {
           bodyHtml += parcelHtml;
-          // Skip Claude's text for this section
           continue;
         }
         continue;
       }
       // Skip Claude's parcel survey text (replaced by cards above)
       if (pdfSec.includes("parcel survey")) continue;
-      if (t.startsWith("### ")) { bodyHtml += `<h3>${t.slice(4)}</h3>`; continue; }
+      if (t.startsWith("### ")) { pdfSubsec = t.slice(4).toLowerCase(); bodyHtml += `<h3>${t.slice(4)}</h3>`; continue; }
+      if (t.startsWith("#### ")) { bodyHtml += `<div style="font-size:10px;font-weight:700;color:${T.orange};text-transform:uppercase;letter-spacing:0.05em;margin:10px 0 4px;font-family:monospace">${t.slice(5)}</div>`; continue; }
       if (t.startsWith("VERDICT:")) {
         const pts = t.slice(8).trim().split("|");
         const w=(pts[0]||"").trim(), d=(pts[1]||"").trim();
@@ -2050,7 +2065,7 @@ export default function Listo() {
       if (t.startsWith("- ")||t.startsWith("* ")){bodyHtml+=`<li style="font-size:12px;color:#2C2420;margin:3px 0">${t.slice(2)}</li>`;continue;}
       if (t==="DEMO"||t==="BUILDING"||t.startsWith("TECHNICAL")||t==="**DEMO**"||t==="**BUILDING**"||t.startsWith("**TECHNICAL")){const cleanLabel=t.replace(/^\*\*|\*\*$/g,"");bodyHtml+=`<div style="font-size:9px;font-weight:700;color:${T.orange};text-transform:uppercase;letter-spacing:0.1em;margin-top:12px;margin-bottom:4px;font-family:monospace">${cleanLabel}</div>`;continue;}
       // Terms & Data Sources — render acronyms as compact tags, data sources as links
-      if (pdfSec.includes("terms")) {
+      if (inPdfSec("terms")) {
         if (t.includes("|") && (t.includes(":") || t.includes("("))) {
           const items = t.split("|").map(s => s.trim()).filter(Boolean);
           const isDataSources = t.toLowerCase().startsWith("data source");
