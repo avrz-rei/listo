@@ -1,13 +1,14 @@
 /**
- * Listo API — /api/analyze  (v7 — security + LAMC tables)
+ * Listo API — /api/analyze
  *
- * The browser queries ZIMAS directly (public ArcGIS API, no key needed).
- * This endpoint receives the pre-fetched parcel data + calls Claude.
+ * All data fetching is done server-side via Cloudflare Worker.
+ * This endpoint receives pre-fetched parcel data + calls Claude.
  *
  * Security:
  * - CORS restricted to listo.zone
  * - Rate limiting: 10 requests per IP per minute
  * - Input sanitization: strips control chars, limits length
+ * - Referrer validation: must originate from listo.zone
  */
 
 // ── Rate limiter (in-memory, resets on cold start) ───────────────────────
@@ -40,9 +41,14 @@ function sanitize(str, maxLen = 500) {
 export default async function handler(req, res) {
   // CORS — restrict to listo.zone in production
   const origin = req.headers?.origin || "";
+  const referer = req.headers?.referer || "";
   const allowed = ["https://listo.zone", "https://www.listo.zone", "http://localhost:3000"];
   if (origin && !allowed.some(a => origin.startsWith(a))) {
     return res.status(403).json({ error: "Origin not allowed" });
+  }
+  // Referrer check — block direct API calls from tools like curl/Postman
+  if (!origin && !allowed.some(a => referer.startsWith(a))) {
+    return res.status(403).json({ error: "Direct API access not permitted" });
   }
   res.setHeader("Access-Control-Allow-Origin", origin || "https://listo.zone");
   res.setHeader("Access-Control-Allow-Methods", "POST");
