@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 
 // ── PostHog ───────────────────────────────────────────────────────────────
 const POSTHOG_KEY = "phc_Gbq7s2JDLrsyaRC2X3jP9PmMEBclWGloKzzL29XZRhv";
+const DEBUG = typeof window !== "undefined" && window.location.search.includes("debug=1");
 function track(event, props = {}) {
   if (typeof window === "undefined" || !window.posthog) return;
   try { window.posthog.capture(event, props); } catch (_) {}
@@ -1395,7 +1396,7 @@ export default function Listo() {
         if (geo?.zip && geo.zip.length === 5) {
           setEditZip(geo.zip);
         }
-      } catch (e) { console.log("[GEOCODE] Background geocode failed:", e.message); }
+      } catch (e) { DEBUG && console.log("[GEOCODE] Background geocode failed:", e.message); }
       setZipDetecting(false);
     }
   };
@@ -1408,549 +1409,137 @@ export default function Listo() {
     "Generating permit analysis...",
   ];
 
-  // ── Client-side ZIMAS query helpers (browser → ZIMAS, no Vercel) ─────
-  const ZIMAS = "https://zimas.lacity.org/arcgis/rest/services";
-
-  const zimasQuery = async (service, layerId, lng, lat, timeoutMs = 12000) => {
-    const p = new URLSearchParams({
-      geometry: lng + "," + lat,
-      geometryType: "esriGeometryPoint",
-      inSR: "4326",
-      spatialRel: "esriSpatialRelIntersects",
-      outFields: "*",
-      returnGeometry: "false",
-      f: "json",
-    });
-    const r = await fetch(ZIMAS + "/" + service + "/MapServer/" + layerId + "/query?" + p,
-      { signal: AbortSignal.timeout(timeoutMs) });
-    if (!r.ok) return null;
-    const d = await r.json();
-    if (d?.error) return null;
-    return d?.features?.[0]?.attributes || null;
-  };
-
-  const zimasIdentify = async (service, lng, lat, timeoutMs = 15000) => {
-    const ext = [lng - 0.0005, lat - 0.0005, lng + 0.0005, lat + 0.0005].join(",");
-    const p = new URLSearchParams({
-      geometry: JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } }),
-      geometryType: "esriGeometryPoint",
-      sr: "4326",
-      layers: "all",
-      tolerance: "10",
-      mapExtent: ext,
-      imageDisplay: "600,400,96",
-      returnGeometry: "false",
-      f: "json",
-    });
-    const r = await fetch(ZIMAS + "/" + service + "/MapServer/identify?" + p,
-      { signal: AbortSignal.timeout(timeoutMs) });
-    if (!r.ok) return [];
-    const d = await r.json();
-    if (d?.error) return [];
-    return d?.results || [];
-  };
+  const WORKER_URL = "https://zimas-proxy.listo.workers.dev";
 
   const geocodeAddress = async (addr) => {
-    // Normalize LA neighborhoods → "Los Angeles"
-    const LA_HOODS = ["Venice","Westchester","Playa Del Rey","Playa del Rey","Marina del Rey",
-      "Pacific Palisades","Brentwood","Bel Air","Westwood","Century City","Mar Vista",
-      "Silver Lake","Echo Park","Hancock Park","Los Feliz","Hollywood Hills",
-      "Koreatown","Highland Park","Eagle Rock","Atwater Village","Chinatown","Downtown",
-      "North Hollywood","Van Nuys","Sherman Oaks","Studio City","Encino","Tarzana",
-      "Woodland Hills","Reseda","Canoga Park","Chatsworth","Granada Hills","Northridge",
-      "Panorama City","Pacoima","Sun Valley","Sylmar","San Pedro","Wilmington",
-      "Harbor City","Playa Vista","Del Rey","Palms","Sawtelle","Mid-Wilshire",
-      "Boyle Heights","Lincoln Heights","El Sereno","Cypress Park","Mount Washington",
-      "Glassell Park","Filipinotown","Ladera Heights","View Park","Hyde Park","Watts"];
-
-    let normalized = addr.trim();
-    for (const hood of LA_HOODS) {
-      if (normalized.toLowerCase().includes(hood.toLowerCase())) {
-        const re = new RegExp(",?\\s*" + hood.replace(/[-]/g, "[-]?"), "i");
-        normalized = normalized.replace(re, "").trim().replace(/,\s*$/, "");
-        break;
-      }
-    }
-    if (!/Los Angeles|Santa Monica|Beverly Hills|Malibu|\b\d{5}\b/i.test(normalized)) {
-      normalized += ", Los Angeles, CA";
-    }
-
-    // Build directional variants
-    const variants = [normalized];
-    const m = normalized.match(/^(\d+)\s+(?!([NSEW])\s)(.+)/i);
-    if (m) { for (const dir of ["W","E","N","S"]) variants.push(m[1]+" "+dir+" "+m[3]); }
-
-    // Nominatim primary geocoder (Census is CORS-blocked from browser)
-    for (const v of [addr, ...variants]) {
-      try {
-        const q = encodeURIComponent(v + ", Los Angeles, CA");
-        const r = await fetch(
-          "https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=us",
-          { headers: { "User-Agent": "Listo/1.0 (listo.zone)" }, signal: AbortSignal.timeout(6000) }
-        );
-        if (r.ok) {
-          const d = await r.json();
-          if (d?.[0]) {
-            // Extract ZIP from display_name — match after state abbreviation or near end, not house number
-            const dn = d[0].display_name;
-            const zipStateMatch = dn.match(/\bCA\s+(\d{5})\b/i) || dn.match(/California[,\s]+(\d{5})\b/);
-            const zipEndMatch = dn.match(/(\d{5}),?\s*(?:USA|United States)\s*$/i);
-            const zipVal = (zipStateMatch || zipEndMatch || [])[1] || "";
-            return {
-              address: dn,
-              city: "Los Angeles", zip: /^9[0-3]/.test(zipVal) ? zipVal : "",
-              lat: parseFloat(d[0].lat),
-              lng: parseFloat(d[0].lon),
-              source: "Nominatim",
-            };
-          }
-        }
-      } catch (e) {}
-    }
-
-    // Structured query fallback — helps Nominatim find addresses it misses with free-form
     try {
-      const houseNum = addr.match(/^(\d+)/)?.[1] || "";
-      const streetOnly = addr.replace(/^\d+\s*/, "").replace(/,.*/, "").trim();
-      if (houseNum && streetOnly) {
-        const structuredUrl = "https://nominatim.openstreetmap.org/search?" + new URLSearchParams({
-          street: houseNum + " " + streetOnly, city: "Los Angeles", state: "CA", country: "US",
-          format: "json", limit: "1",
-        });
-        const r = await fetch(structuredUrl,
-          { headers: { "User-Agent": "Listo/1.0 (listo.zone)" }, signal: AbortSignal.timeout(6000) });
-        if (r.ok) {
-          const d = await r.json();
-          if (d?.[0]) {
-            const dn = d[0].display_name;
-            const zipStateMatch = dn.match(/\bCA\s+(\d{5})\b/i) || dn.match(/California[,\s]+(\d{5})\b/);
-            const zipEndMatch = dn.match(/(\d{5}),?\s*(?:USA|United States)\s*$/i);
-            const zipVal = (zipStateMatch || zipEndMatch || [])[1] || "";
-            return {
-              address: dn,
-              city: "Los Angeles", zip: /^9[0-3]/.test(zipVal) ? zipVal : "",
-              lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon), source: "Nominatim (structured)",
-            };
-          }
-        }
+      const r = await fetch(WORKER_URL + "/geocode?address=" + encodeURIComponent(addr),
+        { signal: AbortSignal.timeout(8000) });
+      if (r.ok) {
+        const d = await r.json();
+        if (d && !d.error) return d;
       }
-    } catch (e) {}
+    } catch (_) {}
     return null;
   };
 
-  const queryZIMASFromBrowser = async (lng, lat) => {
+  const queryParcelData = async (lng, lat) => {
     const parcel = { source: "ZIMAS", hasData: false, overlayLayers: [] };
-
-    // 1. Zoning — confirmed working via zma/zimas layer 1902
-    try {
-      const z = await zimasQuery("zma/zimas", 1902, lng, lat);
-      if (z) {
-        parcel.hasData = true;
-        parcel.zoning = z.ZONE_CMPLT || z.ZONE_CLASS || null;
-        parcel.zoneClass = z.ZONE_CLASS || null;
-        parcel.zoningSource = "ZIMAS zma/zimas/1902 (verified)";
-      }
-    } catch (e) { console.log("[ZIMAS] Zoning query error:", e.message); }
-
-    // 2. LA County Parcel — APN, address, use code + lot area + lot dimensions from geometry
-    const PARCEL_URL = "https://public.gis.lacounty.gov/public/rest/services/LACounty_Cache/LACounty_Parcel/MapServer/0/query";
-    const userHouseNo = (editStreet || address).match(/^(\d+)/)?.[1] || "";
-    const userStreet = (editStreet || address).replace(/^\d+\s*/, "").replace(/,.*/, "").trim().toUpperCase().replace(/\b(AVE|AVENUE|ST|STREET|BLVD|BOULEVARD|DR|DRIVE|RD|ROAD|CT|COURT|PL|PLACE|WAY|LN|LANE|CIR|CIRCLE)\b.*/, "").trim();
-
-    const processParcelFeature = (f, isAddressFallback) => {
-      if (!f?.attributes) return;
-      const a = f.attributes;
-      const situsHouseNo = a.SitusHouseNo || "";
-      if (userHouseNo && situsHouseNo && userHouseNo !== situsHouseNo) {
-        if (!isAddressFallback) {
-          // Spatial query returned wrong parcel — don't store any data, just flag for address fallback
-          parcel.addressMismatch = true;
-          console.log("[PARCEL] ADDRESS MISMATCH:", situsHouseNo, "vs user input", userHouseNo, "— skipping, will try address query");
-          return;
-        }
-        // Even address fallback returned wrong number — store with warning
-        parcel.addressMismatch = true;
-        parcel.addressMismatchNote = "Parcel query returned " + situsHouseNo + " " + (a.SitusStreet||"") + " but you entered " + userHouseNo + ". Verify the correct parcel at zimas.lacity.org.";
-        console.log("[PARCEL] ADDRESS MISMATCH (address query):", situsHouseNo, "vs user input", userHouseNo);
-      } else {
-        parcel.addressMismatch = false;
-      }
-      parcel.hasData = true;
-      parcel.apn = a.APN || a.AIN || null;
-      parcel.situsAddr = a.SitusFullAddress || a.SitusAddress || null;
-      parcel.situsCity = a.SitusCity || null;
-      parcel.situsZip = a.SitusZIP || null;
-      parcel.useCode = a.UseCode || null;
-      parcel.useType = a.UseType || null;
-      parcel.useDescription = a.UseDescription || null;
-      parcel.agencyName = a.AgencyName || null;
-      console.log("[PARCEL] LA County hit — APN:", parcel.apn, "addr:", parcel.situsAddr);
-
-      if (f.geometry?.rings?.[0]) {
-        const ring = f.geometry.rings[0];
-        let area = 0;
-        for (let i = 0; i < ring.length; i++) {
-          const j = (i + 1) % ring.length;
-          area += ring[i][0] * ring[j][1];
-          area -= ring[j][0] * ring[i][1];
-        }
-        parcel.lotSizeSf = Math.round(Math.abs(area) / 2);
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        for (const pt of ring) {
-          if (pt[0] < minX) minX = pt[0];
-          if (pt[0] > maxX) maxX = pt[0];
-          if (pt[1] < minY) minY = pt[1];
-          if (pt[1] > maxY) maxY = pt[1];
-        }
-        const dimX = Math.round(maxX - minX);
-        const dimY = Math.round(maxY - minY);
-        // Validate: if bounding box area > 1.4× lot area, lot is rotated and dims are unreliable
-        const bboxArea = dimX * dimY;
-        if (bboxArea <= parcel.lotSizeSf * 1.4) {
-          // Shorter dimension = width (street frontage), longer = depth
-          parcel.lotWidthFt = Math.min(dimX, dimY);
-          parcel.lotDepthFt = Math.max(dimX, dimY);
-          parcel.lotDimsSource = "estimated from parcel geometry";
-          console.log("[PARCEL] Lot:", parcel.lotSizeSf, "sf, ~" + parcel.lotWidthFt + "×" + parcel.lotDepthFt + " ft");
-        } else {
-          console.log("[PARCEL] Lot:", parcel.lotSizeSf, "sf, bbox " + dimX + "×" + dimY + " too large (rotated lot) — skipping dims");
-        }
-      }
-    };
-
-    // 2a. Spatial point query (primary)
-    try {
-      const p = new URLSearchParams({
-        geometry: lng + "," + lat, geometryType: "esriGeometryPoint", inSR: "4326",
-        spatialRel: "esriSpatialRelIntersects",
-        outFields: "APN,AIN,SitusAddress,SitusFullAddress,SitusCity,SitusZIP,SitusDirection,SitusStreet,SitusHouseNo,UseCode,UseType,UseDescription,AgencyName,TaxRateArea,TaxRateCity",
-        returnGeometry: "true", outSR: "102645", f: "json",
-      });
-      const r = await fetch(PARCEL_URL + "?" + p, { signal: AbortSignal.timeout(12000) });
-      if (r.ok) {
-        const d = await r.json();
-        let bestFeature = d?.features?.[0];
-        if (d?.features?.length > 1 && userHouseNo) {
-          const match = d.features.find(f => f.attributes?.SitusHouseNo === userHouseNo);
-          if (match) bestFeature = match;
-        }
-        processParcelFeature(bestFeature, false);
-      }
-    } catch (e) { console.log("[PARCEL] Spatial query error:", e.message); }
-
-    // 2b. Address-based fallback — if spatial query returned wrong parcel, try by address
-    if (parcel.addressMismatch && userHouseNo && userStreet) {
-      console.log("[PARCEL] Trying address-based query for", userHouseNo, userStreet);
-      try {
-        const p = new URLSearchParams({
-          where: "SitusHouseNo='" + userHouseNo + "' AND SitusStreet LIKE '%" + userStreet + "%'",
-          outFields: "APN,AIN,SitusAddress,SitusFullAddress,SitusCity,SitusZIP,SitusDirection,SitusStreet,SitusHouseNo,UseCode,UseType,UseDescription,AgencyName,TaxRateArea,TaxRateCity",
-          returnGeometry: "true", outSR: "102645", f: "json",
-        });
-        const r = await fetch(PARCEL_URL + "?" + p, { signal: AbortSignal.timeout(12000) });
-        if (r.ok) {
-          const d = await r.json();
-          if (d?.features?.length > 0) {
-            console.log("[PARCEL] Address query found", d.features.length, "results");
-            processParcelFeature(d.features[0], true);
-          }
-        }
-      } catch (e) { console.log("[PARCEL] Address query error:", e.message); }
-    }
-
-    // 3. CGS Seismic Hazards — AUTHORITATIVE state source (ZIMAS gets data from CGS)
-    //    Try multiple endpoints: primary MapServer, overlap zones, and legacy service
-    const CGS = "https://gis.conservation.ca.gov/server/rest/services/CGS_Earthquake_Hazard_Zones";
-    const CGS_LEGACY = "https://services.gis.ca.gov/arcgis/rest/services/GeoscientificInformation";
-    const seismicParams = (lng2, lat2) => new URLSearchParams({
-      geometry: lng2 + "," + lat2,
-      geometryType: "esriGeometryPoint",
-      inSR: "4326",
-      spatialRel: "esriSpatialRelIntersects",
-      outFields: "*",
-      returnGeometry: "false",
-      f: "json",
-    });
-
-    // 3a. Liquefaction — try primary, then overlap, then legacy
-    if (parcel.liquefaction === undefined) {
-      const liqEndpoints = [
-        CGS + "/SHP_Liquefaction_Zones/MapServer/0/query",
-        CGS + "/SHP_LQLS_Overlap_Zones/MapServer/0/query",
-        CGS_LEGACY + "/Liquefaction/MapServer/0/query",
-      ];
-      for (const url of liqEndpoints) {
-        if (parcel.liquefaction === true) break;
-        try {
-          const r = await fetch(url + "?" + seismicParams(lng, lat), { signal: AbortSignal.timeout(8000) });
-          if (r.ok) {
-            const d = await r.json();
-            if (d?.features?.length > 0) {
-              parcel.liquefaction = true;
-              parcel.liquefactionSource = "CGS Seismic Hazard Zones (verified)";
-              parcel.hasData = true;
-              console.log("[CGS] Liquefaction: YES from", url.split("/").slice(-3).join("/"));
-              break;
-            } else if (!d?.error) {
-              console.log("[CGS] Liquefaction: no features from", url.split("/").slice(-3).join("/"));
-            }
-          }
-        } catch (e) { console.log("[CGS] Liquefaction query error:", url.split("/").pop(), e.message); }
-      }
-      if (parcel.liquefaction === undefined) {
-        parcel.liquefaction = false;
-        parcel.liquefactionSource = "CGS (verified — not in zone)";
-        console.log("[CGS] Liquefaction: NO (checked all endpoints)");
-      }
-    }
-
-    // 3b. Landslide
-    try {
-      const r = await fetch(CGS + "/SHP_Landslide_Zones/MapServer/0/query?" + seismicParams(lng, lat),
-        { signal: AbortSignal.timeout(8000) });
-      if (r.ok) {
-        const d = await r.json();
-        parcel.landslide = d?.features?.length > 0;
-        parcel.landslideSource = "CGS (verified)";
-        parcel.hasData = true;
-      }
-    } catch (e) { console.log("[CGS] Landslide query error:", e.message); }
-
-    // 3c. Fault Zones (Alquist-Priolo)
-    try {
-      const r = await fetch(CGS + "/SHP_Fault_Zones/FeatureServer/0/query?" + seismicParams(lng, lat),
-        { signal: AbortSignal.timeout(8000) });
-      if (r.ok) {
-        const d = await r.json();
-        if (d?.features?.length > 0) {
-          parcel.faultZone = d.features[0].attributes?.FaultName || "Alquist-Priolo Fault Zone";
-          parcel.alquistPriolo = true;
-        } else {
-          parcel.alquistPriolo = false;
-        }
-        parcel.faultSource = "CGS (verified)";
-        parcel.hasData = true;
-      }
-    } catch (e) { console.log("[CGS] Fault query error:", e.message); }
-
-    // 4. Legend layers — TOC, hazards, overlays (ZIMAS)
-    try {
-      const results = await zimasIdentify("zma/legend", lng, lat);
-      for (const r of results) {
-        const a = r.attributes || {};
-        const name = (r.layerName || "").toUpperCase();
-        parcel.overlayLayers.push({ layerId: r.layerId, layerName: r.layerName, attrs: a });
-
-        if (name.includes("LIQUEFACTION")) { parcel.liquefaction = true; parcel.hasData = true; }
-        if (name.includes("LANDSLIDE")) { parcel.landslide = true; parcel.hasData = true; }
-        if (name.includes("FAULT") || name.includes("ALQUIST")) { parcel.faultZone = r.layerName; parcel.hasData = true; }
-        if (name.includes("TSUNAMI")) { parcel.tsunami = true; parcel.hasData = true; }
-        if (name.includes("TOC") || name.includes("TRANSIT ORIENTED")) {
-          const tier = a.TIER || a.TOC_TIER || a.LABEL || a.TOC;
-          if (tier) { parcel.toc = "Tier " + String(tier).replace(/\D/g, ""); parcel.hasData = true; }
-        }
-        if (name.includes("FIRE") && name.includes("HAZARD")) { parcel.fireHazard = true; parcel.hasData = true; }
-        if (name.includes("FLOOD")) { parcel.floodZone = r.layerName; parcel.hasData = true; }
-        if (name.includes("METHANE")) { parcel.methane = r.layerName; parcel.hasData = true; }
-        if (name.includes("GRADING") || name.includes("SPECIAL GRADING")) { parcel.specialGrading = true; parcel.hasData = true; }
-        if (name.includes("HILLSIDE")) { parcel.hillside = true; parcel.hasData = true; }
-        if (name.includes("SEA LEVEL")) { parcel.seaLevelRise = true; parcel.hasData = true; }
-        if (name.includes("COASTAL") && !name.includes("TRANSPORTATION")) {
-          parcel.coastalZone = "Yes";
-          parcel.coastalZoneType = a.CST_TYPE || a.TYPE || a.LABEL || r.layerName;
-          parcel.hasData = true;
-        }
-        if (name.includes("HPOZ") || name.includes("HISTORIC PRESERVATION OVERLAY")) {
-          parcel.hpoz = r.layerName; parcel.hasData = true;
-        }
-        if (name.includes("SPECIFIC PLAN")) {
-          parcel.specificPlan = a.NAME || a.SP_NAME || a.LABEL || r.layerName; parcel.hasData = true;
-        }
-      }
-    } catch (e) { console.log("[ZIMAS] Legend identify error:", e.message); }
-
-    // 4. Coastal zones — dedicated service
-    if (!parcel.coastalZone) {
-      try {
-        const results = await zimasIdentify("zma/coastal_zones", lng, lat);
-        for (const r of results) {
-          const a = r.attributes || {};
-          const name = (r.layerName || "").toUpperCase();
-          if (name.includes("PERMIT") || name.includes("COASTAL")) {
-            parcel.coastalZone = "Yes";
-            parcel.coastalZoneType = a.CST_TYPE || a.NAME || r.layerName;
-            parcel.hasData = true;
-            parcel.overlayLayers.push({ layerId: r.layerId, layerName: r.layerName, attrs: a });
-          }
-        }
-      } catch (e) { console.log("[ZIMAS] Coastal identify error:", e.message); }
-    }
-    if (!parcel.coastalZone) parcel.coastalZone = "No";
-
-    // 5. ZIMAS main map identify — catches additional overlays the legend might miss
-    try {
-      const results = await zimasIdentify("zma/zimas", lng, lat);
-      for (const r of results) {
-        const a = r.attributes || {};
-        const name = (r.layerName || "").toUpperCase();
-        // Only capture layers we haven't already got
-        if (name.includes("LIQUEFACTION") && !parcel.liquefaction) { parcel.liquefaction = true; parcel.hasData = true; }
-        if (name.includes("TOC") && !parcel.toc) {
-          const tier = a.TIER || a.TOC_TIER || a.LABEL;
-          if (tier) { parcel.toc = "Tier " + String(tier).replace(/\D/g, ""); parcel.hasData = true; }
-        }
-        if (name.includes("SEISMIC") || name.includes("FAULT")) {
-          if (!parcel.faultZone) { parcel.faultZone = r.layerName; parcel.hasData = true; }
-        }
-        // Capture any overlay we haven't logged yet
-        if (!parcel.overlayLayers.find(o => o.layerId === r.layerId)) {
-          parcel.overlayLayers.push({ layerId: r.layerId, layerName: r.layerName, attrs: a });
-        }
-      }
-    } catch (e) { console.log("[ZIMAS] Main identify error:", e.message); }
-
-    // Set defaults for booleans not detected
-    if (parcel.liquefaction === undefined) parcel.liquefaction = false;
-    if (parcel.hillside === undefined) parcel.hillside = false;
-    if (parcel.specialGrading === undefined) parcel.specialGrading = false;
-    if (parcel.fireHazard === undefined) parcel.fireHazard = false;
-    if (parcel.seaLevelRise === undefined) parcel.seaLevelRise = false;
-
-    // Density calculation — zone-aware
-    if (parcel.lotSizeSf > 0) {
-      const z = (parcel.zoning || "").toUpperCase();
-      if (/^R1|^RS|^RE/.test(z)) {
-        parcel.unitsByRight = 1;
-        parcel.densityCalc = "1 unit per lot (R1 zone)";
-      } else if (/^RD/.test(z)) {
-        parcel.unitsByRight = 2;
-        parcel.densityCalc = "2 units per lot (RD zone)";
-      } else if (/^R4/.test(z)) {
-        parcel.unitsByRight = Math.floor(parcel.lotSizeSf / 400);
-        parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 400 = " + parcel.unitsByRight + " units";
-      } else if (/^R5/.test(z)) {
-        parcel.unitsByRight = null;
-        parcel.densityCalc = "No density limit (R5 — FAR controls)";
-      } else {
-        parcel.unitsByRight = Math.floor(parcel.lotSizeSf / 800);
-        parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 800 = " + parcel.unitsByRight + " units";
-      }
-    }
-
-    // 6. ZIMAS internal API proxy — fills in year built, units, sqft, RSO, JCO, TOC, ZI codes, etc.
     const userAddr = editStreet || address || "";
     const houseNo = userAddr.match(/^(\d+)/)?.[1] || "";
-    const streetPart = userAddr.replace(/^\d+\s*/, "").replace(/,.*/, "").replace(/\b(ave|avenue|st|street|blvd|boulevard|dr|drive|rd|road|ct|court|pl|place|way|ln|lane|cir|circle)\b.*/i, "").trim()
-      .replace(/^(N|S|E|W|NE|NW|SE|SW)\s+/i, ""); // Strip directional prefix — ZIMAS handles it internally
-    if (houseNo && streetPart) {
-      try {
-        console.log("[ZIMAS-PROXY] Calling Cloudflare Worker for", houseNo, streetPart);
-        const ZIMAS_PROXY = "https://zimas-proxy.listo.workers.dev";
-        const zr = await fetch(ZIMAS_PROXY + "?houseNumber=" + encodeURIComponent(houseNo) + "&streetName=" + encodeURIComponent(streetPart),
-          { signal: AbortSignal.timeout(25000) });
-        if (zr.ok) {
-          const zd = await zr.json();
-          if (zd && !zd.error) {
-            console.log("[ZIMAS-PROXY] Got data:", JSON.stringify(zd).slice(0, 300));
-            if (zd._timing) console.log("[ZIMAS-PROXY] Timing:", zd._timing);
-            // Validate: ZIMAS must return the same house number the user typed
-            const zimasHouseNo = (zd.address || "").match(/^(\d+)/)?.[1] || "";
-            if (zimasHouseNo && houseNo && zimasHouseNo !== houseNo) {
-              console.log("[ZIMAS-PROXY] ADDRESS MISMATCH — ZIMAS returned", zd.address, "but user entered", houseNo, streetPart, "— discarding ZIMAS data");
-              parcel.zimasAddressMismatch = true;
-            } else {
-            // Merge ZIMAS data — ZIMAS is authoritative, overrides other sources
-            if (zd.apn) { parcel.apn = zd.apn; parcel.apnSource = "ZIMAS (verified)"; }
-            if (zd.zoning) { parcel.zoning = zd.zoning; parcel.zoningSource = "ZIMAS internal API (verified)"; }
-            if (zd.lotAreaSf) { parcel.lotSizeSf = zd.lotAreaSf; parcel.lotSizeSource = "ZIMAS (verified)"; }
-            if (zd.yearBuilt) { parcel.yearBuilt = zd.yearBuilt; }
-            if (zd.existingUnits) { parcel.existingUnits = zd.existingUnits; }
-            if (zd.existingSqft) { parcel.existingBuildingSqft = zd.existingSqft; }
-            if (zd.existingBedrooms) { parcel.existingBedrooms = zd.existingBedrooms; }
-            if (zd.existingBathrooms) { parcel.existingBathrooms = zd.existingBathrooms; }
-            if (zd.toc) { parcel.toc = zd.toc; } else { parcel.toc = "None"; parcel.tocVerified = true; }
-            if (zd.rso !== null) { parcel.rso = zd.rso; }
-            if (zd.jco !== null) { parcel.jco = zd.jco; }
-            if (zd.heReplacement !== null) { parcel.heReplacement = zd.heReplacement; }
-            if (zd.generalPlan) { parcel.generalPlanLandUse = zd.generalPlan; }
-            if (zd.communityPlan) { parcel.communityPlan = zd.communityPlan; }
-            if (zd.specificPlans?.length) { parcel.specificPlans = zd.specificPlans; parcel.specificPlan = zd.specificPlans.join(", "); }
-            else { parcel.specificPlan = "None"; parcel.specificPlanVerified = true; }
-            if (zd.ziCodes?.length) { parcel.ziCodes = zd.ziCodes; }
-            if (zd.ab2097 !== null) { parcel.ab2097 = zd.ab2097; }
-            if (zd.ab2334 !== null) { parcel.ab2334 = zd.ab2334; }
-            // HPOZ — ZIMAS returns in Planning tab
-            if (zd.hpoz !== undefined && zd.hpoz !== null) { parcel.hpoz = zd.hpoz; }
-            if (zd.cdo !== undefined && zd.cdo !== null) { parcel.cdo = zd.cdo; }
-            if (zd.prelimFaultRupture !== undefined && zd.prelimFaultRupture !== null) { parcel.prelimFaultRupture = zd.prelimFaultRupture; }
-            // Hazards — ZIMAS is authoritative
-            if (zd.liquefaction !== null) { parcel.liquefaction = zd.liquefaction; parcel.liquefactionSource = "ZIMAS (verified)"; }
-            if (zd.landslide !== null) { parcel.landslide = zd.landslide; parcel.landslideSource = "ZIMAS (verified)"; }
-            if (zd.tsunami !== null) { parcel.tsunami = zd.tsunami; }
-            if (zd.seaLevelRise !== null) { parcel.seaLevelRise = zd.seaLevelRise; }
-            if (zd.fireHazard !== null) { parcel.fireHazard = zd.fireHazard; }
-            if (zd.floodZone) { parcel.floodZone = zd.floodZone; }
-            // Methane/Airport: null from ZIMAS means confirmed "None" — set false instead of leaving undefined
-            parcel.methane = zd.methane || false;
-            parcel.airportHazard = zd.airportHazard || false;
-            if (zd.specialGrading !== null) { parcel.specialGrading = zd.specialGrading; }
-            if (zd.faultName) { parcel.faultName = zd.faultName; parcel.faultDistKm = zd.faultDistKm; }
-            if (zd.alquistPriolo !== null) { parcel.alquistPriolo = zd.alquistPriolo; }
-            if (zd.coastalZones?.length) {
-              parcel.coastalZone = "Yes";
-              parcel.coastalZoneType = zd.coastalZones.join(", ");
-            }
-            if (zd.hillside !== null) { parcel.hillside = zd.hillside; }
-            if (zd.useCode) { parcel.useDescription = zd.useCode; }
-            if (zd.address) { parcel.zimasAddress = zd.address; }
-            parcel.source = "ZIMAS";
-            parcel.hasData = true;
-            // Recalculate density with ZIMAS lot size — zone-aware
-            if (parcel.lotSizeSf > 0) {
-              const z2 = (parcel.zoning || "").toUpperCase();
-              if (/^R1|^RS|^RE/.test(z2)) {
-                parcel.unitsByRight = 1;
-                parcel.densityCalc = "1 unit per lot (R1 zone)";
-              } else if (/^RD/.test(z2)) {
-                parcel.unitsByRight = 2;
-                parcel.densityCalc = "2 units per lot (RD zone)";
-              } else if (/^R4/.test(z2)) {
-                parcel.unitsByRight = Math.floor(parcel.lotSizeSf / 400);
-                parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 400 = " + parcel.unitsByRight + " units";
-              } else if (/^R5/.test(z2)) {
-                parcel.unitsByRight = null;
-                parcel.densityCalc = "No density limit (R5 — FAR controls)";
-              } else {
-                parcel.unitsByRight = Math.floor(parcel.lotSizeSf / 800);
-                parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 800 = " + parcel.unitsByRight + " units";
-              }
-            }
-          }
-          } // end address-match else
+    const streetPart = userAddr.replace(/^\d+\s*/, "").replace(/,.*/, "")
+      .replace(/\b(ave|avenue|st|street|blvd|boulevard|dr|drive|rd|road|ct|court|pl|place|way|ln|lane|cir|circle)\b.*/i, "").trim();
+
+    try {
+      const params = new URLSearchParams({ lat, lng, houseNumber: houseNo, streetName: streetPart });
+      const r = await fetch(WORKER_URL + "/parcel?" + params, { signal: AbortSignal.timeout(25000) });
+      if (!r.ok) { DEBUG && console.log("[DATA] Worker returned", r.status); return parcel; }
+      const d = await r.json();
+      DEBUG && console.log("[DATA] Worker response:", JSON.stringify(d).slice(0, 300));
+      if (d._timing) DEBUG && console.log("[DATA] Timing:", d._timing);
+
+      // ── Map Assessor data ──────────────────────────────────────────
+      if (d.parcel) {
+        const p = d.parcel;
+        parcel.hasData = true;
+        if (p.apn) { parcel.apn = p.apn; }
+        if (p.address) { parcel.situsAddr = p.address; }
+        if (p.city) { parcel.situsCity = p.city; }
+        if (p.zip) { parcel.situsZip = p.zip; }
+        if (p.useCode) { parcel.useCode = p.useCode; }
+        if (p.useDescription) { parcel.useDescription = p.useDescription; }
+        if (p.agency) { parcel.agencyName = p.agency; }
+        if (p.lotSizeSf) { parcel.lotSizeSf = p.lotSizeSf; parcel.lotSizeSource = "LA County Assessor"; }
+        if (p.lotWidthFt) { parcel.lotWidthFt = p.lotWidthFt; parcel.lotDepthFt = p.lotDepthFt; parcel.lotDimsSource = "estimated from parcel geometry"; }
+      }
+
+      // ── Map CGS seismic data ───────────────────────────────────────
+      if (d.seismic) {
+        parcel.liquefaction = d.seismic.liquefaction || false;
+        parcel.liquefactionSource = "CGS (verified)";
+        parcel.landslide = d.seismic.landslide || false;
+        parcel.landslideSource = "CGS (verified)";
+        if (d.seismic.faultZone) { parcel.faultZone = true; }
+        if (d.seismic.faultName) { parcel.faultName = d.seismic.faultName; parcel.faultSource = "CGS (verified)"; }
+      }
+
+      // ── Map ZIMAS internal API data ────────────────────────────────
+      const zd = d.zimas;
+      if (zd) {
+        // Validate address match
+        const zimasHouseNo = (zd.address || "").match(/^(\d+)/)?.[1] || "";
+        if (zimasHouseNo && houseNo && zimasHouseNo !== houseNo) {
+          DEBUG && console.log("[DATA] ZIMAS address mismatch:", zd.address, "vs", houseNo);
+          parcel.zimasAddressMismatch = true;
         } else {
-          try {
-            const errBody = await zr.json();
-            console.log("[ZIMAS-PROXY] HTTP", zr.status, "—", errBody.error || "unknown", errBody.searchMs ? "search:" + errBody.searchMs + "ms" : "");
-          } catch (_) { console.log("[ZIMAS-PROXY] HTTP", zr.status); }
-        }
-      } catch (e) {
-        if (e.name === "TimeoutError" || e.message?.includes("timed out")) {
-          console.log("[ZIMAS-PROXY] Browser timeout (25s) — ZIMAS server may be slow. Fields will show NOT VERIFIED.");
-        } else {
-          console.log("[ZIMAS-PROXY] Error:", e.message);
+          // Merge ZIMAS data — authoritative
+          if (zd.apn) { parcel.apn = zd.apn; parcel.apnSource = "ZIMAS (verified)"; }
+          if (zd.zoning) { parcel.zoning = zd.zoning; parcel.zoningSource = "ZIMAS (verified)"; }
+          if (zd.lotAreaSf) { parcel.lotSizeSf = zd.lotAreaSf; parcel.lotSizeSource = "ZIMAS (verified)"; }
+          if (zd.yearBuilt) { parcel.yearBuilt = zd.yearBuilt; }
+          if (zd.existingUnits) { parcel.existingUnits = zd.existingUnits; }
+          if (zd.existingSqft) { parcel.existingBuildingSqft = zd.existingSqft; }
+          if (zd.existingBedrooms) { parcel.existingBedrooms = zd.existingBedrooms; }
+          if (zd.existingBathrooms) { parcel.existingBathrooms = zd.existingBathrooms; }
+          if (zd.toc) { parcel.toc = zd.toc; } else { parcel.toc = "None"; parcel.tocVerified = true; }
+          if (zd.rso !== null) { parcel.rso = zd.rso; }
+          if (zd.jco !== null) { parcel.jco = zd.jco; }
+          if (zd.heReplacement !== null) { parcel.heReplacement = zd.heReplacement; }
+          if (zd.generalPlan) { parcel.generalPlanLandUse = zd.generalPlan; }
+          if (zd.communityPlan) { parcel.communityPlan = zd.communityPlan; }
+          if (zd.specificPlans?.length) { parcel.specificPlans = zd.specificPlans; parcel.specificPlan = zd.specificPlans.join(", "); }
+          else { parcel.specificPlan = "None"; parcel.specificPlanVerified = true; }
+          if (zd.ziCodes?.length) { parcel.ziCodes = zd.ziCodes; }
+          if (zd.ab2097 !== null) { parcel.ab2097 = zd.ab2097; }
+          if (zd.ab2334 !== null) { parcel.ab2334 = zd.ab2334; }
+          if (zd.hpoz !== undefined && zd.hpoz !== null) { parcel.hpoz = zd.hpoz; }
+          if (zd.cdo !== undefined && zd.cdo !== null) { parcel.cdo = zd.cdo; }
+          if (zd.prelimFaultRupture !== undefined && zd.prelimFaultRupture !== null) { parcel.prelimFaultRupture = zd.prelimFaultRupture; }
+          if (zd.liquefaction !== null) { parcel.liquefaction = zd.liquefaction; parcel.liquefactionSource = "ZIMAS (verified)"; }
+          if (zd.landslide !== null) { parcel.landslide = zd.landslide; parcel.landslideSource = "ZIMAS (verified)"; }
+          if (zd.tsunami !== null) { parcel.tsunami = zd.tsunami; }
+          if (zd.seaLevelRise !== null) { parcel.seaLevelRise = zd.seaLevelRise; }
+          if (zd.fireHazard !== null) { parcel.fireHazard = zd.fireHazard; }
+          if (zd.floodZone) { parcel.floodZone = zd.floodZone; }
+          parcel.methane = zd.methane || false;
+          parcel.airportHazard = zd.airportHazard || false;
+          if (zd.specialGrading !== null) { parcel.specialGrading = zd.specialGrading; }
+          if (zd.faultName) { parcel.faultName = zd.faultName; parcel.faultDistKm = zd.faultDistKm; }
+          if (zd.alquistPriolo !== null) { parcel.alquistPriolo = zd.alquistPriolo; }
+          if (zd.coastalZones?.length) { parcel.coastalZone = "Yes"; parcel.coastalZoneType = zd.coastalZones.join(", "); }
+          if (zd.hillside !== null) { parcel.hillside = zd.hillside; }
+          if (zd.useCode) { parcel.useDescription = zd.useCode; }
+          if (zd.address) { parcel.zimasAddress = zd.address; }
+          parcel.source = "ZIMAS";
         }
       }
-    }
 
-    console.log("[ZIMAS] FINAL:", JSON.stringify({
-      zoning: parcel.zoning, apn: parcel.apn, lot: parcel.lotSizeSf,
-      coastal: parcel.coastalZone, toc: parcel.toc, liq: parcel.liquefaction,
-      rso: parcel.rso, jco: parcel.jco, yearBuilt: parcel.yearBuilt,
-      ziCodes: parcel.ziCodes?.length, overlays: parcel.overlayLayers.length
-    }));
+      // Defaults for missing hazard fields
+      if (parcel.liquefaction === undefined) parcel.liquefaction = false;
+      if (parcel.landslide === undefined) parcel.landslide = false;
+      if (parcel.tsunami === undefined) parcel.tsunami = false;
+      if (parcel.alquistPriolo === undefined) parcel.alquistPriolo = false;
+      if (parcel.hillside === undefined) parcel.hillside = false;
+      if (parcel.specialGrading === undefined) parcel.specialGrading = false;
+      if (parcel.fireHazard === undefined) parcel.fireHazard = false;
+      if (parcel.seaLevelRise === undefined) parcel.seaLevelRise = false;
+
+      // Zone-aware density
+      if (parcel.lotSizeSf > 0) {
+        const z2 = (parcel.zoning || "").toUpperCase();
+        if (/^R1|^RS|^RE/.test(z2)) { parcel.unitsByRight = 1; parcel.densityCalc = "1 unit per lot (R1 zone)"; }
+        else if (/^RD/.test(z2)) { parcel.unitsByRight = 2; parcel.densityCalc = "2 units per lot (RD zone)"; }
+        else if (/^R4/.test(z2)) { parcel.unitsByRight = Math.floor(parcel.lotSizeSf / 400); parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 400 = " + parcel.unitsByRight + " units"; }
+        else if (/^R5/.test(z2)) { parcel.unitsByRight = null; parcel.densityCalc = "No density limit (R5 — FAR controls)"; }
+        else { parcel.unitsByRight = Math.floor(parcel.lotSizeSf / 800); parcel.densityCalc = parcel.lotSizeSf.toLocaleString() + " sf / 800 = " + parcel.unitsByRight + " units"; }
+      }
+    } catch (e) {
+      DEBUG && console.log("[DATA] Error:", e.message);
+    }
 
     return parcel;
   };
+
 
   // ── Main analysis handler ──────────────────────────────────────────────
   const handleAnalyze = async () => {
@@ -1986,7 +1575,7 @@ export default function Listo() {
       // Step 2-4: Query ZIMAS directly from browser (bypasses Vercel timeout)
       let parcelData = null;
       if (geo.lat && geo.lng) {
-        parcelData = await queryZIMASFromBrowser(geo.lng, geo.lat);
+        parcelData = await queryParcelData(geo.lng, geo.lat);
         nextStep(); nextStep();
         // Auto-populate ZIP from parcel if still missing
         if (!editZip && parcelData?.situsZip) {
