@@ -522,6 +522,7 @@ function buildSystem(jurisdictionKey) {
     "",
     "MAX FLOOR AREA: [FAR multiplier] × [buildable sf] = [max sf] (LAMC 12.21.1)",
     "TOC BONUS: [result — tier + bonus % + affordable requirement] | ADU: [N ADUs + N JADUs]",
+    "  If TOC data says 'None': state 'TOC: None — parcel not in TOC tier area' (NOT 'Not applicable' — TOC can apply to any zone including R1 if the parcel is near qualifying transit).",
     "  R1 lots: 1 ADU + 1 JADU",
     "  R2+ lots: 2 ADUs + 1 JADU minimum",
     "MAX BUILDOUT: [N] total units (primary + ADU + JADU)",
