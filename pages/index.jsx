@@ -919,10 +919,9 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
           <span style={{ fontSize:13, color:T.text, flex:1 }}>{name}</span>
           <span style={{ fontSize:11, color:T.muted, minWidth:120 }}>{who}</span>
           {stamp && <span style={{ fontSize:9, fontWeight:700, letterSpacing:"0.06em",
-            color:req?"#b91c1c":"#16a34a",
-            background:req?"#FEF2F2":"#F0FDF4",
-            border:`1px solid ${req?"#FECACA":"#BBF7D0"}`,
-            borderRadius:3, padding:"2px 7px", whiteSpace:"nowrap",
+            color:"#fff",
+            background:req?"#b91c1c":"#16a34a",
+            borderRadius:3, padding:"2px 8px", whiteSpace:"nowrap",
             fontFamily:"monospace" }}>STAMP: {req?"REQ":"NOT REQ"}</span>}
         </div>);
         i++; continue;
@@ -2038,7 +2037,28 @@ export default function Listo() {
         bodyHtml += `<div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:10px;font-weight:700;color:#8C7B70;text-transform:uppercase;letter-spacing:0.08em;min-width:70px;font-family:monospace">${kLabel}</span><span style="color:#2C2420">${val}</span></div>`;
         continue;
       }
-      if (t.includes("|") && t.split("|").length >= 3) {
+      // Development Standards table rows — render as structured table
+      if (inPdfSec("development standard") && t.includes("|") && t.split("|").length >= 3) {
+        const pts = t.split("|").map(p => p.trim());
+        if (/standard|max allowed/i.test(pts[0])) {
+          bodyHtml += `<div style="display:flex;gap:4px;padding:6px 0;border-bottom:2px solid ${T.orange}30;font-size:9px;font-weight:700;color:#8C7B70;font-family:monospace;text-transform:uppercase;letter-spacing:0.05em"><span style="flex:2">${pts[0]}</span><span style="flex:2">${pts[1]||""}</span><span style="flex:1">${pts[2]||""}</span><span style="flex:1;text-align:right">${pts[3]||""}</span></div>`;
+        } else {
+          bodyHtml += `<div style="display:flex;gap:4px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="flex:2;font-weight:600;color:#1A1714">${pts[0]}</span><span style="flex:2;color:#2C2420">${pts[1]||""}</span><span style="flex:1;color:#8C7B70">${pts[2]||""}</span><span style="flex:1;color:#8C7B70;text-align:right;font-size:11px">${pts[3]||""}</span></div>`;
+        }
+        continue;
+      }
+      // Fee Summary rows — render consistently
+      if (inPdfSec("fee") && t.includes("|")) {
+        const pts = t.split("|").map(p => p.trim());
+        const isTotal = (pts[0]||"").toUpperCase().includes("TOTAL");
+        if (isTotal) {
+          bodyHtml += `<div style="display:flex;gap:8px;padding:8px 0;border-top:2px solid ${T.orange};margin-top:4px;font-weight:700;font-size:13px"><span style="flex:1;color:${T.orange}">${pts[0]}</span><span style="color:${T.orange}">${pts[1]||""} ${pts[2]||""}</span></div>`;
+        } else {
+          bodyHtml += `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="flex:1;font-weight:600">${pts[0]}</span><span style="color:#8C7B70;min-width:100px">${pts[1]||""}</span><span style="color:#1A1714;font-weight:600">${pts[2]||""}</span></div>`;
+        }
+        continue;
+      }
+      if (t.includes("|") && t.split("|").length >= 3 && !inPdfSec("terms")) {
         const pts=t.split("|").map(p=>p.trim());
         if (pts.length>=4){
           const [pn,pt2,pa,pti,pc]=pts;
