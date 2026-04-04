@@ -2160,12 +2160,22 @@ ${bodyHtml}
   };
 
   const ready = address.trim().length > 5 && projectType !== "";
+  // Load DM Sans font dynamically (avoids SSR hydration mismatch)
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!document.querySelector('link[href*="DM+Sans"]')) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap";
+      document.head.appendChild(link);
+    }
+  }, []);
+
   const coverageText = "City of LA · Santa Monica · Beverly Hills · Malibu";
 
   return (
-    <div style={{ fontFamily:"'Georgia',serif", background:T.warmGray, minHeight:"100vh" }}>
+    <div suppressHydrationWarning style={{ fontFamily:"'Georgia',serif", background:T.warmGray, minHeight:"100vh" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
         body{font-family:'DM Sans',system-ui,sans-serif}
         ::selection{background:${T.orange};color:${T.white}}
