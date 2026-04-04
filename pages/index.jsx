@@ -503,9 +503,18 @@ function ProjectSummary({ parcel, projectType, scoreCards }) {
   const hasTransitProxy = hasAB2097 || parcel.ziCodes?.some(z => z.includes("2452"));
   const isMultifamily = /^R[2-5]|^RD/.test(z);
   const isSingleFamily = /^R1|^RS|^RE/.test(z);
+  const isCommercial = /^C[1-5]|^CR/.test(z);
   const lotAcres = parcel.lotSizeSf ? parcel.lotSizeSf / 43560 : 0;
+  const notFireHazard = parcel.fireHazard !== true;
   const sb684Eligible = isMultifamily && lotAcres <= 5;
-  const sb79Proxy = hasTransitProxy && /^R[1-5]|^RD|^C[1-5]|^CR/.test(z);
+  const sb1123Eligible = isSingleFamily && lotAcres <= 1.5 && !parcel.yearBuilt;
+  const sb79Proxy = hasTransitProxy && /^R[1-5]|^RD|^C[1-5]|^CR/.test(z) && notFireHazard;
+  const sb9Eligible = isSingleFamily && parcel.hpoz !== true;
+  const sb35Eligible = isMultifamily && parcel.ziCodes?.some(z => z.includes("2512"));
+  const ab2011Eligible = isCommercial;
+  const sdblEligible = isMultifamily || (parcel.toc && parcel.toc !== "None");
+  const isCoastal = parcel.coastalZone === "Yes";
+  const hasStateLaws = sb79Proxy || sb684Eligible || sb1123Eligible || hasAB2097 || sb9Eligible || sb35Eligible || ab2011Eligible;
 
   const SRow = ({ label: l, value: v, highlight, small }) => (
     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start",
@@ -548,13 +557,18 @@ function ProjectSummary({ parcel, projectType, scoreCards }) {
         {parcel.lotSizeSf && <SRow label="LOT" value={parcel.lotSizeSf.toLocaleString() + " sf"} />}
 
         {/* State Law Eligibility */}
-        {(sb79Proxy || sb684Eligible || hasAB2097) && (
+        {hasStateLaws && (
           <div style={{ marginTop:10 }}>
             <div style={{ fontSize:9, color:T.orange, fontFamily:"monospace",
               letterSpacing:"0.1em", marginBottom:6 }}>STATE LAW ELIGIBILITY</div>
             {sb79Proxy && <StateLawBadge name="SB 79 — Transit upzoning (eff. July 2026)" status="LIKELY" color="#2563eb" />}
+            {sb35Eligible && <StateLawBadge name="SB 35/423 — Streamlined ministerial" status="LIKELY" color="#2563eb" />}
             {sb684Eligible && <StateLawBadge name="SB 684 — Ministerial ≤10 units" status="ELIGIBLE" color="#16a34a" />}
+            {sb1123Eligible && <StateLawBadge name="SB 1123 — Starter homes (vacant SF lot)" status="LIKELY" color="#2563eb" />}
+            {sb9Eligible && <StateLawBadge name="SB 9 — Duplex + lot split" status="ELIGIBLE" color="#16a34a" />}
+            {ab2011Eligible && <StateLawBadge name="AB 2011 — Housing on commercial" status="CHECK" color="#d97706" />}
             {hasAB2097 && <StateLawBadge name="AB 2097 — No parking minimum" status="YES" color="#16a34a" />}
+            {isCoastal && <StateLawBadge name="SB 1077 — Coastal ADU streamlining (eff. July 2026)" status="PENDING" color="#6366f1" />}
           </div>
         )}
 
