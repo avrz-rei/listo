@@ -1409,6 +1409,7 @@ export default function Listo() {
     "Generating permit analysis...",
   ];
 
+  // Data API — change to "https://api.listo.zone" after setting up Cloudflare custom domain
   const WORKER_URL = "https://zimas-proxy.listo.workers.dev";
 
   const geocodeAddress = async (addr) => {
