@@ -23,12 +23,15 @@ jobs:
           
           # Key LAMC sections to monitor
           SECTIONS=(
+            "https://library.municode.com/ca/los_angeles/codes/code_of_ordinances?nodeId=CHIVDINGS_ART2SPDINGS_S12.03DE"
+            "https://library.municode.com/ca/los_angeles/codes/code_of_ordinances?nodeId=CHIVDINGS_ART2SPDINGS_S12.07R1ONFADWZO"
             "https://library.municode.com/ca/los_angeles/codes/code_of_ordinances?nodeId=CHIVDINGS_ART2SPDINGS_S12.08R2TWFADWZO"
             "https://library.municode.com/ca/los_angeles/codes/code_of_ordinances?nodeId=CHIVDINGS_ART2SPDINGS_S12.09R3MUTWDWZO"
+            "https://library.municode.com/ca/los_angeles/codes/code_of_ordinances?nodeId=CHIVDINGS_ART2SPDINGS_S12.09.1RDREDEMU"
             "https://library.municode.com/ca/los_angeles/codes/code_of_ordinances?nodeId=CHIVDINGS_ART2SPDINGS_S12.21.1GERE"
             "https://library.municode.com/ca/los_angeles/codes/code_of_ordinances?nodeId=CHIVDINGS_ART2SPDINGS_S12.22GEPRRE"
           )
-          NAMES=("12.08-R2" "12.09-R3" "12.21.1-General" "12.22-Provisions")
+          NAMES=("12.03-Definitions" "12.07-R1" "12.08-R2" "12.09-R3" "12.09.1-RD" "12.21.1-General" "12.22-Provisions")
           
           for i in "${!SECTIONS[@]}"; do
             URL="${SECTIONS[$i]}"
@@ -89,10 +92,12 @@ jobs:
           PAGES=(
             "https://www.hcd.ca.gov/planning-and-research/sb79-tod"
             "https://www.hcd.ca.gov/planning-and-community-development/housing-element"
+            "https://www.hcd.ca.gov/planning-and-community-development/housing-streamlining"
             "https://ternercenter.berkeley.edu/research-and-policy/california-housing-laws/"
             "https://planning.lacity.gov/resources/senate-bill-sb-79"
+            "https://www.ladbs.org/services/getting-started/information-bulletins"
           )
-          NAMES=("HCD-SB79" "HCD-Housing-Element" "Terner-CA-Laws" "LACITY-SB79")
+          NAMES=("HCD-SB79" "HCD-Housing-Element" "HCD-Streamlining" "Terner-CA-Laws" "LACITY-SB79" "LADBS-Bulletins")
           
           for i in "${!PAGES[@]}"; do
             URL="${PAGES[$i]}"
