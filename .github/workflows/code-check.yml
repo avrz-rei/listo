@@ -61,7 +61,6 @@ jobs:
         run: |
           mkdir -p .code-snapshots
           
-          # Check LADBS fee schedule page for updates
           HASH=$(curl -s "https://www.ladbs.org/services/getting-started/fees" | md5sum | cut -d' ' -f1 2>/dev/null || echo "fetch-failed")
           SNAPSHOT=".code-snapshots/ladbs-fees.md5"
           LADBS_CHANGED=""
@@ -80,6 +79,45 @@ jobs:
           
           echo "ladbs_changed=$LADBS_CHANGED" >> $GITHUB_OUTPUT
 
+      - name: Check CA state housing law sources
+        id: statelaw
+        run: |
+          mkdir -p .code-snapshots
+          STATE_CHANGED=""
+          
+          # HCD housing law page — primary source for SB 79, SB 684, SB 1123
+          PAGES=(
+            "https://www.hcd.ca.gov/planning-and-research/sb79-tod"
+            "https://www.hcd.ca.gov/planning-and-community-development/housing-element"
+            "https://ternercenter.berkeley.edu/research-and-policy/california-housing-laws/"
+            "https://planning.lacity.gov/resources/senate-bill-sb-79"
+          )
+          NAMES=("HCD-SB79" "HCD-Housing-Element" "Terner-CA-Laws" "LACITY-SB79")
+          
+          for i in "${!PAGES[@]}"; do
+            URL="${PAGES[$i]}"
+            NAME="${NAMES[$i]}"
+            SNAPSHOT=".code-snapshots/state-${NAME}.md5"
+            
+            HASH=$(curl -s "$URL" | md5sum | cut -d' ' -f1 2>/dev/null || echo "fetch-failed")
+            
+            if [ -f "$SNAPSHOT" ]; then
+              OLD_HASH=$(cat "$SNAPSHOT")
+              if [ "$HASH" != "$OLD_HASH" ] && [ "$HASH" != "fetch-failed" ]; then
+                STATE_CHANGED="${STATE_CHANGED}${NAME} page may have changed\n"
+                echo "$HASH" > "$SNAPSHOT"
+              fi
+            else
+              if [ "$HASH" != "fetch-failed" ]; then
+                echo "$HASH" > "$SNAPSHOT"
+              fi
+            fi
+          done
+          
+          echo "state_changed<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$STATE_CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Commit updated snapshots
         run: |
           git config user.name "github-actions[bot]"
@@ -89,14 +127,15 @@ jobs:
           git push || true
 
       - name: Create issue if changes detected
-        if: steps.lamc.outputs.lamc_changed != '' || steps.ladbs.outputs.ladbs_changed != ''
+        if: steps.lamc.outputs.lamc_changed != '' || steps.ladbs.outputs.ladbs_changed != '' || steps.statelaw.outputs.state_changed != ''
         uses: actions/github-script@v7
         with:
           script: |
             const lamcChanges = `${{ steps.lamc.outputs.lamc_changed }}`.trim();
             const ladbsChanges = `${{ steps.ladbs.outputs.ladbs_changed }}`.trim();
+            const stateChanges = `${{ steps.statelaw.outputs.state_changed }}`.trim();
             
-            let body = '## Monthly Code & Fee Check\n\n';
+            let body = '## Monthly Code, Fee & Legislative Check\n\n';
             body += 'The automated monthly check detected potential changes:\n\n';
             
             if (lamcChanges) {
@@ -111,15 +150,26 @@ jobs:
               body += '\n**Action:** Check [ladbs.org/services/getting-started/fees](https://www.ladbs.org/services/getting-started/fees) and update fee ranges in `pages/api/analyze.js` if needed.\n\n';
             }
             
+            if (stateChanges) {
+              body += '### CA State Housing Laws\n';
+              body += stateChanges.split('\n').filter(l => l).map(l => `- ⚠️ ${l}`).join('\n');
+              body += '\n\n**Action:** Review state housing law changes. Key sources:\n';
+              body += '- [HCD SB 79 TOD page](https://www.hcd.ca.gov/planning-and-research/sb79-tod)\n';
+              body += '- [Terner Center CA Housing Laws](https://ternercenter.berkeley.edu/research-and-policy/california-housing-laws/)\n';
+              body += '- [LA City Planning SB 79](https://planning.lacity.gov/resources/senate-bill-sb-79)\n';
+              body += '\nUpdate the State Housing Law Eligibility section in `pages/api/analyze.js` and the state law date stamp.\n\n';
+            }
+            
             body += '### After updating:\n';
-            body += '1. Update the `LAMC_LAST_UPDATED` date in analyze.js\n';
+            body += '1. Update the LAMC date stamp in analyze.js\n';
             body += '2. Update the fee schedule date stamp\n';
-            body += '3. Test with 622 Woodlawn Ave, Venice 90291\n';
+            body += '3. Update the state housing law date stamp\n';
+            body += '4. Test with 622 Woodlawn Ave (Venice) and 1601 N Kings Rd (Hollywood)\n';
             
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `🔔 Code/Fee Check: Changes detected (${new Date().toISOString().slice(0,7)})`,
+              title: `🔔 Monthly Check: Changes detected (${new Date().toISOString().slice(0,7)})`,
               body: body,
               labels: ['maintenance', 'data-update']
             });
