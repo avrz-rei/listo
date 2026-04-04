@@ -445,6 +445,24 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
         )}
       </Card>
 
+      {/* ZIMAS address mismatch warning — data was discarded for safety */}
+      {parcel.zimasAddressMismatch && (
+        <div style={{ background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:10,
+          padding:"14px 18px", marginBottom:12 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:"#991B1B", marginBottom:4 }}>
+            ⚠ ZIMAS returned a different address — data discarded
+          </div>
+          <div style={{ fontSize:12, color:"#7F1D1D", lineHeight:1.6 }}>
+            ZIMAS matched a different property than the one you entered. To protect report accuracy,
+            ZIMAS-specific data (year built, TOC, RSO, specific plans) was not included.
+            Try running the report again, or verify directly at{" "}
+            <a href="https://zimas.lacity.org" target="_blank" style={{ color:"#DC2626", fontWeight:600 }}>
+              zimas.lacity.org
+            </a>.
+          </div>
+        </div>
+      )}
+
       {/* Manual entry prompt — only show if ZIMAS proxy didn't fill in the data */}
       {(!parcel.yearBuilt && !parcel.existingUnits && !parcel.toc) && (
         <div style={{ background:"#FFFBEB", border:"1px solid #FDE68A", borderRadius:10,
@@ -1705,6 +1723,12 @@ export default function Listo() {
           if (zd && !zd.error) {
             console.log("[ZIMAS-PROXY] Got data:", JSON.stringify(zd).slice(0, 300));
             if (zd._timing) console.log("[ZIMAS-PROXY] Timing:", zd._timing);
+            // Validate: ZIMAS must return the same house number the user typed
+            const zimasHouseNo = (zd.address || "").match(/^(\d+)/)?.[1] || "";
+            if (zimasHouseNo && houseNo && zimasHouseNo !== houseNo) {
+              console.log("[ZIMAS-PROXY] ADDRESS MISMATCH — ZIMAS returned", zd.address, "but user entered", houseNo, streetPart, "— discarding ZIMAS data");
+              parcel.zimasAddressMismatch = true;
+            } else {
             // Merge ZIMAS data — ZIMAS is authoritative, overrides other sources
             if (zd.apn) { parcel.apn = zd.apn; parcel.apnSource = "ZIMAS (verified)"; }
             if (zd.zoning) { parcel.zoning = zd.zoning; parcel.zoningSource = "ZIMAS internal API (verified)"; }
@@ -1771,6 +1795,7 @@ export default function Listo() {
               }
             }
           }
+          } // end address-match else
         } else {
           try {
             const errBody = await zr.json();
