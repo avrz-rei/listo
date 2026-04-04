@@ -483,6 +483,102 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
   );
 }
 
+// ── Project Summary — deterministic overview from parcel data ─────────────
+function ProjectSummary({ parcel, projectType, scoreCards }) {
+  if (!parcel) return null;
+  const label = getLabel(projectType);
+  const z = (parcel.zoning || "").toUpperCase();
+
+  // FAR lookup
+  const farMap = { "R1":0.50, "RS":0.50, "RE":0.50, "R2":3.00, "RD":3.00, "R3":3.00, "R4":3.00, "R5":6.00, "C1":1.50, "C2":1.50, "C4":1.50, "C5":6.00, "CR":6.00 };
+  const zoneBase = z.match(/^(R[1-5]|RD|RS|RE|C[1-5]|CR|CM|M[1-2])/)?.[1] || "";
+  const far = farMap[zoneBase] || null;
+
+  // Height lookup
+  const htMap = { "R1":"28-33 ft (BMO)", "RS":"28-33 ft", "RE":"28-33 ft", "R2":"45 ft", "RD":"45 ft", "R3":"45 ft", "R4":"No limit (HD1)", "R5":"No limit (HD1)" };
+  const maxHeight = htMap[zoneBase] || null;
+
+  // State law eligibility checks
+  const hasAB2097 = parcel.ab2097 === true;
+  const hasTransitProxy = hasAB2097 || parcel.ziCodes?.some(z => z.includes("2452"));
+  const isMultifamily = /^R[2-5]|^RD/.test(z);
+  const isSingleFamily = /^R1|^RS|^RE/.test(z);
+  const lotAcres = parcel.lotSizeSf ? parcel.lotSizeSf / 43560 : 0;
+  const sb684Eligible = isMultifamily && lotAcres <= 5;
+  const sb79Proxy = hasTransitProxy && /^R[1-5]|^RD|^C[1-5]|^CR/.test(z);
+
+  const SRow = ({ label: l, value: v, highlight, small }) => (
+    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start",
+      padding: small ? "4px 0" : "6px 0", borderBottom:`1px solid ${T.border}`, gap:8 }}>
+      <span style={{ fontSize:11, color:T.muted, fontFamily:"monospace", letterSpacing:"0.04em",
+        flexShrink:0, paddingTop:1 }}>{l}</span>
+      <span style={{ fontSize:12, color: highlight ? T.orange : T.text, fontWeight: highlight ? 700 : 400,
+        textAlign:"right", lineHeight:1.4 }}>{v || "—"}</span>
+    </div>
+  );
+
+  const StateLawBadge = ({ name, status, color }) => (
+    <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 0",
+      borderBottom:`1px solid ${T.border}` }}>
+      <span style={{ fontSize:8, fontWeight:700, color:"#fff", background:color,
+        borderRadius:3, padding:"1px 6px", fontFamily:"monospace", whiteSpace:"nowrap" }}>{status}</span>
+      <span style={{ fontSize:11, color:T.text }}>{name}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ background:T.white, borderRadius:12, border:`1px solid ${T.border}`,
+      overflow:"hidden" }}>
+      {/* Header */}
+      <div style={{ background:T.orange, padding:"12px 16px", display:"flex",
+        justifyContent:"space-between", alignItems:"center" }}>
+        <div style={{ fontSize:11, fontWeight:700, color:T.white, letterSpacing:"0.06em",
+          fontFamily:"monospace" }}>PROJECT SUMMARY</div>
+        <span style={{ fontSize:12, fontWeight:700, color:T.white,
+          fontFamily:"'Georgia',serif" }}>{label}</span>
+      </div>
+
+      <div style={{ padding:"12px 16px" }}>
+        {/* Key Metrics */}
+        <SRow label="ZONING" value={parcel.zoning || "—"} />
+        <SRow label="DENSITY" value={parcel.densityCalc || "—"} highlight />
+        {far && <SRow label="FAR" value={far + "× buildable area"} />}
+        {maxHeight && <SRow label="MAX HEIGHT" value={maxHeight} />}
+        <SRow label="TOC" value={parcel.toc === "None" ? "None" : parcel.toc || "Not verified"} />
+        {parcel.lotSizeSf && <SRow label="LOT" value={parcel.lotSizeSf.toLocaleString() + " sf"} />}
+
+        {/* State Law Eligibility */}
+        {(sb79Proxy || sb684Eligible || hasAB2097) && (
+          <div style={{ marginTop:10 }}>
+            <div style={{ fontSize:9, color:T.orange, fontFamily:"monospace",
+              letterSpacing:"0.1em", marginBottom:6 }}>STATE LAW ELIGIBILITY</div>
+            {sb79Proxy && <StateLawBadge name="SB 79 — Transit upzoning (eff. July 2026)" status="LIKELY" color="#2563eb" />}
+            {sb684Eligible && <StateLawBadge name="SB 684 — Ministerial ≤10 units" status="ELIGIBLE" color="#16a34a" />}
+            {hasAB2097 && <StateLawBadge name="AB 2097 — No parking minimum" status="YES" color="#16a34a" />}
+          </div>
+        )}
+
+        {/* Permit Estimates from Score Cards */}
+        {scoreCards && (scoreCards.fees || scoreCards.timeline) && (
+          <div style={{ marginTop:10 }}>
+            <div style={{ fontSize:9, color:T.orange, fontFamily:"monospace",
+              letterSpacing:"0.1em", marginBottom:6 }}>PERMIT ESTIMATES</div>
+            {scoreCards.fees && <SRow label="EST. FEES" value={scoreCards.fees} small />}
+            {scoreCards.timeline && <SRow label="TIMELINE" value={scoreCards.timeline} small />}
+          </div>
+        )}
+
+        {/* Data Source */}
+        <div style={{ marginTop:10, fontSize:10, color:T.muted, textAlign:"center",
+          padding:"6px 0", borderTop:`1px solid ${T.border}` }}>
+          {parcel.source === "ZIMAS" ? "✓ ZIMAS verified" : "Estimated from ZIP"}
+          {" · "}State law data as of April 2026
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Inline markdown renderer ──────────────────────────────────────────────
 function renderInline(text) {
   return (text||"").split(/(\*\*[^*]+\*\*)/g).map((p,i) =>
@@ -492,7 +588,7 @@ function renderInline(text) {
 }
 
 // ── Report markdown renderer — light mode ─────────────────────────────────
-function ReportMarkdown({ text, jurisdiction, parcel }) {
+function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
   const lines = text.split("\n");
   const els = [];
   let i = 0, lk = 0, sec = "", subsec = "";
@@ -620,11 +716,20 @@ function ReportMarkdown({ text, jurisdiction, parcel }) {
         els.push(renderScoreCardsBlock());
         continue;
       }
-      // Insert visual parcel survey cards instead of Claude's text
+      // Insert visual parcel survey cards + project summary side by side
       if (sec.includes("parcel survey") && parcel) {
-        els.push(<ParcelSurveyCards key="parcel-cards" parcel={parcel} />);
+        els.push(
+          <div key="survey-summary" style={{ display:"flex", gap:16, alignItems:"flex-start",
+            flexWrap:"wrap" }}>
+            <div style={{ flex:"1 1 340px", minWidth:300 }}>
+              <ParcelSurveyCards key="parcel-cards" parcel={parcel} />
+            </div>
+            <div style={{ flex:"1 1 280px", minWidth:260 }}>
+              <ProjectSummary parcel={parcel} projectType={projectType} scoreCards={sc} />
+            </div>
+          </div>
+        );
         i++;
-        // Skip Claude's text for this section
         while (i < lines.length && !lines[i].trim().startsWith("## ")) { i++; }
         continue;
       }
@@ -2597,7 +2702,7 @@ ${bodyHtml}
 
                 {/* Report body */}
                 <div style={{ padding:"28px 28px 0" }}>
-                  <ReportMarkdown text={result} jurisdiction={jurisdiction} parcel={parcel} />
+                  <ReportMarkdown text={result} jurisdiction={jurisdiction} parcel={parcel} projectType={projectType} />
                 </div>
 
                 {/* Listo footer */}
