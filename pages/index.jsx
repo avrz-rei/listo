@@ -15,13 +15,16 @@ const T = {
   black:    "#1A1714",
   cream:    "#FAF7F2",
   warmGray: "#F0EBE3",
-  lime:     "#C8F135",
-  text:     "#2C2420",
-  muted:    "#8C7B70",
+  gold:     "#F5C563",
+  goldTint: "#FAECC8",
+  text:     "#44403C",
+  textHead: "#1A1714",
+  secondary:"#78716C",
+  muted:    "#A8A29E",
   border:   "#E2D9D0",
-  green:    "#16A34A",
-  yellow:   "#D97706",
-  red:      "#DC2626",
+  green:    "#15803D",
+  yellow:   "#B45309",
+  red:      "#B91C1C",
   white:    "#FFFFFF",
 };
 
@@ -197,23 +200,29 @@ function Logo({ size = 32, light = false }) {
 // ── Flag component (from brand preview) ──────────────────────────────────
 function Flag({ level, title, meta, children }) {
   const cfg = {
-    red:    { bg:"#FEF2F2", border:"#FECACA", dot:T.red,    label:"FLAG" },
-    yellow: { bg:"#FFFBEB", border:"#FDE68A", dot:T.yellow, label:"REVIEW" },
-    green:  { bg:"#F0FDF4", border:"#BBF7D0", dot:T.green,  label:"CLEAR" },
-    blue:   { bg:"#EFF6FF", border:"#BFDBFE", dot:"#2563eb",label:"INFO" },
-  }[level] || { bg:"#F9FAFB", border:T.border, dot:T.muted, label:"NOTE" };
+    red:    { bg:"#FEF2F2", border:"#FECACA", color:T.red,    label:"REQUIRED",
+              icon:<svg width={12} height={12} viewBox="0 0 16 16" fill="none"><path d="M8 4v5M8 11v1" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg> },
+    yellow: { bg:"#FFFBEB", border:"#FDE68A", color:T.yellow, label:"FACTOR",
+              icon:<svg width={12} height={12} viewBox="0 0 16 16" fill="none"><path d="M8 4v5M8 11v1" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg> },
+    green:  { bg:"#F0FDF4", border:"#BBF7D0", color:T.green,  label:"CLEAR",
+              icon:<svg width={12} height={12} viewBox="0 0 16 16" fill="none"><path d="M4 8.5L7 11.5L12 5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+    blue:   { bg:"#F0FDF4", border:"#BBF7D0", color:T.green,  label:"BENEFIT",
+              icon:<svg width={12} height={12} viewBox="0 0 16 16" fill="none"><path d="M4 8.5L7 11.5L12 5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+  }[level] || { bg:"#F9FAFB", border:T.border, color:T.secondary, label:"NOTE",
+              icon:<svg width={12} height={12} viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="1.5" fill="#fff"/><path d="M8 4v2" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg> };
 
   return (
     <div style={{ background:cfg.bg, border:`1px solid ${cfg.border}`,
       borderRadius:8, padding:"12px 14px", display:"flex", gap:12, alignItems:"flex-start" }}>
-      <div style={{ width:8, height:8, borderRadius:"50%", background:cfg.dot,
-        marginTop:5, flexShrink:0 }} />
+      <div style={{ width:24, height:24, borderRadius:6, background:cfg.color,
+        display:"flex", alignItems:"center", justifyContent:"center",
+        flexShrink:0, marginTop:1 }}>{cfg.icon}</div>
       <div style={{ flex:1 }}>
-        <div style={{ fontSize:9, color:cfg.dot, fontFamily:"monospace",
+        <div style={{ fontSize:9, color:cfg.color, fontFamily:"monospace",
           letterSpacing:"0.1em", marginBottom:3 }}>{cfg.label}</div>
         {title && <div style={{ fontSize:13, fontWeight:600, color:T.text, marginBottom:3 }}>{title}</div>}
         <div style={{ fontSize:13, color:T.text, lineHeight:1.6 }}>{children}</div>
-        {meta && <div style={{ fontSize:11, color:T.muted, marginTop:4 }}>{meta}</div>}
+        {meta && <div style={{ fontSize:11, color:T.secondary, marginTop:4 }}>{meta}</div>}
       </div>
     </div>
   );
@@ -223,11 +232,11 @@ function Flag({ level, title, meta, children }) {
 function ScoreCard({ label, value, sub, color }) {
   return (
     <div style={{ background:T.white, padding:"20px 24px", borderRight:`1px solid ${T.border}` }}>
-      <div style={{ fontSize:9, color:T.muted, fontFamily:"monospace",
+      <div style={{ fontSize:9, color:T.secondary, fontFamily:"monospace",
         letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:6 }}>{label}</div>
-      <div style={{ fontSize:22, fontWeight:700, color: color||T.text,
+      <div style={{ fontSize:22, fontWeight:700, color: color||T.textHead,
         fontFamily:"'Georgia',serif", marginBottom:4 }}>{value}</div>
-      <div style={{ fontSize:11, color:T.muted }}>{sub}</div>
+      <div style={{ fontSize:11, color:T.secondary }}>{sub}</div>
     </div>
   );
 }
@@ -252,7 +261,7 @@ function JurisdictionBadge({ jurisdiction }) {
       borderRadius:20, padding:"3px 10px", fontSize:11 }}>
       <div style={{ width:6, height:6, borderRadius:"50%", background:jurisdiction.color }} />
       <span style={{ color:jurisdiction.color, fontWeight:600 }}>{jurisdiction.short}</span>
-      <span style={{ color:T.muted }}>· {jurisdiction.agency}</span>
+      <span style={{ color:T.secondary }}>· {jurisdiction.agency}</span>
     </div>
   );
 }
@@ -269,11 +278,11 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
     if (flagged || yes === true) return (
       <span style={{ fontSize:10, fontWeight:600, padding:"2px 8px", borderRadius:4,
         background: flagged ? "#FEE2E2" : "#D1FAE5", color: flagged ? "#991B1B" : "#065F46",
-        fontFamily:"monospace" }}>{flagged ? "YES — ACTION" : typeof value === "string" ? value : "YES"}</span>
+        fontFamily:"monospace" }}>{flagged ? "YES" : typeof value === "string" ? value : "YES"}</span>
     );
     return (
       <span style={{ fontSize:10, fontWeight:600, padding:"2px 8px", borderRadius:4,
-        background:"#F3F4F6", color:"#6B7280", fontFamily:"monospace" }}>{typeof value === "string" ? value : "NO"}</span>
+        background:"#F3F4F6", color:"#78716C", fontFamily:"monospace" }}>{typeof value === "string" ? value : "NO"}</span>
     );
   };
 
@@ -284,8 +293,10 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
       {typeof value === "string" || typeof value === "number" ? (
         <div style={{ display:"flex", alignItems:"center", gap:6, flex:"0 0 auto" }}>
           <span style={{ fontSize:12, fontWeight:600, color: bold ? T.black : "#374151" }}>{value}</span>
-          <span style={{ fontSize:9, fontWeight:600, padding:"2px 6px", borderRadius:3,
-            background:"#D1FAE5", color:"#065F46", fontFamily:"monospace" }}>VERIFIED</span>
+          <span style={{ display:"flex", alignItems:"center", gap:3, fontSize:9, fontWeight:600, padding:"2px 6px", borderRadius:3,
+            background:T.green+"18", color:T.green, fontFamily:"monospace" }}>
+            <svg width={9} height={9} viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke={T.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            ZIMAS</span>
         </div>
       ) : value !== undefined && value !== null ? (
         <Badge yes={value} value={value} flagged={flagged} />
@@ -365,11 +376,12 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
           densityText = parcel.lotSizeSf.toLocaleString() + " sf ÷ 800 = " + unitCount + " units by-right";
         }
         return (
-        <div style={{ background:"#1A1714", borderRadius:10, padding:"14px 18px", marginBottom:12,
-          display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 }}>
+        <div style={{ background:T.warmGray, borderRadius:10, padding:"14px 18px", marginBottom:12,
+          display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8,
+          border:`2px solid ${T.orange}30` }}>
           <div>
             <div style={{ fontSize:10, color:T.orange, fontFamily:"monospace", letterSpacing:"0.1em" }}>DENSITY</div>
-            <div style={{ fontSize:16, fontWeight:700, color:"white", fontFamily:"Georgia,serif", marginTop:2 }}>
+            <div style={{ fontSize:16, fontWeight:700, color:T.textHead, fontFamily:"Georgia,serif", marginTop:2 }}>
               {densityText}
             </div>
           </div>
@@ -391,7 +403,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
       </Card>
 
       {/* Hazards & Environmental */}
-      <Card title="Hazards & Environmental" color="#DC2626">
+      <Card title="Hazards & Environmental" color="#B91C1C">
         <HazardGrid items={[
           ["Coastal Zone", parcel.coastalZone === "Yes" ? parcel.coastalZoneType || "Yes" : parcel.coastalZone === "No" ? false : null, parcel.coastalZone === "Yes"],
           ["Very High Fire Hazard Zone", parcel.fireHazard, false],
@@ -418,7 +430,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
         <Row label="Community Plan" value={parcel.communityPlan || null} />
         {parcel.ziCodes?.length > 0 && (
           <div style={{ marginTop:8 }}>
-            <div style={{ fontSize:10, color:T.muted, fontFamily:"monospace", marginBottom:4,
+            <div style={{ fontSize:10, color:T.secondary, fontFamily:"monospace", marginBottom:4,
               letterSpacing:"0.08em" }}>ZONING INFORMATION ({parcel.ziCodes.length})</div>
             <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
               {parcel.ziCodes.map((zi,i) => (
@@ -432,7 +444,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
         )}
         {parcel.overlayLayers?.length > 0 && (
           <div style={{ marginTop:8 }}>
-            <div style={{ fontSize:10, color:T.muted, fontFamily:"monospace", marginBottom:4,
+            <div style={{ fontSize:10, color:T.secondary, fontFamily:"monospace", marginBottom:4,
               letterSpacing:"0.08em" }}>ALL DETECTED OVERLAYS ({parcel.overlayLayers.length})</div>
             <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
               {parcel.overlayLayers.map((o,i) => (
@@ -457,7 +469,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
             ZIMAS matched a different property than the one you entered. To protect report accuracy,
             ZIMAS-specific data (year built, TOC, RSO, specific plans) was not included.
             Try running the report again, or verify directly at{" "}
-            <a href="https://zimas.lacity.org" target="_blank" style={{ color:"#DC2626", fontWeight:600 }}>
+            <a href="https://zimas.lacity.org" target="_blank" style={{ color:"#B91C1C", fontWeight:600 }}>
               zimas.lacity.org
             </a>.
           </div>
@@ -520,7 +532,7 @@ function ProjectSummary({ parcel, projectType, scoreCards }) {
   const SRow = ({ label: l, value: v, highlight, small }) => (
     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start",
       padding: small ? "4px 0" : "6px 0", borderBottom:`1px solid ${T.border}`, gap:8 }}>
-      <span style={{ fontSize:11, color:T.muted, fontFamily:"monospace", letterSpacing:"0.04em",
+      <span style={{ fontSize:11, color:T.secondary, fontFamily:"monospace", letterSpacing:"0.04em",
         flexShrink:0, paddingTop:1 }}>{l}</span>
       <span style={{ fontSize:12, color: highlight ? T.orange : T.text, fontWeight: highlight ? 700 : 400,
         textAlign:"right", lineHeight:1.4 }}>{v || "—"}</span>
@@ -564,11 +576,11 @@ function ProjectSummary({ parcel, projectType, scoreCards }) {
               letterSpacing:"0.1em", marginBottom:6 }}>STATE LAW ELIGIBILITY</div>
             {sb79Proxy && <StateLawBadge name="SB 79 — Transit upzoning (eff. July 2026)" status="LIKELY" color="#2563eb" />}
             {sb35Eligible && <StateLawBadge name="SB 35/423 — Streamlined ministerial" status="LIKELY" color="#2563eb" />}
-            {sb684Eligible && <StateLawBadge name="SB 684 — Ministerial ≤10 units" status="ELIGIBLE" color="#16a34a" />}
+            {sb684Eligible && <StateLawBadge name="SB 684 — Ministerial ≤10 units" status="ELIGIBLE" color="#15803d" />}
             {sb1123Eligible && <StateLawBadge name="SB 1123 — Starter homes (vacant SF lot)" status="LIKELY" color="#2563eb" />}
-            {sb9Eligible && <StateLawBadge name="SB 9 — Duplex + lot split" status="ELIGIBLE" color="#16a34a" />}
-            {ab2011Eligible && <StateLawBadge name="AB 2011 — Housing on commercial" status="CHECK" color="#d97706" />}
-            {hasAB2097 && <StateLawBadge name="AB 2097 — No parking minimum" status="YES" color="#16a34a" />}
+            {sb9Eligible && <StateLawBadge name="SB 9 — Duplex + lot split" status="ELIGIBLE" color="#15803d" />}
+            {ab2011Eligible && <StateLawBadge name="AB 2011 — Housing on commercial" status="CHECK" color="#b45309" />}
+            {hasAB2097 && <StateLawBadge name="AB 2097 — No parking minimum" status="YES" color="#15803d" />}
             {isCoastal && <StateLawBadge name="SB 1077 — Coastal ADU streamlining (eff. July 2026)" status="PENDING" color="#6366f1" />}
           </div>
         )}
@@ -584,7 +596,7 @@ function ProjectSummary({ parcel, projectType, scoreCards }) {
         )}
 
         {/* Data Source */}
-        <div style={{ marginTop:10, fontSize:10, color:T.muted, textAlign:"center",
+        <div style={{ marginTop:10, fontSize:10, color:T.secondary, textAlign:"center",
           padding:"6px 0", borderTop:`1px solid ${T.border}` }}>
           {parcel.source === "ZIMAS" ? "✓ ZIMAS verified" : "Estimated from ZIP"}
           {" · "}State law data as of April 2026
@@ -717,7 +729,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
               kpiEls.push(
                 <div key={"k"+i} style={{ display:"flex", gap:10, padding:"7px 0",
                   borderBottom:`1px solid ${T.border}`, alignItems:"flex-start" }}>
-                  <span style={{ fontSize:10, fontWeight:700, color:label==="ALERTS"?T.red:T.muted,
+                  <span style={{ fontSize:10, fontWeight:700, color:label==="ALERTS"?T.red:T.secondary,
                     textTransform:"uppercase", letterSpacing:"0.08em", minWidth:70,
                     paddingTop:2, flexShrink:0, fontFamily:"monospace" }}>{label}</span>
                   <span style={{ fontSize:13, color:T.text, lineHeight:1.5, flex:1 }}>{renderInline(val)}</span>
@@ -776,41 +788,49 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
       const pts = t.split("|").map(p=>p.trim());
       const [sev, name, dollar, time] = pts;
       const levelMap = {
-        "ACTION REQUIRED":"red", "CRITICAL":"red",
-        "CAUTION":"yellow",
-        "NOTE":"blue", "INFO":"blue",
+        "REQUIRED":"red", "ACTION REQUIRED":"red", "CRITICAL":"red",
+        "FACTOR":"yellow", "CAUTION":"yellow",
+        "BENEFIT":"green", "NOTE":"green", "INFO":"green",
         "CLEAR":"green"
       };
-      const level = levelMap[sev] || "blue";
-      // Update display label
-      const displayLabel = sev === "ACTION REQUIRED" ? "ACTION REQUIRED"
-        : sev === "CRITICAL" ? "ACTION REQUIRED"
-        : sev === "INFO" ? "NOTE"
-        : sev;
+      const level = levelMap[sev] || "green";
+      const displayLabel = level === "red" ? "REQUIRED"
+        : level === "yellow" ? "FACTOR"
+        : "BENEFIT";
       let desc = "";
       if (i+1 < lines.length && !lines[i+1].trim().includes("|") && lines[i+1].trim()) {
         desc = lines[i+1].trim(); i++;
       }
       const meta = [dollar, time ? `+${time}` : ""].filter(Boolean).join(" · ");
-      // Override the flag label display
       const cfgOverride = level === "red"
-        ? { bg:"#FEF2F2", border:"#FECACA", dot:T.red, label:displayLabel }
+        ? { bg:"#FEF2F2", border:"#FECACA", color:T.red, label:displayLabel }
         : level === "yellow"
-        ? { bg:"#FFFBEB", border:"#FDE68A", dot:T.yellow, label:"CAUTION" }
-        : level === "green"
-        ? { bg:"#F0FDF4", border:"#BBF7D0", dot:T.green, label:"CLEAR" }
-        : { bg:"#EFF6FF", border:"#BFDBFE", dot:"#2563eb", label:"NOTE" };
+        ? { bg:"#FFFBEB", border:"#FDE68A", color:T.yellow, label:displayLabel }
+        : { bg:"#F0FDF4", border:"#BBF7D0", color:T.green, label:displayLabel };
+      const iconPath = level === "green"
+        ? <path d="M4 8.5L7 11.5L12 5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        : <><path d="M8 4v5" stroke="#fff" strokeWidth="2" strokeLinecap="round"/><path d="M8 11v1" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></>;
       els.push(<div key={i} style={{ marginBottom:8 }}>
         <div style={{ background:cfgOverride.bg, border:`1px solid ${cfgOverride.border}`,
-          borderRadius:8, padding:"12px 14px", display:"flex", gap:12, alignItems:"flex-start" }}>
-          <div style={{ width:8, height:8, borderRadius:"50%", background:cfgOverride.dot,
-            marginTop:5, flexShrink:0 }} />
+          borderRadius:8, padding:"14px 16px", display:"flex", gap:14, alignItems:"flex-start" }}>
+          <div style={{ width:24, height:24, borderRadius:6, background:cfgOverride.color,
+            display:"flex", alignItems:"center", justifyContent:"center",
+            flexShrink:0, marginTop:1 }}>
+            <svg width={12} height={12} viewBox="0 0 16 16" fill="none">{iconPath}</svg>
+          </div>
           <div style={{ flex:1 }}>
-            <div style={{ fontSize:9, color:cfgOverride.dot, fontFamily:"monospace",
-              letterSpacing:"0.1em", marginBottom:3 }}>{cfgOverride.label}</div>
-            {name && <div style={{ fontSize:13, fontWeight:600, color:T.text, marginBottom:3 }}>{name}</div>}
-            <div style={{ fontSize:13, color:T.text, lineHeight:1.6 }}>{desc}</div>
-            {meta && <div style={{ fontSize:11, color:T.muted, marginTop:4 }}>{meta}</div>}
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
+              <div>
+                <div style={{ fontSize:9, color:cfgOverride.color, fontFamily:"monospace",
+                  letterSpacing:"0.1em", marginBottom:2 }}>{cfgOverride.label}</div>
+                {name && <div style={{ fontSize:13, fontWeight:600, color:T.text }}>{name}</div>}
+              </div>
+              {dollar && dollar !== "Variable" && dollar !== "Benefit" && dollar !== "None" && (
+                <span style={{ fontSize:13, fontWeight:700, color:cfgOverride.color, whiteSpace:"nowrap" }}>{dollar}</span>
+              )}
+            </div>
+            <div style={{ fontSize:13, color:T.text, lineHeight:1.6, marginTop:2 }}>{desc}</div>
+            {meta && <div style={{ fontSize:11, color:T.secondary, marginTop:4 }}>{meta}</div>}
           </div>
         </div>
       </div>);
@@ -836,7 +856,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
           <span style={{ fontSize:9, fontWeight:700, letterSpacing:"0.08em",
             background:b.bg, color:b.color, border:`1px solid ${b.border}`,
             borderRadius:3, padding:"2px 8px" }}>{b.label}</span>
-          <div style={{ display:"flex", flexWrap:"wrap", gap:12, fontSize:12, color:T.muted }}>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:12, fontSize:12, color:T.secondary }}>
             {agency && <span>{agency}</span>}
             {time && <span>{time}</span>}
             {cost && <span style={{ color:T.orange, fontWeight:600 }}>{cost}</span>}
@@ -884,8 +904,8 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
               borderBottom:`1px solid ${T.border}` }}>
               <div style={{ padding:"8px 10px", fontSize:12, fontWeight:600, color:T.text }}>{renderInline(std)}</div>
               <div style={{ padding:"8px 10px", fontSize:12, color:T.green, fontWeight:500 }}>{renderInline(maxA||"")}</div>
-              <div style={{ padding:"8px 10px", fontSize:12, color:T.muted }}>{renderInline(prop||"")}</div>
-              <div style={{ padding:"8px 10px", fontSize:11, color:T.muted, fontFamily:"monospace" }}>{lamc||""}</div>
+              <div style={{ padding:"8px 10px", fontSize:12, color:T.secondary }}>{renderInline(prop||"")}</div>
+              <div style={{ padding:"8px 10px", fontSize:11, color:T.secondary, fontFamily:"monospace" }}>{lamc||""}</div>
             </div>);
             rowIdx++;
           }
@@ -905,7 +925,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
             letterSpacing:"0.08em", minWidth:70, marginTop:1, flexShrink:0 }}>EXEMPT</span>
           <span style={{ fontSize:12, color:T.text, flex:1, lineHeight:1.5 }}>{renderInline(desc)}</span>
           {amount && <span style={{ fontSize:11, color:T.orange, fontWeight:600, whiteSpace:"nowrap" }}>{amount}</span>}
-          {lamc && <span style={{ fontSize:10, color:T.muted, fontFamily:"monospace", whiteSpace:"nowrap" }}>{lamc}</span>}
+          {lamc && <span style={{ fontSize:10, color:T.secondary, fontFamily:"monospace", whiteSpace:"nowrap" }}>{lamc}</span>}
         </div>);
         i++; continue;
       }
@@ -919,7 +939,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
         const val = t.slice(colonIdx+1).trim();
         els.push(<div key={i} style={{ display:"flex", gap:10, padding:"6px 0",
           borderBottom:`1px solid ${T.border}`, alignItems:"flex-start" }}>
-          <span style={{ fontSize:9, fontWeight:700, color:T.muted, fontFamily:"monospace",
+          <span style={{ fontSize:9, fontWeight:700, color:T.secondary, fontFamily:"monospace",
             letterSpacing:"0.06em", minWidth:110, flexShrink:0, paddingTop:2 }}>{label}</span>
           <span style={{ fontSize:12, color:T.text, lineHeight:1.6 }}>{renderInline(val)}</span>
         </div>);
@@ -927,7 +947,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
       }
       // "Analysis as of" date stamp
       if (t.toLowerCase().startsWith("analysis as of") || t.toLowerCase().startsWith("lamc standards")) {
-        els.push(<div key={i} style={{ fontSize:11, color:T.muted, fontStyle:"italic",
+        els.push(<div key={i} style={{ fontSize:11, color:T.secondary, fontStyle:"italic",
           padding:"8px 0", marginTop:4 }}>{renderInline(t)}</div>);
         i++; continue;
       }
@@ -947,7 +967,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
       if (t.startsWith("BUILDABLE AREA:")) {
         els.push(<div key={i} style={{ background:T.warmGray, border:`1px solid ${T.border}`,
           borderRadius:6, padding:"8px 12px", marginBottom:6, display:"flex", gap:8 }}>
-          <span style={{ fontSize:9, fontWeight:700, color:T.muted, letterSpacing:"0.1em",
+          <span style={{ fontSize:9, fontWeight:700, color:T.secondary, letterSpacing:"0.1em",
             fontFamily:"monospace" }}>BUILDABLE</span>
           <span style={{ fontSize:13, color:T.text }}>{t.slice(15).trim()}</span>
         </div>);
@@ -988,16 +1008,16 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
         els.push(<div key={i} style={{ background:eligible?"#EFF6FF":"#F9FAFB",
           border:`1px solid ${eligible?"#BFDBFE":T.border}`, borderRadius:6,
           padding:"8px 12px", marginBottom:6, display:"flex", gap:8, alignItems:"center" }}>
-          <span style={{ fontSize:9, fontWeight:700, color:eligible?"#2563eb":T.muted,
+          <span style={{ fontSize:9, fontWeight:700, color:eligible?"#2563eb":T.secondary,
             letterSpacing:"0.1em", fontFamily:"monospace" }}>TOC</span>
-          <span style={{ fontSize:13, color:eligible?"#1d4ed8":T.muted }}>{val}</span>
+          <span style={{ fontSize:13, color:eligible?"#1d4ed8":T.secondary }}>{val}</span>
         </div>);
         i++; continue;
       }
       if (t.startsWith("ADU:")) {
         els.push(<div key={i} style={{ background:T.warmGray, border:`1px solid ${T.border}`,
           borderRadius:6, padding:"8px 12px", marginBottom:6, display:"flex", gap:8 }}>
-          <span style={{ fontSize:9, fontWeight:700, color:T.muted, letterSpacing:"0.1em",
+          <span style={{ fontSize:9, fontWeight:700, color:T.secondary, letterSpacing:"0.1em",
             fontFamily:"monospace" }}>ADU</span>
           <span style={{ fontSize:13, color:T.text }}>{t.slice(4).trim()}</span>
         </div>);
@@ -1006,9 +1026,9 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
       if (t.startsWith("EXISTING STRUCTURE:")) {
         els.push(<div key={i} style={{ background:T.warmGray, border:`1px solid ${T.border}`,
           borderRadius:6, padding:"8px 12px", marginBottom:6, display:"flex", gap:8 }}>
-          <span style={{ fontSize:9, fontWeight:700, color:T.muted, letterSpacing:"0.1em",
+          <span style={{ fontSize:9, fontWeight:700, color:T.secondary, letterSpacing:"0.1em",
             fontFamily:"monospace" }}>EXISTING</span>
-          <span style={{ fontSize:13, color:T.muted }}>{t.slice(19).trim()}</span>
+          <span style={{ fontSize:13, color:T.secondary }}>{t.slice(19).trim()}</span>
         </div>);
         i++; continue;
       }
@@ -1037,10 +1057,10 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
             </svg>
           </div>
           <span style={{ fontSize:13, color:T.text, flex:1 }}>{name}</span>
-          <span style={{ fontSize:11, color:T.muted, minWidth:120 }}>{who}</span>
+          <span style={{ fontSize:11, color:T.secondary, minWidth:120 }}>{who}</span>
           {stamp && <span style={{ fontSize:9, fontWeight:700, letterSpacing:"0.06em",
             color:"#fff",
-            background:req?"#b91c1c":"#16a34a",
+            background:req?"#b91c1c":"#15803d",
             borderRadius:3, padding:"2px 8px", whiteSpace:"nowrap",
             fontFamily:"monospace" }}>STAMP: {req?"REQ":"NOT REQ"}</span>}
         </div>);
@@ -1057,7 +1077,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
         background:isTotal?T.orange+"08":"transparent",
         paddingLeft:isTotal?8:0, paddingRight:isTotal?8:0,
         borderRadius:isTotal?6:0, marginTop:isTotal?4:0 }}>
-        <span style={{ fontSize:13, color:isTotal?T.orange:T.muted, flex:1,
+        <span style={{ fontSize:13, color:isTotal?T.orange:T.secondary, flex:1,
           fontWeight:isTotal?700:400 }}>{name}</span>
         {basis && !isTotal && <span style={{ fontSize:11, color:T.border, minWidth:120 }}>{basis}</span>}
         <span style={{ fontSize:13, color:isTotal?T.orange:T.text,
@@ -1068,7 +1088,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
 
     // Fee excludes / notes
     if (inSec("fee") && (t.startsWith("EXCLUDES:") || t.startsWith("Note:"))) {
-      els.push(<p key={i} style={{ fontSize:11, color:T.muted, lineHeight:1.6,
+      els.push(<p key={i} style={{ fontSize:11, color:T.secondary, lineHeight:1.6,
         marginTop:8, fontStyle:"italic" }}>{renderInline(t)}</p>);
       i++; continue;
     }
@@ -1088,7 +1108,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
       if (t.startsWith("BEST CASE:") || t.startsWith("WORST CASE:")) {
         const isB = t.startsWith("BEST");
         els.push(<div key={i} style={{ display:"flex", gap:8, alignItems:"center", padding:"6px 0" }}>
-          <span style={{ fontSize:10, fontWeight:700, color:T.muted, fontFamily:"monospace",
+          <span style={{ fontSize:10, fontWeight:700, color:T.secondary, fontFamily:"monospace",
             letterSpacing:"0.06em", minWidth:90 }}>{isB?"BEST CASE":"WORST CASE"}</span>
           <span style={{ fontSize:13, color:isB?T.green:T.red, fontWeight:700 }}>
             {t.slice(t.indexOf(":")+1).trim()}
@@ -1114,7 +1134,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
           <p style={{ fontSize:13, color:T.text, fontWeight:600, margin:0, lineHeight:1.5 }}>
             {renderInline(action)}
           </p>
-          {meta && <p style={{ fontSize:12, color:T.muted, margin:"2px 0 0", lineHeight:1.5 }}>
+          {meta && <p style={{ fontSize:12, color:T.secondary, margin:"2px 0 0", lineHeight:1.5 }}>
             {renderInline(meta)}
           </p>}
         </div>
@@ -1132,7 +1152,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
           display:"flex", gap:10, alignItems:"flex-start" }}>
           <span style={{ fontSize:10, fontWeight:700, color:T.orange, fontFamily:"monospace",
             minWidth:90, flexShrink:0, paddingTop:2 }}>{term}</span>
-          <span style={{ fontSize:12, color:T.muted, lineHeight:1.5 }}>{renderInline(def)}</span>
+          <span style={{ fontSize:12, color:T.secondary, lineHeight:1.5 }}>{renderInline(def)}</span>
         </div>);
         i++; continue;
       }
@@ -1151,10 +1171,10 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
               return <span key={idx} style={{ fontSize:10, padding:"3px 8px", background:T.warmGray,
                 border:`1px solid ${T.border}`, borderRadius:4, lineHeight:1.4 }}>
                 <strong style={{ color:T.orange }}>{abbr}</strong>
-                <span style={{ color:T.muted }}> {full}</span>
+                <span style={{ color:T.secondary }}> {full}</span>
               </span>;
             }
-            return <span key={idx} style={{ fontSize:10, color:T.muted, padding:"3px 8px",
+            return <span key={idx} style={{ fontSize:10, color:T.secondary, padding:"3px 8px",
               background:T.warmGray, border:`1px solid ${T.border}`, borderRadius:4 }}>{item}</span>;
           })}
         </div>);
@@ -1164,7 +1184,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
       if (t.toLowerCase().startsWith("data source")) {
         const sources = t.slice(t.indexOf(":") + 1).trim().split("|").map(s => s.trim()).filter(Boolean);
         els.push(<div key={i} style={{ marginTop:8 }}>
-          <div style={{ fontSize:9, color:T.muted, fontFamily:"monospace", letterSpacing:"0.08em",
+          <div style={{ fontSize:9, color:T.secondary, fontFamily:"monospace", letterSpacing:"0.08em",
             marginBottom:6 }}>DATA SOURCES</div>
           <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
             {sources.map((s, si) => {
@@ -1214,7 +1234,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
               const cells = row.split("|").filter((_,ci,a)=>ci>0&&ci<a.length-1).map(c=>c.trim());
               return <tr key={ri} style={{ background:ri%2===0?T.white:T.warmGray }}>
                 {cells.map((c,ci)=><td key={ci} style={{ padding:"8px 12px",
-                  color:ci===0?T.muted:T.text, fontWeight:ci===0?600:400,
+                  color:ci===0?T.secondary:T.text, fontWeight:ci===0?600:400,
                   borderBottom:`1px solid ${T.border}`, lineHeight:1.5 }}>{renderInline(c)}</td>)}
               </tr>;
             })}</tbody>
@@ -1258,7 +1278,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
       continue;
     }
 
-    els.push(<p key={i} style={{ fontSize:13, color:T.muted, lineHeight:1.8,
+    els.push(<p key={i} style={{ fontSize:13, color:T.secondary, lineHeight:1.8,
       marginBottom:3 }}>{renderInline(t)}</p>);
     i++;
   }
@@ -1295,12 +1315,12 @@ function AcronymLegend({ jurisdiction }) {
   return (
     <div style={{ margin:0 }}>
       <button onClick={() => setOpen(!open)} style={{
-        width:"100%", background:"#ffffff10", border:"none", padding:"10px 16px",
+        width:"100%", background:"#ffffff12", border:"none", padding:"10px 16px",
         display:"flex", justifyContent:"space-between", alignItems:"center",
         cursor:"pointer", fontFamily:"'DM Sans',sans-serif", borderRadius:6 }}>
-        <span style={{ fontSize:11, fontWeight:700, color:"#ffffff77", fontFamily:"monospace",
+        <span style={{ fontSize:11, fontWeight:700, color:"#D6D3D1", fontFamily:"monospace",
           letterSpacing:"0.1em" }}>TERMS & DATA SOURCES</span>
-        <span style={{ fontSize:11, color:"#ffffff55" }}>{open ? "▲ Hide" : "▼ Show"}</span>
+        <span style={{ fontSize:11, color:"#A8A29E" }}>{open ? "▲ Hide" : "▼ Show"}</span>
       </button>
       {open && (
         <div style={{ padding:"16px 0 0" }}>
@@ -1310,23 +1330,23 @@ function AcronymLegend({ jurisdiction }) {
                 borderBottom:"1px solid #ffffff10", alignItems:"flex-start" }}>
                 <span style={{ fontSize:10, fontWeight:700, color:T.orange,
                   fontFamily:"monospace", minWidth:50, flexShrink:0, paddingTop:1 }}>{term}</span>
-                <span style={{ fontSize:11, color:"#ffffff77", lineHeight:1.5 }}>{def}</span>
+                <span style={{ fontSize:11, color:"#D6D3D1", lineHeight:1.5 }}>{def}</span>
               </div>
             ))}
           </div>
-          <div style={{ fontSize:10, color:"#ffffff55", fontFamily:"monospace",
+          <div style={{ fontSize:10, color:"#A8A29E", fontFamily:"monospace",
             letterSpacing:"0.08em", marginBottom:6 }}>DATA SOURCES</div>
           <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
             {sources.map(([label, url, href]) => (
               <a key={label} href={href} target="_blank" style={{
-                fontSize:11, color:T.lime, textDecoration:"none",
+                fontSize:11, color:T.gold, textDecoration:"none",
                 border:"1px solid #ffffff20", borderRadius:4, padding:"3px 8px",
                 fontFamily:"'DM Sans',sans-serif" }}>
                 {label} · {url}
               </a>
             ))}
           </div>
-          <div style={{ fontSize:10, color:T.muted, marginTop:12, lineHeight:1.6,
+          <div style={{ fontSize:10, color:T.secondary, marginTop:12, lineHeight:1.6,
             fontStyle:"italic" }}>
             All data sourced from publicly available LA City and County records.
             Always verify directly with the relevant agency before making project decisions.
@@ -1641,7 +1661,7 @@ export default function Listo() {
         ? `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#D1FAE5;color:#065F46;font-family:monospace">VERIFIED</span>`
         : `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#FEF3C7;color:#92400E;font-family:monospace">NOT VERIFIED</span>`;
       const pRow = (label, val) => `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F3F4F6;font-size:11px"><span>${label}</span><span style="font-weight:600">${val !== null && val !== undefined ? val + " " + vBadge(val) : vBadge(null)}</span></div>`;
-      const flagBadge = (val, flagged) => val ? `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:${flagged?"#FEE2E2;color:#991B1B":"#D1FAE5;color:#065F46"};font-family:monospace">${typeof val === "string" ? val : "YES"}</span>` : `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#F3F4F6;color:#6B7280;font-family:monospace">NO</span>`;
+      const flagBadge = (val, flagged) => val ? `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:${flagged?"#FEE2E2;color:#991B1B":"#D1FAE5;color:#065F46"};font-family:monospace">${typeof val === "string" ? val : "YES"}</span>` : `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#F3F4F6;color:#78716C;font-family:monospace">NO</span>`;
       const hRow = (label, val, flagged) => `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #F3F4F6;font-size:11px"><span>${label}</span>${val !== undefined && val !== null ? flagBadge(val, flagged) : vBadge(null)}</div>`;
 
       parcelHtml = `
@@ -1662,8 +1682,8 @@ export default function Listo() {
           <div><div style="font-size:9px;color:${T.orange};font-family:monospace;letter-spacing:0.1em">DENSITY</div><div style="font-size:14px;font-weight:700;color:white;font-family:Georgia,serif">${parcel.lotSizeSf.toLocaleString()} sf ÷ 800 = ${Math.floor(parcel.lotSizeSf/800)} units by-right</div></div>
           ${parcel.toc ? `<div style="background:${T.orange}20;border:1px solid ${T.orange}40;border-radius:4px;padding:3px 8px"><div style="font-size:8px;color:${T.orange};font-family:monospace">TOC</div><div style="font-size:12px;font-weight:700;color:${T.orange}">${parcel.toc}</div></div>` : ""}
         </div>` : ""}
-        <div style="border:1px solid #E5E7EB;border-left:4px solid #DC2626;border-radius:8px;margin:8px 0;overflow:hidden">
-          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#DC2626;text-transform:uppercase;letter-spacing:0.08em;font-family:monospace">HAZARDS & ENVIRONMENTAL</div>
+        <div style="border:1px solid #E5E7EB;border-left:4px solid #B91C1C;border-radius:8px;margin:8px 0;overflow:hidden">
+          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#B91C1C;text-transform:uppercase;letter-spacing:0.08em;font-family:monospace">HAZARDS & ENVIRONMENTAL</div>
           <div style="padding:6px 14px;display:grid;grid-template-columns:1fr 1fr;gap:0 14px">
             ${hRow("Coastal Zone", parcel.coastalZone === "Yes" ? (parcel.coastalZoneType || "Yes") : parcel.coastalZone === "No" ? false : null, parcel.coastalZone === "Yes")}
             ${hRow("Fire Hazard Zone", parcel.fireHazard, false)}
@@ -1685,7 +1705,7 @@ export default function Listo() {
             ${pRow("HPOZ", parcel.hpoz === true ? "Yes" : parcel.hpoz === false ? "No" : null)}
             ${pRow("General Plan", parcel.generalPlanLandUse || null)}
             ${pRow("Community Plan", parcel.communityPlan || null)}
-            ${parcel.ziCodes?.length ? '<div style="margin-top:6px"><div style="font-size:9px;color:#8C7B70;font-family:monospace;margin-bottom:3px">ZONING INFORMATION (' + parcel.ziCodes.length + ')</div>' + parcel.ziCodes.map(zi => '<div style="font-size:9px;color:#1E40AF;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:3px;padding:2px 6px;margin:2px 0">' + zi + '</div>').join('') + '</div>' : ''}
+            ${parcel.ziCodes?.length ? '<div style="margin-top:6px"><div style="font-size:9px;color:#78716C;font-family:monospace;margin-bottom:3px">ZONING INFORMATION (' + parcel.ziCodes.length + ')</div>' + parcel.ziCodes.map(zi => '<div style="font-size:9px;color:#1E40AF;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:3px;padding:2px 6px;margin:2px 0">' + zi + '</div>').join('') + '</div>' : ''}
           </div>
         </div>
         <div style="border:1px solid #E5E7EB;border-left:4px solid #7C3AED;border-radius:8px;margin:8px 0;overflow:hidden">
@@ -1725,17 +1745,19 @@ export default function Listo() {
         const pts = t.slice(8).trim().split("|");
         const w=(pts[0]||"").trim(), d=(pts[1]||"").trim();
         const c=w==="GO"?T.green:w==="COMPLEX"?T.red:T.yellow;
-        bodyHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:${c}15;border:2px solid ${c};border-radius:8px;margin:8px 0"><span style="font-size:10px;font-weight:800;color:#fff;background:${c};border-radius:4px;padding:2px 10px">${w}</span><span style="font-size:12px;color:#2C2420">${d}</span></div>`;
+        bodyHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:${c}15;border:2px solid ${c};border-radius:8px;margin:8px 0"><span style="font-size:10px;font-weight:800;color:#fff;background:${c};border-radius:4px;padding:2px 10px">${w}</span><span style="font-size:12px;color:#44403C">${d}</span></div>`;
         continue;
       }
-      // Zone Alerts with ACTION REQUIRED/CAUTION/NOTE
-      if (t.includes("|") && /^(ACTION REQUIRED|CRITICAL|CAUTION|NOTE|INFO|CLEAR)\s*\|/.test(t)) {
+      // Zone Alerts with REQUIRED/FACTOR/BENEFIT
+      if (t.includes("|") && /^(REQUIRED|ACTION REQUIRED|CRITICAL|FACTOR|CAUTION|BENEFIT|NOTE|INFO|CLEAR)\s*\|/.test(t)) {
         const pts=t.split("|").map(p=>p.trim());
         const [sev,name2,dollar,time]=pts;
-        const displayLabel = sev === "CRITICAL" ? "ACTION REQUIRED" : sev === "INFO" ? "NOTE" : sev;
-        const cs={"ACTION REQUIRED":["#FEF2F2","#b91c1c"],CRITICAL:["#FEF2F2","#b91c1c"],CAUTION:["#FFFBEB","#d97706"],NOTE:["#EFF6FF","#2563eb"],INFO:["#EFF6FF","#2563eb"],CLEAR:["#F0FDF4","#16a34a"]};
-        const [bg,bc]=cs[sev]||["#F9FAFB","#6B7280"];
-        bodyHtml += `<div style="padding:8px 12px;margin:6px 0;border-radius:6px;border-left:3px solid ${bc};background:${bg}"><span style="font-size:9px;font-weight:800;color:#fff;background:${bc};border-radius:3px;padding:1px 6px;margin-right:8px">${displayLabel}</span><strong>${name2||""}</strong>${dollar?` <span style="color:#6B7280;font-size:11px">· ${dollar}</span>`:""}${time?` <span style="color:#6B7280;font-size:11px">· ${time}</span>`:""}</div>`;
+        const levelMap2={"REQUIRED":"red","ACTION REQUIRED":"red","CRITICAL":"red","FACTOR":"yellow","CAUTION":"yellow","BENEFIT":"green","NOTE":"green","INFO":"green","CLEAR":"green"};
+        const lv=levelMap2[sev]||"green";
+        const displayLabel = lv === "red" ? "REQUIRED" : lv === "yellow" ? "FACTOR" : "BENEFIT";
+        const cs={"red":["#FEF2F2","#b91c1c"],"yellow":["#FFFBEB","#b45309"],"green":["#F0FDF4","#15803d"]};
+        const [bg,bc]=cs[lv]||["#F9FAFB","#78716C"];
+        bodyHtml += `<div style="padding:8px 12px;margin:6px 0;border-radius:6px;border-left:3px solid ${bc};background:${bg}"><span style="font-size:9px;font-weight:800;color:#fff;background:${bc};border-radius:3px;padding:1px 6px;margin-right:8px">${displayLabel}</span><strong>${name2||""}</strong>${dollar?` <span style="color:#78716C;font-size:11px">· ${dollar}</span>`:""}${time?` <span style="color:#78716C;font-size:11px">· ${time}</span>`:""}</div>`;
         continue;
       }
       // KPI lines
@@ -1743,16 +1765,16 @@ export default function Listo() {
       const kpi = KPI.find(k => t.startsWith(k));
       if (kpi && pdfSec.includes("project overview")) {
         const kLabel = kpi.slice(0,-1), val = t.slice(kpi.length).trim();
-        bodyHtml += `<div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:10px;font-weight:700;color:#8C7B70;text-transform:uppercase;letter-spacing:0.08em;min-width:70px;font-family:monospace">${kLabel}</span><span style="color:#2C2420">${val}</span></div>`;
+        bodyHtml += `<div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:10px;font-weight:700;color:#78716C;text-transform:uppercase;letter-spacing:0.08em;min-width:70px;font-family:monospace">${kLabel}</span><span style="color:#44403C">${val}</span></div>`;
         continue;
       }
       // Development Standards table rows — render as structured table
       if (inPdfSec("development standard") && t.includes("|") && t.split("|").length >= 3) {
         const pts = t.split("|").map(p => p.trim());
         if (/standard|max allowed/i.test(pts[0])) {
-          bodyHtml += `<div style="display:flex;gap:4px;padding:6px 0;border-bottom:2px solid ${T.orange}30;font-size:9px;font-weight:700;color:#8C7B70;font-family:monospace;text-transform:uppercase;letter-spacing:0.05em"><span style="flex:2">${pts[0]}</span><span style="flex:2">${pts[1]||""}</span><span style="flex:1">${pts[2]||""}</span><span style="flex:1;text-align:right">${pts[3]||""}</span></div>`;
+          bodyHtml += `<div style="display:flex;gap:4px;padding:6px 0;border-bottom:2px solid ${T.orange}30;font-size:9px;font-weight:700;color:#78716C;font-family:monospace;text-transform:uppercase;letter-spacing:0.05em"><span style="flex:2">${pts[0]}</span><span style="flex:2">${pts[1]||""}</span><span style="flex:1">${pts[2]||""}</span><span style="flex:1;text-align:right">${pts[3]||""}</span></div>`;
         } else {
-          bodyHtml += `<div style="display:flex;gap:4px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="flex:2;font-weight:600;color:#1A1714">${pts[0]}</span><span style="flex:2;color:#2C2420">${pts[1]||""}</span><span style="flex:1;color:#8C7B70">${pts[2]||""}</span><span style="flex:1;color:#8C7B70;text-align:right;font-size:11px">${pts[3]||""}</span></div>`;
+          bodyHtml += `<div style="display:flex;gap:4px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="flex:2;font-weight:600;color:#1A1714">${pts[0]}</span><span style="flex:2;color:#44403C">${pts[1]||""}</span><span style="flex:1;color:#78716C">${pts[2]||""}</span><span style="flex:1;color:#78716C;text-align:right;font-size:11px">${pts[3]||""}</span></div>`;
         }
         continue;
       }
@@ -1763,7 +1785,7 @@ export default function Listo() {
         if (isTotal) {
           bodyHtml += `<div style="display:flex;gap:8px;padding:8px 0;border-top:2px solid ${T.orange};margin-top:4px;font-weight:700;font-size:13px"><span style="flex:1;color:${T.orange}">${pts[0]}</span><span style="color:${T.orange}">${pts[1]||""} ${pts[2]||""}</span></div>`;
         } else {
-          bodyHtml += `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="flex:1;font-weight:600">${pts[0]}</span><span style="color:#8C7B70;min-width:100px">${pts[1]||""}</span><span style="color:#1A1714;font-weight:600">${pts[2]||""}</span></div>`;
+          bodyHtml += `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="flex:1;font-weight:600">${pts[0]}</span><span style="color:#78716C;min-width:100px">${pts[1]||""}</span><span style="color:#1A1714;font-weight:600">${pts[2]||""}</span></div>`;
         }
         continue;
       }
@@ -1772,26 +1794,26 @@ export default function Listo() {
         if (pts.length>=4){
           const [pn,pt2,pa,pti,pc]=pts;
           const tc=pt2==="OTC"?T.green:T.orange;
-          bodyHtml+=`<div style="padding:7px 12px;margin:3px 0;background:#F9FAFB;border-radius:5px;display:flex;align-items:center;gap:8px;font-size:12px"><span style="font-weight:600;color:#1A1714;flex:1">${pn}</span><span style="font-size:9px;font-weight:700;color:#fff;background:${tc};border-radius:3px;padding:1px 6px">${pt2}</span><span style="color:#8C7B70">${pa||""} ${pti||""}</span>${pc?`<span style="color:${T.orange};font-weight:600">${pc}</span>`:""}</div>`;
+          bodyHtml+=`<div style="padding:7px 12px;margin:3px 0;background:#F9FAFB;border-radius:5px;display:flex;align-items:center;gap:8px;font-size:12px"><span style="font-weight:600;color:#1A1714;flex:1">${pn}</span><span style="font-size:9px;font-weight:700;color:#fff;background:${tc};border-radius:3px;padding:1px 6px">${pt2}</span><span style="color:#78716C">${pa||""} ${pti||""}</span>${pc?`<span style="color:${T.orange};font-weight:600">${pc}</span>`:""}</div>`;
           continue;
         }
         const [dn,dw,ds]=pts;
         const isT=(dn||"").toUpperCase().includes("TOTAL");
         const req=ds&&ds.toUpperCase().includes("YES");
         if(ds&&(ds.toUpperCase().includes("YES")||ds.toUpperCase().includes("NO")||ds.toUpperCase().includes("REQ"))){
-          bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="color:#1A1714;flex:1">${dn}</span><span style="color:#8C7B70;min-width:120px">${dw}</span><span style="font-size:9px;font-weight:700;color:#fff;background:${req?"#b91c1c":"#16a34a"};border-radius:3px;padding:1px 6px">STAMP:${req?" REQ":" NOT REQ"}</span></div>`;
+          bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="color:#1A1714;flex:1">${dn}</span><span style="color:#78716C;min-width:120px">${dw}</span><span style="font-size:9px;font-weight:700;color:#fff;background:${req?"#b91c1c":"#15803d"};border-radius:3px;padding:1px 6px">STAMP:${req?" REQ":" NOT REQ"}</span></div>`;
         } else {
-          bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid ${isT?T.orange:"#E2D9D0"};font-size:12px${isT?";font-weight:700;color:"+T.orange:""}"><span style="flex:1">${dn}</span>${dw&&!isT?`<span style="color:#8C7B70;min-width:100px">${dw}</span>`:""}<span>${ds||""}</span></div>`;
+          bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid ${isT?T.orange:"#E2D9D0"};font-size:12px${isT?";font-weight:700;color:"+T.orange:""}"><span style="flex:1">${dn}</span>${dw&&!isT?`<span style="color:#78716C;min-width:100px">${dw}</span>`:""}<span>${ds||""}</span></div>`;
         }
         continue;
       }
-      if (/^EXEMPTION:/i.test(t)){const rest=t.slice(10).trim();const pts=rest.split("|").map(p=>p.trim());bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:9px;font-weight:700;color:#fff;background:${T.orange};border-radius:3px;padding:1px 6px;margin-top:1px">EXEMPT</span><span style="flex:1">${pts[0]||""}</span><span style="color:${T.orange};font-weight:600">${pts[1]||""}</span><span style="color:#8C7B70;font-size:11px">${pts[2]||""}</span></div>`;continue;}
-      if (/^(ENCROACHMENT|GRADING:|BASEMENT:|FIRE SPRINKLERS:|OFFSET PLAN|SWIMMING POOL:|PARKING STALLS:)/i.test(t)){const ci=t.indexOf(":");const lbl=t.slice(0,ci).trim();bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:9px;font-weight:700;color:#8C7B70;font-family:monospace;min-width:120px;padding-top:1px">${lbl}</span><span style="color:#2C2420">${t.slice(ci+1).trim()}</span></div>`;continue;}
+      if (/^EXEMPTION:/i.test(t)){const rest=t.slice(10).trim();const pts=rest.split("|").map(p=>p.trim());bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:9px;font-weight:700;color:#fff;background:${T.orange};border-radius:3px;padding:1px 6px;margin-top:1px">EXEMPT</span><span style="flex:1">${pts[0]||""}</span><span style="color:${T.orange};font-weight:600">${pts[1]||""}</span><span style="color:#78716C;font-size:11px">${pts[2]||""}</span></div>`;continue;}
+      if (/^(ENCROACHMENT|GRADING:|BASEMENT:|FIRE SPRINKLERS:|OFFSET PLAN|SWIMMING POOL:|PARKING STALLS:)/i.test(t)){const ci=t.indexOf(":");const lbl=t.slice(0,ci).trim();bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:9px;font-weight:700;color:#78716C;font-family:monospace;min-width:120px;padding-top:1px">${lbl}</span><span style="color:#44403C">${t.slice(ci+1).trim()}</span></div>`;continue;}
       if (/^CRITICAL PATH:/i.test(t)){bodyHtml+=`<div style="padding:8px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;margin:8px 0;display:flex;gap:8px;align-items:center"><span style="font-size:10px;font-weight:700;color:#2563eb;font-family:monospace">CRITICAL PATH</span><span style="font-size:13px;color:#1d4ed8">${t.slice(14).trim()}</span></div>`;continue;}
       if (/^(DENSITY MATH|TOC|MAX BUILDOUT|EXISTING|BEST CASE|WORST CASE)/i.test(t)){const ci=t.indexOf(":")||t.indexOf(" ");const lbl=t.slice(0,ci).trim();const val=t.slice(ci+1).trim();bodyHtml+=`<div style="padding:6px 12px;margin:4px 0;background:#F9FAFB;border-radius:6px;border-left:3px solid ${T.orange}"><span style="font-size:9px;font-weight:700;color:${T.orange};font-family:monospace;margin-right:8px">${lbl}</span><span style="font-size:13px;color:#1A1714;font-weight:600">${val}</span></div>`;continue;}
-      if (/^Weeks?\s[\d\-–]+:/i.test(t)){const ci=t.indexOf(":");bodyHtml+=`<div style="display:flex;gap:12px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-weight:700;color:${T.orange};min-width:80px;font-size:11px;font-family:monospace">${t.slice(0,ci)}</span><span style="color:#2C2420">${t.slice(ci+1).trim()}</span></div>`;continue;}
-      if (/^\d+\./.test(t)){const rest2=t.replace(/^\d+\.\s*/,"");const pi=rest2.indexOf("|");const act=pi>0?rest2.slice(0,pi).trim():rest2;const me=pi>0?rest2.slice(pi+1).trim():"";const n2=(t.match(/^\d+/)||[""])[0];bodyHtml+=`<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #E2D9D0;align-items:flex-start"><span style="font-size:10px;font-weight:800;color:#fff;background:${T.orange};border-radius:4px;padding:2px 6px;white-space:nowrap;margin-top:1px">${n2}</span><div><strong style="font-size:12px">${act}</strong>${me?`<span style="display:block;font-size:11px;color:#8C7B70;margin-top:2px">${me}</span>`:""}</div></div>`;continue;}
-      if (t.startsWith("- ")||t.startsWith("* ")){bodyHtml+=`<li style="font-size:12px;color:#2C2420;margin:3px 0">${t.slice(2)}</li>`;continue;}
+      if (/^Weeks?\s[\d\-–]+:/i.test(t)){const ci=t.indexOf(":");bodyHtml+=`<div style="display:flex;gap:12px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-weight:700;color:${T.orange};min-width:80px;font-size:11px;font-family:monospace">${t.slice(0,ci)}</span><span style="color:#44403C">${t.slice(ci+1).trim()}</span></div>`;continue;}
+      if (/^\d+\./.test(t)){const rest2=t.replace(/^\d+\.\s*/,"");const pi=rest2.indexOf("|");const act=pi>0?rest2.slice(0,pi).trim():rest2;const me=pi>0?rest2.slice(pi+1).trim():"";const n2=(t.match(/^\d+/)||[""])[0];bodyHtml+=`<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #E2D9D0;align-items:flex-start"><span style="font-size:10px;font-weight:800;color:#fff;background:${T.orange};border-radius:4px;padding:2px 6px;white-space:nowrap;margin-top:1px">${n2}</span><div><strong style="font-size:12px">${act}</strong>${me?`<span style="display:block;font-size:11px;color:#78716C;margin-top:2px">${me}</span>`:""}</div></div>`;continue;}
+      if (t.startsWith("- ")||t.startsWith("* ")){bodyHtml+=`<li style="font-size:12px;color:#44403C;margin:3px 0">${t.slice(2)}</li>`;continue;}
       if (t==="DEMO"||t==="BUILDING"||t.startsWith("TECHNICAL")||t==="**DEMO**"||t==="**BUILDING**"||t.startsWith("**TECHNICAL")){const cleanLabel=t.replace(/^\*\*|\*\*$/g,"");bodyHtml+=`<div style="font-size:9px;font-weight:700;color:${T.orange};text-transform:uppercase;letter-spacing:0.1em;margin-top:12px;margin-bottom:4px;font-family:monospace">${cleanLabel}</div>`;continue;}
       // Terms & Data Sources — render acronyms as compact tags, data sources as links
       if (inPdfSec("terms")) {
@@ -1799,7 +1821,7 @@ export default function Listo() {
           const items = t.split("|").map(s => s.trim()).filter(Boolean);
           const isDataSources = t.toLowerCase().startsWith("data source");
           if (isDataSources) {
-            bodyHtml += `<div style="font-size:9px;color:#8C7B70;font-family:monospace;letter-spacing:0.08em;margin:8px 0 4px">DATA SOURCES</div><div style="display:flex;flex-wrap:wrap;gap:4px">`;
+            bodyHtml += `<div style="font-size:9px;color:#78716C;font-family:monospace;letter-spacing:0.08em;margin:8px 0 4px">DATA SOURCES</div><div style="display:flex;flex-wrap:wrap;gap:4px">`;
             for (const s of items) {
               const urlMatch = s.match(/\(([^)]+)\)/);
               const label = s.replace(/\([^)]+\)/, "").replace(/^data sources?:?\s*/i, "").trim();
@@ -1813,9 +1835,9 @@ export default function Listo() {
               if (ci > 0) {
                 const abbr = item.slice(0, ci).trim();
                 const full = item.slice(ci + 1).trim();
-                bodyHtml += `<span style="font-size:9px;padding:2px 6px;background:#F0EBE3;border:1px solid #E2D9D0;border-radius:3px"><strong style="color:${T.orange}">${abbr}</strong> <span style="color:#8C7B70">${full}</span></span>`;
+                bodyHtml += `<span style="font-size:9px;padding:2px 6px;background:#F0EBE3;border:1px solid #E2D9D0;border-radius:3px"><strong style="color:${T.orange}">${abbr}</strong> <span style="color:#78716C">${full}</span></span>`;
               } else {
-                bodyHtml += `<span style="font-size:9px;padding:2px 6px;background:#F0EBE3;border:1px solid #E2D9D0;border-radius:3px;color:#8C7B70">${item}</span>`;
+                bodyHtml += `<span style="font-size:9px;padding:2px 6px;background:#F0EBE3;border:1px solid #E2D9D0;border-radius:3px;color:#78716C">${item}</span>`;
               }
             }
             bodyHtml += `</div>`;
@@ -1823,13 +1845,13 @@ export default function Listo() {
           continue;
         }
       }
-      bodyHtml+=`<p style="font-size:12px;color:#2C2420;margin:4px 0">${t}</p>`;
+      bodyHtml+=`<p style="font-size:12px;color:#44403C;margin:4px 0">${t}</p>`;
     }
     const addrLine = editStreet || address;
     const parcelMeta = [label, date, parcel?.hasData ? "ZIMAS verified" : "ZIP estimates", jurisdiction?.short].filter(Boolean).join(" · ");
     const parcelInfo = [parcel?.zoning, parcel?.lotSizeSf ? parcel.lotSizeSf.toLocaleString() + " sf" : null, parcel?.apn ? "APN " + parcel.apn : null].filter(Boolean).join(" · ");
     const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Listo_${addrSlug}_${dateSlug}</title>
-<style>*{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:32px;color:#1A1714;font-size:13px;line-height:1.65;counter-reset:page}.header{border-bottom:3px solid ${T.orange};padding-bottom:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}.brand{font-size:20px;font-weight:700;color:#1A1714;font-family:Georgia,serif}.brand span{color:${T.orange}}.meta{font-size:10px;color:#8C7B70;text-align:right;font-family:monospace}.address-bar{background:${T.orange};color:white;padding:14px 18px;border-radius:8px;margin:12px 0}.addr-main{font-size:16px;font-weight:700;font-family:Georgia,serif}.addr-sub{font-size:11px;margin-top:3px;opacity:0.8}.addr-info{font-size:11px;margin-top:2px;opacity:0.7}h2{font-size:14px;font-weight:700;color:${T.orange};font-family:Georgia,serif;border-bottom:2px solid ${T.orange}30;padding-bottom:4px;margin:22px 0 10px;text-transform:uppercase;letter-spacing:0.05em}h3{font-size:12px;font-weight:700;color:#2C2420;margin:12px 0 6px;background:#F0EBE3;padding:3px 8px;border-radius:4px}ul{padding-left:18px;margin:6px 0}.footer{margin-top:24px;font-size:10px;color:#A8A29C;text-align:center;border-top:1px solid #E2D9D0;padding-top:12px}.data-src{margin-top:12px;padding:8px 12px;background:#FAF7F2;border-radius:6px;font-size:10px;color:#8C7B70;text-align:center}@media print{body{padding:20px}h2{page-break-before:auto}@page{margin:20mm;@bottom-right{content:"Page " counter(page);font-size:9px;color:#8C7B70;font-family:Arial,sans-serif}}}</style>
+<style>*{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:32px;color:#1A1714;font-size:13px;line-height:1.65;counter-reset:page}.header{border-bottom:3px solid ${T.orange};padding-bottom:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}.brand{font-size:20px;font-weight:700;color:#1A1714;font-family:Georgia,serif}.brand span{color:${T.orange}}.meta{font-size:10px;color:#78716C;text-align:right;font-family:monospace}.address-bar{background:${T.orange};color:white;padding:14px 18px;border-radius:8px;margin:12px 0}.addr-main{font-size:16px;font-weight:700;font-family:Georgia,serif}.addr-sub{font-size:11px;margin-top:3px;opacity:0.8}.addr-info{font-size:11px;margin-top:2px;opacity:0.7}h2{font-size:14px;font-weight:700;color:${T.orange};font-family:Georgia,serif;border-bottom:2px solid ${T.orange}30;padding-bottom:4px;margin:22px 0 10px;text-transform:uppercase;letter-spacing:0.05em}h3{font-size:12px;font-weight:700;color:#44403C;margin:12px 0 6px;background:#F0EBE3;padding:3px 8px;border-radius:4px}ul{padding-left:18px;margin:6px 0}.footer{margin-top:24px;font-size:10px;color:#A8A29C;text-align:center;border-top:1px solid #E2D9D0;padding-top:12px}.data-src{margin-top:12px;padding:8px 12px;background:#FAF7F2;border-radius:6px;font-size:10px;color:#78716C;text-align:center}@media print{body{padding:20px}h2{page-break-before:auto}@page{margin:20mm;@bottom-right{content:"Page " counter(page);font-size:9px;color:#78716C;font-family:Arial,sans-serif}}}</style>
 </head><body>
 <div class="header"><div class="brand">listo<span>.</span></div><div class="meta">PERMIT ANALYSIS REPORT<br>${date}</div></div>
 <div class="address-bar"><div class="addr-main">${addrLine}</div><div class="addr-sub">${parcelMeta}</div>${parcelInfo ? `<div class="addr-info">${parcelInfo}</div>` : ""}</div>
@@ -1914,9 +1936,9 @@ ${bodyHtml}
             <Logo size={28} light />
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <span style={{ fontSize:11, color:"#ffffff44", fontStyle:"italic",
+            <span style={{ fontSize:11, color:"#A8A29E", fontStyle:"italic",
               fontFamily:"'DM Sans',sans-serif" }}>Know before you build.</span>
-            <span style={{ fontSize:10, color:"#ffffff33", border:"1px solid #ffffff15",
+            <span style={{ fontSize:10, color:"#78716C", border:"1px solid #ffffff15",
               borderRadius:20, padding:"3px 10px", fontFamily:"monospace" }}>
               {coverageText}
             </span>
@@ -1938,7 +1960,7 @@ ${bodyHtml}
                 <div style={{ display:"inline-flex", alignItems:"center", gap:8,
                   background:"#ffffff08", border:"1px solid #ffffff15", borderRadius:20,
                   padding:"4px 14px", marginBottom:20 }}>
-                  <div style={{ width:6, height:6, borderRadius:"50%", background:T.lime }} />
+                  <div style={{ width:6, height:6, borderRadius:"50%", background:T.gold }} />
                   <span style={{ fontSize:11, color:"#ffffff66", fontFamily:"monospace" }}>
                     NOW LIVE · {coverageText}
                   </span>
@@ -1947,7 +1969,7 @@ ${bodyHtml}
                   color:T.cream, lineHeight:1.1, marginBottom:20, fontWeight:700 }}>
                   Know before<br />you <span style={{ color:T.orange }}>build.</span>
                 </h1>
-                <p style={{ fontSize:16, color:"#ffffff55", maxWidth:480,
+                <p style={{ fontSize:16, color:"#A8A29E", maxWidth:480,
                   lineHeight:1.8, marginBottom:0, fontFamily:"'DM Sans',sans-serif",
                   fontWeight:300 }}>
                   Instant permit intelligence for LA area contractors and investors.
@@ -1963,7 +1985,7 @@ ${bodyHtml}
               <div style={{ background:T.black, padding:"14px 24px",
                 display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <Logo size={22} light />
-                <span style={{ fontSize:10, color:"#ffffff33", fontFamily:"monospace" }}>
+                <span style={{ fontSize:10, color:"#78716C", fontFamily:"monospace" }}>
                   FREE · AI-POWERED
                 </span>
               </div>
@@ -1971,14 +1993,14 @@ ${bodyHtml}
               <div style={{ padding:28 }}>
                 <h2 style={{ fontSize:20, fontFamily:"'Georgia',serif", color:T.black,
                   marginBottom:6, fontWeight:700 }}>Permit Intelligence Report</h2>
-                <p style={{ fontSize:13, color:T.muted, marginBottom:28,
+                <p style={{ fontSize:13, color:T.secondary, marginBottom:28,
                   fontFamily:"'DM Sans',sans-serif" }}>
                   Enter the project address to get started
                 </p>
 
                 {/* Address */}
                 <div style={{ marginBottom:20 }}>
-                  <label style={{ fontSize:10, color:T.muted, fontFamily:"monospace",
+                  <label style={{ fontSize:10, color:T.secondary, fontFamily:"monospace",
                     letterSpacing:"0.12em", textTransform:"uppercase",
                     display:"block", marginBottom:8 }}>Property Address</label>
                   <div style={{ border:`2px solid ${address.trim().length > 5 ? T.orange : T.border}`,
@@ -2001,7 +2023,7 @@ ${bodyHtml}
 
                 {/* Project type */}
                 <div style={{ marginBottom:20 }}>
-                  <label style={{ fontSize:10, color:T.muted, fontFamily:"monospace",
+                  <label style={{ fontSize:10, color:T.secondary, fontFamily:"monospace",
                     letterSpacing:"0.12em", textTransform:"uppercase",
                     display:"block", marginBottom:8 }}>Project Type</label>
                   {/* Quick chips */}
@@ -2015,7 +2037,7 @@ ${bodyHtml}
                       </button>
                     ))}
                     <button className="chip" onClick={() => setShowAllTypes(!showAllTypes)}
-                      style={{ background:T.white, color:T.muted }}>
+                      style={{ background:T.white, color:T.secondary }}>
                       {showAllTypes ? "Less ▲" : "More ▼"}
                     </button>
                   </div>
@@ -2023,7 +2045,7 @@ ${bodyHtml}
                   {showAllTypes && (
                     <select style={{ width:"100%", border:`1px solid ${T.border}`,
                       borderRadius:8, padding:"11px 14px", fontSize:13,
-                      color:projectType?T.text:T.muted, background:T.white,
+                      color:projectType?T.text:T.secondary, background:T.white,
                       cursor:"pointer", appearance:"none",
                       backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238C7B70' d='M5 6L0 0h10z'/%3E%3C/svg%3E")`,
                       backgroundRepeat:"no-repeat", backgroundPosition:"right 14px center" }}
@@ -2040,7 +2062,7 @@ ${bodyHtml}
 
                 {/* Details */}
                 <div style={{ marginBottom:24 }}>
-                  <label style={{ fontSize:10, color:T.muted, fontFamily:"monospace",
+                  <label style={{ fontSize:10, color:T.secondary, fontFamily:"monospace",
                     letterSpacing:"0.12em", textTransform:"uppercase",
                     display:"block", marginBottom:8 }}>
                     Additional Details <span style={{ fontWeight:300, textTransform:"none",
@@ -2062,7 +2084,7 @@ ${bodyHtml}
                   </svg>
                   Get Listo Report
                 </button>
-                <div style={{ textAlign:"center", fontSize:11, color:T.muted,
+                <div style={{ textAlign:"center", fontSize:11, color:T.secondary,
                   marginTop:10, fontFamily:"'DM Sans',sans-serif" }}>
                   Results in seconds · AI-generated · Always verify with jurisdiction
                 </div>
@@ -2070,7 +2092,7 @@ ${bodyHtml}
             </div>
 
             {/* Coverage note */}
-            <div style={{ textAlign:"center", fontSize:12, color:T.muted,
+            <div style={{ textAlign:"center", fontSize:12, color:T.secondary,
               fontFamily:"'DM Sans',sans-serif" }}>
               Currently covering: <strong style={{ color:T.text }}>City of Los Angeles</strong>
               {" · "}<strong style={{ color:T.text }}>Santa Monica</strong>
@@ -2085,7 +2107,7 @@ ${bodyHtml}
         {stage === "confirm" && (
           <div className="fade-up">
             <button onClick={reset} style={{ background:"none", border:"none",
-              color:T.muted, cursor:"pointer", fontSize:13, padding:"0 0 20px",
+              color:T.secondary, cursor:"pointer", fontSize:13, padding:"0 0 20px",
               fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", gap:6 }}>
               ← Edit Address
             </button>
@@ -2100,14 +2122,14 @@ ${bodyHtml}
               <div style={{ padding:28 }}>
                 <h2 style={{ fontSize:20, fontFamily:"'Georgia',serif", color:T.black,
                   marginBottom:6 }}>Confirm your address</h2>
-                <p style={{ fontSize:13, color:T.muted, marginBottom:24,
+                <p style={{ fontSize:13, color:T.secondary, marginBottom:24,
                   fontFamily:"'DM Sans',sans-serif" }}>
                   The <strong style={{ color:T.orange }}>ZIP code</strong> determines jurisdiction, zoning, and permit rules.
                 </p>
 
                 {/* Address field */}
                 <div style={{ marginBottom:16 }}>
-                  <label style={{ fontSize:10, color:T.muted, fontFamily:"monospace",
+                  <label style={{ fontSize:10, color:T.secondary, fontFamily:"monospace",
                     letterSpacing:"0.12em", textTransform:"uppercase",
                     display:"block", marginBottom:8 }}>Street Address</label>
                   <input style={{ width:"100%", border:`1px solid ${T.border}`, borderRadius:8,
@@ -2121,19 +2143,19 @@ ${bodyHtml}
                   <label style={{ fontSize:10, color:T.orange, fontFamily:"monospace",
                     letterSpacing:"0.12em", textTransform:"uppercase",
                     display:"block", marginBottom:8 }}>
-                    ZIP Code <span style={{ fontWeight:300, color:T.muted,
+                    ZIP Code <span style={{ fontWeight:300, color:T.secondary,
                       textTransform:"none", letterSpacing:0 }}>— double-check this</span>
                   </label>
                   <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-                    <input style={{ width:120, border:`2px solid ${editZip.length === 5 ? T.orange : zipDetecting ? T.muted : T.red}`,
+                    <input style={{ width:120, border:`2px solid ${editZip.length === 5 ? T.orange : zipDetecting ? T.secondary : T.red}`,
                       borderRadius:8, padding:"11px 14px", fontSize:22,
-                      fontWeight:700, color: editZip.length === 5 ? T.orange : zipDetecting ? T.muted : T.red, letterSpacing:"0.12em",
+                      fontWeight:700, color: editZip.length === 5 ? T.orange : zipDetecting ? T.secondary : T.red, letterSpacing:"0.12em",
                       textAlign:"center", fontFamily:"'DM Sans',sans-serif" }}
                       type="text" maxLength={5} value={editZip}
                       onChange={e=>setEditZip(e.target.value.replace(/\D/g,"").slice(0,5))}
                       placeholder={zipDetecting ? "···" : "ZIP"} />
                     {editZip.length === 5 && <JurisdictionBadge jurisdiction={jurisdiction} />}
-                    {zipDetecting && <span style={{ fontSize:12, color:T.muted, fontStyle:"italic" }}>Detecting ZIP...</span>}
+                    {zipDetecting && <span style={{ fontSize:12, color:T.secondary, fontStyle:"italic" }}>Detecting ZIP...</span>}
                   </div>
                   {!editZip && !zipDetecting && (
                     <div style={{ marginTop:8, fontSize:12, color:T.red,
@@ -2171,7 +2193,7 @@ ${bodyHtml}
             </button>
             <div style={{ textAlign:"center", marginTop:12 }}>
               <button onClick={reset} style={{ background:"none", border:"none",
-                color:T.muted, cursor:"pointer", fontSize:13,
+                color:T.secondary, cursor:"pointer", fontSize:13,
                 fontFamily:"'DM Sans',sans-serif", textDecoration:"underline" }}>
                 ← Start over
               </button>
@@ -2185,11 +2207,11 @@ ${bodyHtml}
             <div className="no-print" style={{ display:"flex", justifyContent:"space-between",
               alignItems:"center", marginBottom:4 }}>
               <button onClick={reset} style={{ background:"none", border:"none",
-                color:T.muted, cursor:"pointer", fontSize:13, padding:"0 0 16px",
+                color:T.secondary, cursor:"pointer", fontSize:13, padding:"0 0 16px",
                 fontFamily:"'DM Sans',sans-serif" }}>← New Search</button>
               {result && <button onClick={handlePrint}
                 style={{ background:"none", border:`1px solid ${T.border}`,
-                  color:T.muted, cursor:"pointer", fontSize:12, padding:"6px 14px",
+                  color:T.secondary, cursor:"pointer", fontSize:12, padding:"6px 14px",
                   borderRadius:6, fontFamily:"'DM Sans',sans-serif", marginBottom:16 }}>
                 ↓ Export PDF
               </button>}
@@ -2209,7 +2231,7 @@ ${bodyHtml}
                 </div>
                 <div style={{ fontSize:22, fontFamily:"'Georgia',serif",
                   color:T.cream, marginBottom:8 }}>Working on it...</div>
-                <div style={{ fontSize:13, color:"#ffffff44",
+                <div style={{ fontSize:13, color:"#A8A29E",
                   fontFamily:"'DM Sans',sans-serif", marginBottom:28 }}>
                   Checking zones, overlays, and permit pathways
                 </div>
@@ -2218,7 +2240,7 @@ ${bodyHtml}
                   {LOADING_STEPS.map((step, idx) => (
                     <div key={idx} style={{ display:"flex", gap:10, alignItems:"center" }}>
                       <div style={{ width:16, height:16, borderRadius:"50%",
-                        background: idx <= loadingStep ? T.green : "#ffffff15",
+                        background: idx <= loadingStep ? T.green : "#ffffff12",
                         display:"flex", alignItems:"center", justifyContent:"center",
                         flexShrink:0, transition:"background 0.3s" }}>
                         {idx <= loadingStep && (
@@ -2228,7 +2250,7 @@ ${bodyHtml}
                           </svg>
                         )}
                       </div>
-                      <span style={{ fontSize:12, color: idx <= loadingStep ? T.cream : "#ffffff33",
+                      <span style={{ fontSize:12, color: idx <= loadingStep ? T.cream : "#78716C",
                         fontFamily:"'DM Sans',sans-serif", textAlign:"left" }}>{step}</span>
                     </div>
                   ))}
@@ -2252,9 +2274,9 @@ ${bodyHtml}
                   display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                   <Logo size={22} light />
                   <div style={{ textAlign:"right" }}>
-                    <div style={{ fontSize:10, color:"#ffffff33",
+                    <div style={{ fontSize:10, color:"#78716C",
                       fontFamily:"monospace" }}>PERMIT ANALYSIS REPORT</div>
-                    <div style={{ fontSize:12, color:"#ffffff55",
+                    <div style={{ fontSize:12, color:"#A8A29E",
                       fontFamily:"monospace" }}>
                       {new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})}
                     </div>
@@ -2263,11 +2285,11 @@ ${bodyHtml}
 
                 {/* Address bar — orange */}
                 <div style={{ background:T.orange, padding:"16px 28px" }}>
-                  <div style={{ fontSize:10, color:"#ffffff88", fontFamily:"monospace",
+                  <div style={{ fontSize:10, color:"#D6D3D1", fontFamily:"monospace",
                     letterSpacing:"0.12em", marginBottom:4 }}>PROPERTY</div>
                   <div style={{ fontSize:18, fontFamily:"'Georgia',serif",
                     color:T.white, fontWeight:700 }}>{editStreet || address}</div>
-                  <div style={{ fontSize:13, color:"#ffffff88",
+                  <div style={{ fontSize:13, color:"#D6D3D1",
                     fontFamily:"'DM Sans',sans-serif", marginTop:2,
                     display:"flex", gap:12, flexWrap:"wrap", alignItems:"center" }}>
                     <span>{getLabel(projectType)}</span>
@@ -2292,13 +2314,13 @@ ${bodyHtml}
                     return (
                     <a key={sec}
                       href={"#sec-"+fullNames[idx].toLowerCase().replace(/[^a-z0-9]+/g,"-")}
-                      style={{ fontSize:10, color:T.muted, padding:"4px 10px",
+                      style={{ fontSize:10, color:T.secondary, padding:"4px 10px",
                         textDecoration:"none",
                         fontFamily:"monospace", letterSpacing:"0.04em",
                         border:`1px solid ${T.border}`, borderRadius:4,
                         background:T.warmGray }}
                       onMouseEnter={e=>{e.target.style.color=T.orange;e.target.style.borderColor=T.orange}}
-                      onMouseLeave={e=>{e.target.style.color=T.muted;e.target.style.borderColor=T.border}}>
+                      onMouseLeave={e=>{e.target.style.color=T.secondary;e.target.style.borderColor=T.border}}>
                       {sec}
                     </a>
                   );})}
@@ -2312,7 +2334,7 @@ ${bodyHtml}
                 {/* Listo footer */}
                 <div style={{ margin:"24px 28px 0", background:T.black,
                   borderRadius:10, padding:"16px 24px", textAlign:"center" }}>
-                  <div style={{ fontSize:10, color:"#ffffff55", lineHeight:1.6, margin:0 }}>
+                  <div style={{ fontSize:10, color:"#A8A29E", lineHeight:1.6, margin:0 }}>
                     Data sourced from City of Los Angeles ZIMAS (ArcGIS), LA County Assessor,
                     and Census/Nominatim geocoding. Data provided "as is" per ZIMAS terms at zimas.lacity.org.
                   </div>
@@ -2326,7 +2348,7 @@ ${bodyHtml}
                     <div style={{ position:"relative" }}>
                       <button onClick={handleShare}
                         style={{ display:"flex", alignItems:"center", gap:8,
-                          background:T.lime, color:T.black, border:"none",
+                          background:T.gold, color:T.black, border:"none",
                           borderRadius:8, padding:"10px 20px", fontSize:13,
                           fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
                         <svg width={14} height={14} viewBox="0 0 24 24" fill="none"
@@ -2337,9 +2359,9 @@ ${bodyHtml}
                       </button>
                       {shareToast && (
                         <div style={{ position:"absolute", bottom:"calc(100% + 8px)", left:"50%",
-                          transform:"translateX(-50%)", background:T.black, color:T.lime,
+                          transform:"translateX(-50%)", background:T.black, color:T.gold,
                           fontSize:11, padding:"5px 12px", borderRadius:6, whiteSpace:"nowrap",
-                          fontFamily:"'DM Sans',sans-serif", border:`1px solid ${T.lime}40` }}>
+                          fontFamily:"'DM Sans',sans-serif", border:`1px solid ${T.gold}40` }}>
                           ✓ Copied to clipboard
                         </div>
                       )}
@@ -2359,7 +2381,7 @@ ${bodyHtml}
                   <button onClick={() => window.open(jurisdiction?.applyUrl || jurisdiction?.agencyUrl || "https://www.ladbs.org/permits-inspections/apply-for-a-permit","_blank")}
                     style={{ display:"flex", alignItems:"center", gap:6,
                       background:"transparent", border:`1px solid ${T.border}`,
-                      color:T.muted, borderRadius:8, padding:"10px 16px",
+                      color:T.secondary, borderRadius:8, padding:"10px 16px",
                       fontSize:12, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
                     Apply at {jurisdiction?.agency||"LADBS"} →
                   </button>
@@ -2369,13 +2391,13 @@ ${bodyHtml}
                 <div style={{ padding:"16px 28px 24px", borderTop:`1px solid ${T.border}` }}
                   className="no-print">
                   {!fbDone ? (<>
-                    <div style={{ fontSize:13, color:T.muted, marginBottom:10,
+                    <div style={{ fontSize:13, color:T.secondary, marginBottom:10,
                       fontFamily:"'DM Sans',sans-serif" }}>Was this analysis accurate and useful?</div>
                     <div style={{ display:"flex", gap:8, marginBottom:fbOpen?14:0 }}>
                       <button onClick={() => { setFbState("up"); submitFeedback("up"); }}
                         style={{ fontSize:13, background:fbState==="up"?"#F0FDF4":T.white,
                           border:`1px solid ${fbState==="up"?"#BBF7D0":T.border}`,
-                          color:fbState==="up"?T.green:T.muted, borderRadius:8,
+                          color:fbState==="up"?T.green:T.secondary, borderRadius:8,
                           padding:"8px 16px", cursor:"pointer",
                           fontFamily:"'DM Sans',sans-serif" }}>
                         ✓ Accurate
@@ -2383,7 +2405,7 @@ ${bodyHtml}
                       <button onClick={() => { setFbState("down"); setFbOpen(true); }}
                         style={{ fontSize:13, background:fbState==="down"?"#FEF2F2":T.white,
                           border:`1px solid ${fbState==="down"?"#FECACA":T.border}`,
-                          color:fbState==="down"?T.red:T.muted, borderRadius:8,
+                          color:fbState==="down"?T.red:T.secondary, borderRadius:8,
                           padding:"8px 16px", cursor:"pointer",
                           fontFamily:"'DM Sans',sans-serif" }}>
                         Something's wrong
@@ -2418,7 +2440,7 @@ ${bodyHtml}
       </main>
 
       <footer style={{ borderTop:`1px solid ${T.border}`, padding:"16px 24px",
-        textAlign:"center", fontSize:11, color:T.muted,
+        textAlign:"center", fontSize:11, color:T.secondary,
         fontFamily:"'DM Sans',sans-serif" }} className="no-print">
         listo.zone · City of LA · Santa Monica · Beverly Hills · Malibu
         {" · "}Not affiliated with LADBS or any city building department.
