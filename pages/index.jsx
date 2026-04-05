@@ -376,11 +376,12 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
           densityText = parcel.lotSizeSf.toLocaleString() + " sf ÷ 800 = " + unitCount + " units by-right";
         }
         return (
-        <div style={{ background:"#1A1714", borderRadius:10, padding:"14px 18px", marginBottom:12,
-          display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 }}>
+        <div style={{ background:T.warmGray, borderRadius:10, padding:"14px 18px", marginBottom:12,
+          display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8,
+          border:`2px solid ${T.orange}30` }}>
           <div>
-            <div style={{ fontSize:10, color:T.orange, fontFamily:"monospace", letterSpacing:"0.1em" }}>DENSITY</div>
-            <div style={{ fontSize:16, fontWeight:700, color:"white", fontFamily:"Georgia,serif", marginTop:2 }}>
+            <div style={{ fontSize:10, color:T.orange, letterSpacing:"0.1em" }}>DENSITY</div>
+            <div style={{ fontSize:16, fontWeight:700, color:T.textHead, fontFamily:"Georgia,serif", marginTop:2 }}>
               {densityText}
             </div>
           </div>
@@ -606,31 +607,6 @@ function ProjectSummary({ parcel, projectType, scoreCards }) {
 }
 
 
-// ────────────────────────────────────────────────────────────────────────
-const T = {
-  orange:   "#E8620A",
-  orangeL:  "#FF7A24",
-  black:    "#1A1714",
-  cream:    "#FAF7F2",
-  warmGray: "#F0EBE3",
-  gold:     "#F5C563",
-  goldTint: "#FAECC8",
-  text:     "#44403C",
-  textHead: "#1A1714",
-  secondary:"#78716C",
-  muted:    "#A8A29E",
-  border:   "#E2D9D0",
-  green:    "#15803D",
-  yellow:   "#B45309",
-  red:      "#B91C1C",
-  white:    "#FFFFFF",
-};
-
-
-// ────────────────────────────────────────────────────────────────────────
-// BLOCK 2: Replace ReportMarkdown function (lines 605-1267 in original)
-//          with parseReportSections + SectionLines + ReportBody
-// ────────────────────────────────────────────────────────────────────────
 
 // ── Split Claude's output into sections by ## headers ─────────────────
 function parseReportSections(text) {
