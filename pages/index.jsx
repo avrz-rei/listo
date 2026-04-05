@@ -1080,7 +1080,17 @@ function ReportBody({ text, parcel, projectType, jurisdiction }) {
 
   return (
     <div style={{ padding: "16px 16px 0" }}>
-      {sections.map((section, si) => {
+      {/* Reorder sections to match prototype: Overview → Opportunity → Alerts → Standards → Permits → Survey → rest */}
+      {(() => {
+        const order = ["project overview","development opportunity","zone alert","regulation","development standard","permitting","permit road","parcel survey","hazard","housing","definition","terms","legal"];
+        const sorted = [];
+        for (const target of order) {
+          const found = sections.find(s => s.name.toLowerCase().includes(target) && !sorted.includes(s));
+          if (found) sorted.push(found);
+        }
+        for (const s of sections) { if (!sorted.includes(s)) sorted.push(s); }
+        return sorted;
+      })().map((section, si) => {
         const sn = section.name.toLowerCase();
 
         // ── PROJECT OVERVIEW ──
@@ -1262,22 +1272,41 @@ function ReportHero({ address, parcel, projectType, jurisdiction, resultText }) 
           <span style={{ fontSize: 13, color: "#E7E5E4", lineHeight: 1.4, flex: 1 }}>{kpis.verdictDesc}</span>
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* KPI strip */}
-      <div className="hero-kpi-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", borderTop: "1px solid #ffffff12" }}>
-        {[
-          { label: "MAX BUILDOUT", value: maxBuildout, color: T.gold },
-          { label: "EST. FEES", value: kpis.fees || "—", color: T.gold },
-          { label: "TIMELINE", value: (kpis.timeline || "—").replace("week critical path", "wks").replace("weeks", "wks"), color: T.white },
-          { label: "ALERTS", value: `${rc} required`, sub: `${fc} factors · ${bc} benefits`, color: parseInt(rc) > 0 ? T.red : T.green },
-        ].map((kpi, ki) => (
-          <div key={ki} style={{ padding: "14px 18px", borderRight: ki < 3 ? "1px solid #ffffff08" : "none" }}>
-            <div style={{ fontSize: 9, color: T.secondary, letterSpacing: "0.1em", marginBottom: 5 }}>{kpi.label}</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: kpi.color, fontFamily: "'Georgia',serif", marginBottom: 1 }}>{kpi.value}</div>
-            {kpi.sub && <div style={{ fontSize: 10, color: T.secondary }}>{kpi.sub}</div>}
-          </div>
-        ))}
-      </div>
+// ── KPI Strip — light background, below hero ─────────────────────────────
+function KPIStrip({ parcel, resultText }) {
+  const kpis = extractKPIs(resultText);
+  const z = (parcel?.zoning || "").toUpperCase();
+  let maxBuildout = "—";
+  if (parcel?.lotSizeSf > 0) {
+    const base = /^R1|^RS|^RE/.test(z) ? 1 : /^RD/.test(z) ? 2 : /^R4/.test(z) ? Math.floor(parcel.lotSizeSf / 400) : Math.floor(parcel.lotSizeSf / 800);
+    const tocMulti = parcel.toc === "Tier 4" ? 1.80 : parcel.toc === "Tier 3" ? 1.70 : parcel.toc === "Tier 2" ? 1.50 : parcel.toc === "Tier 1" ? 1.35 : 1;
+    const primary = Math.max(base, Math.floor(base * tocMulti));
+    const adus = /^R[2-5]|^RD/.test(z) ? 2 : 1;
+    maxBuildout = `${primary + adus + 1} units`;
+  }
+  const al = kpis.alerts || "";
+  const rc = (al.match(/(\d+)\s*(?:required|action)/i) || [0, "0"])[1];
+  const fc = (al.match(/(\d+)\s*(?:factor|caution)/i) || [0, "0"])[1];
+  const bc = (al.match(/(\d+)\s*(?:benefit|info|note)/i) || [0, "0"])[1];
+
+  return (
+    <div className="hero-kpi-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", background: T.warmGray, border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden", margin: "8px 0" }}>
+      {[
+        { label: "MAX BUILDOUT", value: maxBuildout, color: T.orange },
+        { label: "EST. FEES", value: kpis.fees || "—", color: T.textHead },
+        { label: "TIMELINE", value: (kpis.timeline || "—").replace("week critical path", "wks").replace("weeks", "wks"), color: T.textHead },
+        { label: "ALERTS", value: `${rc} required`, sub: `${fc} factors · ${bc} benefits`, color: parseInt(rc) > 0 ? T.red : T.green },
+      ].map((kpi, ki) => (
+        <div key={ki} style={{ padding: "14px 18px", borderRight: ki < 3 ? `1px solid ${T.border}` : "none", background: T.white }}>
+          <div style={{ fontSize: 9, color: T.secondary, letterSpacing: "0.1em", marginBottom: 5 }}>{kpi.label}</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: kpi.color, fontFamily: "'Georgia',serif", marginBottom: 1 }}>{kpi.value}</div>
+          {kpi.sub && <div style={{ fontSize: 10, color: T.secondary }}>{kpi.sub}</div>}
+        </div>
+      ))}
     </div>
   );
 }
@@ -2299,6 +2328,11 @@ ${bodyHtml}
               <div>
                 {/* Hero Card */}
                 <ReportHero address={editStreet || address} parcel={parcel} projectType={projectType} jurisdiction={jurisdiction} resultText={result} />
+
+                {/* KPI Strip — light background */}
+                <div style={{ padding: "0 16px" }}>
+                  <KPIStrip parcel={parcel} resultText={result} />
+                </div>
 
                 {/* Sticky Nav */}
                 <SectionNav />
