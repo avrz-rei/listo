@@ -62,7 +62,7 @@ const JURISDICTIONS = {
     name: "Beverly Hills", short: "Beverly Hills",
     agency: "Beverly Hills Building & Safety", agencyUrl: "https://www.beverlyhills.org/departments/communitydevelopment/buildingdivision/",
     applyUrl: "https://www.beverlyhills.org/departments/communitydevelopment/buildingdivision/permitapplication/",
-    covered: true, color: "#7c3aed",
+    covered: true, color: "#E8620A",
     note: "Beverly Hills has its own building department and zoning code, separate from City of LA.",
     zips: ["90210","90211","90212"],
   },
@@ -200,25 +200,25 @@ function Logo({ size = 32, light = false }) {
 // ── Flag component (from brand preview) ──────────────────────────────────
 function Flag({ level, title, meta, children }) {
   const cfg = {
-    red:    { bg:"#FEF2F2", border:"#FECACA", color:T.red,    label:"REQUIRED",
-              icon:<svg width={12} height={12} viewBox="0 0 16 16" fill="none"><path d="M8 4v5M8 11v1" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg> },
-    yellow: { bg:"#FFFBEB", border:"#FDE68A", color:T.yellow, label:"FACTOR",
-              icon:<svg width={12} height={12} viewBox="0 0 16 16" fill="none"><path d="M8 4v5M8 11v1" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg> },
-    green:  { bg:"#F0FDF4", border:"#BBF7D0", color:T.green,  label:"CLEAR",
-              icon:<svg width={12} height={12} viewBox="0 0 16 16" fill="none"><path d="M4 8.5L7 11.5L12 5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-    blue:   { bg:"#F0FDF4", border:"#BBF7D0", color:T.green,  label:"BENEFIT",
-              icon:<svg width={12} height={12} viewBox="0 0 16 16" fill="none"><path d="M4 8.5L7 11.5L12 5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-  }[level] || { bg:"#F9FAFB", border:T.border, color:T.secondary, label:"NOTE",
-              icon:<svg width={12} height={12} viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="1.5" fill="#fff"/><path d="M8 4v2" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg> };
+    red:    { bg:"#FEF2F2", border:"#FECACA", color:T.red,    label:"REQUIRED" },
+    yellow: { bg:"#FFFBEB", border:"#FDE68A", color:T.yellow, label:"FACTOR" },
+    green:  { bg:"#F0FDF4", border:"#BBF7D0", color:T.green,  label:"CLEAR" },
+    blue:   { bg:"#F0FDF4", border:"#BBF7D0", color:T.green,  label:"BENEFIT" },
+  }[level] || { bg:"#F9FAFB", border:T.border, color:T.secondary, label:"NOTE" };
+  const iconPath = level === "green" || level === "blue"
+    ? <path d="M4 8.5L7 11.5L12 5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    : <><path d="M8 4v5" stroke="#fff" strokeWidth="2" strokeLinecap="round"/><path d="M8 11v1" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></>;
 
   return (
     <div style={{ background:cfg.bg, border:`1px solid ${cfg.border}`,
       borderRadius:8, padding:"12px 14px", display:"flex", gap:12, alignItems:"flex-start" }}>
       <div style={{ width:24, height:24, borderRadius:6, background:cfg.color,
         display:"flex", alignItems:"center", justifyContent:"center",
-        flexShrink:0, marginTop:1 }}>{cfg.icon}</div>
+        flexShrink:0, marginTop:1 }}>
+        <svg width={12} height={12} viewBox="0 0 16 16" fill="none">{iconPath}</svg>
+      </div>
       <div style={{ flex:1 }}>
-        <div style={{ fontSize:9, color:cfg.color, fontFamily:"monospace",
+        <div style={{ fontSize:9, color:cfg.color,
           letterSpacing:"0.1em", marginBottom:3 }}>{cfg.label}</div>
         {title && <div style={{ fontSize:13, fontWeight:600, color:T.text, marginBottom:3 }}>{title}</div>}
         <div style={{ fontSize:13, color:T.text, lineHeight:1.6 }}>{children}</div>
@@ -234,7 +234,7 @@ function ScoreCard({ label, value, sub, color }) {
     <div style={{ background:T.white, padding:"20px 24px", borderRight:`1px solid ${T.border}` }}>
       <div style={{ fontSize:9, color:T.secondary, fontFamily:"monospace",
         letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:6 }}>{label}</div>
-      <div style={{ fontSize:22, fontWeight:700, color: color||T.textHead,
+      <div style={{ fontSize:22, fontWeight:700, color: color||T.text,
         fontFamily:"'Georgia',serif", marginBottom:4 }}>{value}</div>
       <div style={{ fontSize:11, color:T.secondary }}>{sub}</div>
     </div>
@@ -278,7 +278,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
     if (flagged || yes === true) return (
       <span style={{ fontSize:10, fontWeight:600, padding:"2px 8px", borderRadius:4,
         background: flagged ? "#FEE2E2" : "#D1FAE5", color: flagged ? "#991B1B" : "#065F46",
-        fontFamily:"monospace" }}>{flagged ? "YES" : typeof value === "string" ? value : "YES"}</span>
+        fontFamily:"monospace" }}>{flagged ? "YES — ACTION" : typeof value === "string" ? value : "YES"}</span>
     );
     return (
       <span style={{ fontSize:10, fontWeight:600, padding:"2px 8px", borderRadius:4,
@@ -293,8 +293,8 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
       {typeof value === "string" || typeof value === "number" ? (
         <div style={{ display:"flex", alignItems:"center", gap:6, flex:"0 0 auto" }}>
           <span style={{ fontSize:12, fontWeight:600, color: bold ? T.black : "#374151" }}>{value}</span>
-          <span style={{ display:"flex", alignItems:"center", gap:3, fontSize:9, fontWeight:600, padding:"2px 6px", borderRadius:3,
-            background:T.green+"18", color:T.green, fontFamily:"monospace" }}>
+          <span style={{ fontSize:9, fontWeight:600, padding:"2px 6px", borderRadius:3,
+            background:T.green+"18", color:T.green, display:"flex", alignItems:"center", gap:3 }}>
             <svg width={9} height={9} viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke={T.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             ZIMAS</span>
         </div>
@@ -311,7 +311,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
       borderLeft:`4px solid ${color}`, marginBottom:12, overflow:"hidden" }}>
       <div style={{ padding:"10px 16px", background:"#FAFAFA", borderBottom:"1px solid #F3F4F6" }}>
         <span style={{ fontSize:11, fontWeight:700, color, textTransform:"uppercase",
-          letterSpacing:"0.08em" }}>{title}</span>
+          letterSpacing:"0.08em", fontFamily:"monospace" }}>{title}</span>
       </div>
       <div style={{ padding:"8px 16px" }}>{children}</div>
     </div>
@@ -376,12 +376,11 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
           densityText = parcel.lotSizeSf.toLocaleString() + " sf ÷ 800 = " + unitCount + " units by-right";
         }
         return (
-        <div style={{ background:T.warmGray, borderRadius:10, padding:"14px 18px", marginBottom:12,
-          display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8,
-          border:`2px solid ${T.orange}30` }}>
+        <div style={{ background:"#1A1714", borderRadius:10, padding:"14px 18px", marginBottom:12,
+          display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 }}>
           <div>
-            <div style={{ fontSize:10, color:T.orange, letterSpacing:"0.1em" }}>DENSITY</div>
-            <div style={{ fontSize:16, fontWeight:700, color:T.textHead, fontFamily:"Georgia,serif", marginTop:2 }}>
+            <div style={{ fontSize:10, color:T.orange, fontFamily:"monospace", letterSpacing:"0.1em" }}>DENSITY</div>
+            <div style={{ fontSize:16, fontWeight:700, color:"white", fontFamily:"Georgia,serif", marginTop:2 }}>
               {densityText}
             </div>
           </div>
@@ -430,7 +429,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
         <Row label="Community Plan" value={parcel.communityPlan || null} />
         {parcel.ziCodes?.length > 0 && (
           <div style={{ marginTop:8 }}>
-            <div style={{ fontSize:10, color:T.secondary, marginBottom:4,
+            <div style={{ fontSize:10, color:T.secondary, fontFamily:"monospace", marginBottom:4,
               letterSpacing:"0.08em" }}>ZONING INFORMATION ({parcel.ziCodes.length})</div>
             <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
               {parcel.ziCodes.map((zi,i) => (
@@ -444,7 +443,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
         )}
         {parcel.overlayLayers?.length > 0 && (
           <div style={{ marginTop:8 }}>
-            <div style={{ fontSize:10, color:T.secondary, marginBottom:4,
+            <div style={{ fontSize:10, color:T.secondary, fontFamily:"monospace", marginBottom:4,
               letterSpacing:"0.08em" }}>ALL DETECTED OVERLAYS ({parcel.overlayLayers.length})</div>
             <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
               {parcel.overlayLayers.map((o,i) => (
@@ -532,7 +531,7 @@ function ProjectSummary({ parcel, projectType, scoreCards }) {
   const SRow = ({ label: l, value: v, highlight, small }) => (
     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start",
       padding: small ? "4px 0" : "6px 0", borderBottom:`1px solid ${T.border}`, gap:8 }}>
-      <span style={{ fontSize:11, color:T.secondary, letterSpacing:"0.04em",
+      <span style={{ fontSize:11, color:T.secondary, fontFamily:"monospace", letterSpacing:"0.04em",
         flexShrink:0, paddingTop:1 }}>{l}</span>
       <span style={{ fontSize:12, color: highlight ? T.orange : T.text, fontWeight: highlight ? 700 : 400,
         textAlign:"right", lineHeight:1.4 }}>{v || "—"}</span>
@@ -555,7 +554,7 @@ function ProjectSummary({ parcel, projectType, scoreCards }) {
       <div style={{ background:T.orange, padding:"12px 16px", display:"flex",
         justifyContent:"space-between", alignItems:"center" }}>
         <div style={{ fontSize:11, fontWeight:700, color:T.white, letterSpacing:"0.06em",
-          fontFamily:"'DM Sans',sans-serif" }}>PROJECT SUMMARY</div>
+          fontFamily:"monospace" }}>PROJECT SUMMARY</div>
         <span style={{ fontSize:12, fontWeight:700, color:T.white,
           fontFamily:"'Georgia',serif" }}>{label}</span>
       </div>
@@ -579,7 +578,7 @@ function ProjectSummary({ parcel, projectType, scoreCards }) {
             {sb684Eligible && <StateLawBadge name="SB 684 — Ministerial ≤10 units" status="ELIGIBLE" color="#15803d" />}
             {sb1123Eligible && <StateLawBadge name="SB 1123 — Starter homes (vacant SF lot)" status="LIKELY" color={T.yellow} />}
             {sb9Eligible && <StateLawBadge name="SB 9 — Duplex + lot split" status="ELIGIBLE" color="#15803d" />}
-            {ab2011Eligible && <StateLawBadge name="AB 2011 — Housing on commercial" status="CHECK" color="#b45309" />}
+            {ab2011Eligible && <StateLawBadge name="AB 2011 — Housing on commercial" status="CHECK" color="#d97706" />}
             {hasAB2097 && <StateLawBadge name="AB 2097 — No parking minimum" status="YES" color="#15803d" />}
             {isCoastal && <StateLawBadge name="SB 1077 — Coastal ADU streamlining (eff. July 2026)" status="PENDING" color="#6366f1" />}
           </div>
@@ -606,486 +605,284 @@ function ProjectSummary({ parcel, projectType, scoreCards }) {
   );
 }
 
-// ── Inline markdown renderer ──────────────────────────────────────────────
+
+// ────────────────────────────────────────────────────────────────────────
+const T = {
+  orange:   "#E8620A",
+  orangeL:  "#FF7A24",
+  black:    "#1A1714",
+  cream:    "#FAF7F2",
+  warmGray: "#F0EBE3",
+  gold:     "#F5C563",
+  goldTint: "#FAECC8",
+  text:     "#44403C",
+  textHead: "#1A1714",
+  secondary:"#78716C",
+  muted:    "#A8A29E",
+  border:   "#E2D9D0",
+  green:    "#15803D",
+  yellow:   "#B45309",
+  red:      "#B91C1C",
+  white:    "#FFFFFF",
+};
+
+
+// ────────────────────────────────────────────────────────────────────────
+// BLOCK 2: Replace ReportMarkdown function (lines 605-1267 in original)
+//          with parseReportSections + SectionLines + ReportBody
+// ────────────────────────────────────────────────────────────────────────
+
+// ── Split Claude's output into sections by ## headers ─────────────────
+function parseReportSections(text) {
+  const lines = (text || "").split("\n");
+  const sections = [];
+  let current = null;
+  for (const line of lines) {
+    const t = line.trim();
+    if (t.startsWith("## ")) {
+      if (current) sections.push(current);
+      const name = t.slice(3);
+      current = { name, id: "sec-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, ""), lines: [] };
+    } else if (current) {
+      current.lines.push(line);
+    }
+    // Lines before first ## are ignored (shouldn't happen with Listo's output format)
+  }
+  if (current) sections.push(current);
+  return sections;
+}
+
+// ── Extract KPIs from Claude's output for the hero card ───────────────
+function extractKPIs(text) {
+  const r = { verdict: "", verdictDesc: "", fees: "", timeline: "", alerts: "", project: "", zoning: "", units: "", data: "" };
+  for (const line of (text || "").split("\n")) {
+    const t = line.trim().replace(/\*\*/g, "");
+    if (t.startsWith("VERDICT:")) { const p = t.slice(8).trim().split("|").map(s => s.trim()); r.verdict = p[0]; r.verdictDesc = p[1] || ""; }
+    if (t.startsWith("PERMITS:")) { const p = t.slice(8).trim().split("|").map(s => s.trim()); r.fees = p[0]; r.timeline = p[1] || ""; }
+    if (t.startsWith("ALERTS:")) r.alerts = t.slice(7).trim();
+    if (t.startsWith("PROJECT:")) r.project = t.slice(8).trim();
+    if (t.startsWith("ZONING:")) r.zoning = t.slice(7).trim();
+    if (t.startsWith("UNITS:")) r.units = t.slice(6).trim();
+    if (t.startsWith("DATA:")) r.data = t.slice(5).trim();
+  }
+  return r;
+}
+
+// ── Inline markdown renderer ──────────────────────────────────────────
 function renderInline(text) {
-  return (text||"").split(/(\*\*[^*]+\*\*)/g).map((p,i) =>
+  return (text || "").split(/(\*\*[^*]+\*\*)/g).map((p, i) =>
     p.startsWith("**") && p.endsWith("**")
-      ? <strong key={i} style={{ color:T.text }}>{p.slice(2,-2)}</strong> : p
+      ? <strong key={i} style={{ color: T.text }}>{p.slice(2, -2)}</strong> : p
   );
 }
 
-// ── Report markdown renderer — light mode ─────────────────────────────────
-function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
-  const lines = text.split("\n");
+// ── Render lines within a section — preserves ALL existing parsing ─────
+function SectionLines({ lines, sectionName }) {
   const els = [];
-  let i = 0, lk = 0, sec = "", subsec = "";
-  let scoreCards = null;
-
-  // Extract score cards from Deal Summary for the header
-  const extractScoreCards = (allLines) => {
-    let verdict = "", permits = "", zoning = "";
-    for (const l of allLines) {
-      const t = l.trim();
-      if (t.startsWith("VERDICT:")) verdict = t.slice(8).trim();
-      if (t.startsWith("PERMITS:")) permits = t.slice(8).trim();
-      if (t.startsWith("ZONING:")) zoning = t.slice(7).trim();
-    }
-    const complexityMap = { GO:"Low", CAUTION:"Medium", COMPLEX:"High" };
-    const complexityColor = { GO:T.green, CAUTION:T.yellow, COMPLEX:T.red };
-    const verdictWord = (verdict.split("|")[0]||"").trim();
-    const [fees, timeline] = (permits||"").split("|").map(p=>p.trim());
-    return { verdictWord, fees, timeline, zoning, complexityMap, complexityColor };
-  };
-
-  const sc = extractScoreCards(lines);
-
-  // Render score cards block (rendered once at top of deal summary)
-  const renderScoreCardsBlock = () => (
-    <div key="score-cards" style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr",
-      background:T.border, gap:1, marginBottom:24, borderRadius:8, overflow:"hidden",
-      border:`1px solid ${T.border}` }}>
-      <ScoreCard
-        label="Permit Complexity"
-        value={sc.complexityMap[sc.verdictWord] || "—"}
-        sub={sc.verdictWord === "GO" ? "Standard pathway" : sc.verdictWord === "CAUTION" ? "2–3 review rounds typical" : "Entitlement likely required"}
-        color={sc.complexityColor[sc.verdictWord] || T.text}
-      />
-      <ScoreCard
-        label="Est. Timeline"
-        value={(sc.timeline||"").replace("week critical path","wks").replace("weeks","wks")||"—"}
-        sub="From submittal to approval"
-        color={T.black}
-      />
-      <ScoreCard
-        label="Est. Permit Fees"
-        value={(sc.fees||"").replace("estimated fees","").trim()||"—"}
-        sub={`${jurisdiction?.short||"City of LA"} fee schedule`}
-        color={T.orange}
-      />
-    </div>
-  );
-
-  let scoreCardsRendered = false;
+  let i = 0, lk = 0;
+  const sec = sectionName.toLowerCase();
+  let subsec = "";
+  const inSec = (s) => sec.includes(s) || subsec.includes(s);
 
   while (i < lines.length) {
     const line = lines[i];
     const t = line.trim();
+    if (!t || t === "---") { els.push(<div key={i} style={{ height: 5 }} />); i++; continue; }
 
-    // Section headers — push marker for post-processing into cards
-    if (t.startsWith("## ")) {
-      sec = t.slice(3).toLowerCase();
-      subsec = ""; // reset subsection
-      const id = "sec-" + sec.replace(/[^a-z0-9]+/g,"-").replace(/-+$/,"");
-      const noCard = sec.includes("parcel survey"); // survey uses its own card grid
-
-      // Push a marker (not a React element) — post-processing wraps in cards
-      els.push({ __section: true, id, title: t.slice(3), noCard });
-
-      // ── Project Overview: inject stats grid, skip KPIs (hero has them) ──
-      if ((sec.includes("project overview") || sec.includes("deal")) && !scoreCardsRendered) {
-        scoreCardsRendered = true;
-        i++;
-        // Parse KPI lines
-        const kpiData = {};
-        while (i < lines.length && !lines[i].trim().startsWith("## ")) {
-          const ktRaw = lines[i].trim();
-          if (!ktRaw) { i++; continue; }
-          const kt = ktRaw.replace(/\*\*/g, "");
-          if (kt.startsWith("VERDICT:")) { const pts = kt.slice(8).trim().split("|").map(p=>p.trim()); kpiData.verdict = pts[0]; kpiData.verdictDesc = pts[1]||""; }
-          if (kt.startsWith("ZONING:")) kpiData.zoning = kt.slice(7).trim();
-          if (kt.startsWith("UNITS:")) kpiData.units = kt.slice(6).trim();
-          i++;
-        }
-        // Stats grid
-        els.push(
-          <div key="overview-stats" className="overview-stats-grid" style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:10, marginBottom:14 }}>
-            {[
-              { label:"ZONING", value:parcel?.zoning||"—", sub:(kpiData.zoning||"").split("|").pop()?.trim()||"" },
-              { label:"LOT SIZE", value:parcel?.lotSizeSf ? parcel.lotSizeSf.toLocaleString()+" sf" : "—", sub:parcel?.apn ? "APN "+parcel.apn : "" },
-              { label:"EXISTING", value:(parcel?.existingBuildingSqft||"—")+" sf / "+(parcel?.existingUnits||"—")+" unit", sub:parcel?.yearBuilt ? "Built "+parcel.yearBuilt : "" },
-              { label:"JURISDICTION", value:jurisdiction?.short||"City of LA", sub:jurisdiction?.agency||"LADBS" },
-            ].map((s,si) => (
-              <div key={si} style={{ background:T.warmGray, borderRadius:8, padding:"10px 12px" }}>
-                <div style={{ fontSize:9, color:T.secondary, letterSpacing:"0.1em", marginBottom:4 }}>{s.label}</div>
-                <div style={{ fontSize:14, fontWeight:700, color:T.textHead, fontFamily:"'Georgia',serif" }}>{s.value}</div>
-                <div style={{ fontSize:10, color:T.secondary }}>{s.sub}</div>
-              </div>
-            ))}
-          </div>
-        );
-        // Existing structure warning
-        if (parcel?.yearBuilt && parcel?.heReplacement) {
-          els.push(
-            <div key="he-warning" style={{ background:"#FFFBEB", border:"1px solid #FDE68A", borderRadius:8, padding:"10px 14px", fontSize:12, color:"#92400E", lineHeight:1.6 }}>
-              <strong>Existing structure:</strong> {parcel.yearBuilt}, {parcel.existingUnits||"?"} unit{(parcel.existingUnits||0)>1?"s":""}, {parcel.existingBuildingSqft||"?"} sf{parcel.rso ? ", RSO" : ", non-RSO"} — demolition triggers HE Replacement
-            </div>
-          );
-        }
-        continue;
-      }
-
-      // ── Development Opportunity: inject scenario cards ──
-      if (sec.includes("opportunity") && parcel) {
-        els.push(<DensityScenarios key="density-scenarios" parcel={parcel} />);
-        i++; continue;
-      }
-
-      // ── Zone Alerts: inject summary bar ──
-      if (sec.includes("alert")) {
-        els.push(<AlertsSummaryBar key="alerts-summary" resultText={text} />);
-        i++; continue;
-      }
-
-      // ── Parcel Survey: visual cards + project summary side by side ──
-      if (sec.includes("parcel survey") && parcel) {
-        els.push(
-          <div key="survey-grid" className="survey-grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, alignItems:"flex-start" }}>
-            <div><ParcelSurveyCards parcel={parcel} /></div>
-            <div><ProjectSummary parcel={parcel} projectType={projectType} scoreCards={sc} /></div>
-          </div>
-        );
-        i++;
-        while (i < lines.length && !lines[i].trim().startsWith("## ")) { i++; }
-        continue;
-      }
-      i++; continue;
-    }
-
+    // Subsection headers
     if (t.startsWith("### ")) {
       subsec = t.slice(4).toLowerCase();
-      els.push(<h3 key={i} style={{ fontSize:13, fontWeight:700, color:T.textHead,
-        margin:"14px 0 8px", background:T.warmGray, padding:"4px 10px", borderRadius:4 }}>
+      els.push(<h3 key={i} style={{ fontSize: 13, fontWeight: 700, color: T.textHead,
+        margin: "14px 0 8px", background: T.warmGray, padding: "4px 10px", borderRadius: 4 }}>
         {renderInline(t.slice(4))}
       </h3>);
       i++; continue;
     }
     if (t.startsWith("#### ")) {
-      els.push(<h3 key={i} style={{ fontSize:12, fontWeight:700, color:T.orange,
-        margin:"10px 0 6px", fontFamily:"monospace", letterSpacing:"0.05em" }}>
+      els.push(<h3 key={i} style={{ fontSize: 12, fontWeight: 700, color: T.orange,
+        margin: "10px 0 6px", letterSpacing: "0.05em" }}>
         {t.slice(5)}
       </h3>);
       i++; continue;
     }
-    if (!t || t === "---") { els.push(<div key={i} style={{ height:"5px" }} />); i++; continue; }
 
-    // Helper: check if current section or subsection matches
-    const inSec = (s) => sec.includes(s) || subsec.includes(s);
-
-    // Zone Alerts — render as Flag components
+    // ── Zone Alerts — flag cards with icon squares ──
     if (sec.includes("alert") && t.includes("|") && t.split("|").length >= 2) {
-      const pts = t.split("|").map(p=>p.trim());
+      const pts = t.split("|").map(p => p.trim());
       const [sev, name, dollar, time] = pts;
-      const levelMap = {
-        "REQUIRED":"red", "ACTION REQUIRED":"red", "CRITICAL":"red",
-        "FACTOR":"yellow", "CAUTION":"yellow",
-        "BENEFIT":"green", "NOTE":"green", "INFO":"green",
-        "CLEAR":"green"
-      };
+      const levelMap = { "REQUIRED": "red", "ACTION REQUIRED": "red", "CRITICAL": "red", "FACTOR": "yellow", "CAUTION": "yellow", "BENEFIT": "green", "NOTE": "green", "INFO": "green", "CLEAR": "green" };
       const level = levelMap[sev] || "green";
-      const displayLabel = level === "red" ? "REQUIRED"
-        : level === "yellow" ? "FACTOR"
-        : "BENEFIT";
-      let desc = "";
-      if (i+1 < lines.length && !lines[i+1].trim().includes("|") && lines[i+1].trim()) {
-        desc = lines[i+1].trim(); i++;
-      }
-      const meta = [dollar, time ? `+${time}` : ""].filter(Boolean).join(" · ");
-      const cfgOverride = level === "red"
-        ? { bg:"#FEF2F2", border:"#FECACA", color:T.red, label:displayLabel }
+      const displayLabel = level === "red" ? "REQUIRED" : level === "yellow" ? "FACTOR" : "BENEFIT";
+      const cfg = level === "red"
+        ? { bg: "#FEF2F2", border: "#FECACA", color: T.red }
         : level === "yellow"
-        ? { bg:"#FFFBEB", border:"#FDE68A", color:T.yellow, label:displayLabel }
-        : { bg:"#F0FDF4", border:"#BBF7D0", color:T.green, label:displayLabel };
+        ? { bg: "#FFFBEB", border: "#FDE68A", color: T.yellow }
+        : { bg: "#F0FDF4", border: "#BBF7D0", color: T.green };
       const iconPath = level === "green"
-        ? <path d="M4 8.5L7 11.5L12 5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        : <><path d="M8 4v5" stroke="#fff" strokeWidth="2" strokeLinecap="round"/><path d="M8 11v1" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></>;
-      els.push(<div key={i} style={{ marginBottom:8 }}>
-        <div style={{ background:cfgOverride.bg, border:`1px solid ${cfgOverride.border}`,
-          borderRadius:8, padding:"14px 16px", display:"flex", gap:14, alignItems:"flex-start" }}>
-          <div style={{ width:24, height:24, borderRadius:6, background:cfgOverride.color,
-            display:"flex", alignItems:"center", justifyContent:"center",
-            flexShrink:0, marginTop:1 }}>
+        ? <path d="M4 8.5L7 11.5L12 5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        : <><path d="M8 4v5" stroke="#fff" strokeWidth="2" strokeLinecap="round" /><path d="M8 11v1" stroke="#fff" strokeWidth="2" strokeLinecap="round" /></>;
+      let desc = "";
+      if (i + 1 < lines.length && !lines[i + 1].trim().includes("|") && lines[i + 1].trim()) {
+        desc = lines[i + 1].trim(); i++;
+      }
+      els.push(<div key={i} style={{ marginBottom: 8 }}>
+        <div style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 10, padding: "14px 16px", display: "flex", gap: 14, alignItems: "flex-start" }}>
+          <div style={{ width: 24, height: 24, borderRadius: 6, background: cfg.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
             <svg width={12} height={12} viewBox="0 0 16 16" fill="none">{iconPath}</svg>
           </div>
-          <div style={{ flex:1 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
               <div>
-                <div style={{ fontSize:9, color:cfgOverride.color, fontFamily:"monospace",
-                  letterSpacing:"0.1em", marginBottom:2 }}>{cfgOverride.label}</div>
-                {name && <div style={{ fontSize:13, fontWeight:600, color:T.text }}>{name}</div>}
+                <div style={{ fontSize: 9, color: cfg.color, letterSpacing: "0.1em", marginBottom: 2 }}>{displayLabel}</div>
+                {name && <div style={{ fontSize: 14, fontWeight: 600, color: T.textHead }}>{name}</div>}
               </div>
               {dollar && dollar !== "Variable" && dollar !== "Benefit" && dollar !== "None" && (
-                <span style={{ fontSize:13, fontWeight:700, color:cfgOverride.color, whiteSpace:"nowrap" }}>{dollar}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: cfg.color, whiteSpace: "nowrap" }}>{dollar}</span>
               )}
             </div>
-            <div style={{ fontSize:13, color:T.text, lineHeight:1.6, marginTop:2 }}>{desc}</div>
-            {meta && <div style={{ fontSize:11, color:T.secondary, marginTop:4 }}>{meta}</div>}
+            <div style={{ fontSize: 13, color: T.text, lineHeight: 1.6, marginTop: 2 }}>{desc}</div>
+            {(dollar || time) && <div style={{ fontSize: 11, color: T.secondary, marginTop: 4 }}>
+              {dollar && dollar !== "Variable" && dollar !== "Benefit" ? dollar : ""}{time && time !== "—" && time !== "Variable" ? (dollar && dollar !== "Variable" && dollar !== "Benefit" ? " · " : "") + "+" + time : ""}
+            </div>}
           </div>
         </div>
       </div>);
       i++; continue;
     }
 
-    // Permit roadmap cards
-    if ((inSec("roadmap")||inSec("road map")||inSec("permit")) && t.includes("|") && t.split("|").length >= 3) {
-      const [name,type,agency,time,cost] = t.split("|").map(p=>p.trim());
-      const isOTC = (type||"").toUpperCase()==="OTC";
-      const isSpecial = (type||"").toUpperCase().includes("SPECIAL");
-      const badgeStyle = {
-        OTC:    { bg:T.green+"20",  color:T.green,  border:T.green+"40",  label:"OTC" },
-        SPECIAL:{ bg:T.orange+"20", color:T.orange, border:T.orange+"40", label:"SPECIAL" },
-        DEFAULT:{ bg:T.warmGray,     color:T.secondary, border:T.border,    label:"PLAN CHECK" },
-      };
-      const b = isOTC ? badgeStyle.OTC : isSpecial ? badgeStyle.SPECIAL : badgeStyle.DEFAULT;
+    // ── Permit roadmap cards ──
+    if ((inSec("roadmap") || inSec("road map") || inSec("permit")) && t.includes("|") && t.split("|").length >= 3) {
+      const [name2, type, agency, time2, cost] = t.split("|").map(p => p.trim());
+      const isOTC = (type || "").toUpperCase() === "OTC";
+      const b = isOTC
+        ? { bg: T.green + "20", color: T.green, border: T.green + "40", label: "OTC" }
+        : { bg: T.warmGray, color: T.secondary, border: T.border, label: "PLAN CHECK" };
       els.push(
-        <div key={i} style={{ background:T.white, border:`1px solid ${T.border}`,
-          borderRadius:8, padding:"10px 14px", marginBottom:6, display:"flex",
-          alignItems:"center", gap:10, flexWrap:"wrap" }}>
-          <span style={{ fontSize:13, fontWeight:600, color:T.text, flex:1 }}>{name}</span>
-          <span style={{ fontSize:9, fontWeight:700, letterSpacing:"0.08em",
-            background:b.bg, color:b.color, border:`1px solid ${b.border}`,
-            borderRadius:3, padding:"2px 8px" }}>{b.label}</span>
-          <div style={{ display:"flex", flexWrap:"wrap", gap:12, fontSize:12, color:T.secondary }}>
+        <div key={i} style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 8, padding: "10px 14px", marginBottom: 4, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: T.text, flex: 1 }}>{name2}</span>
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", background: b.bg, color: b.color, border: `1px solid ${b.border}`, borderRadius: 3, padding: "2px 8px" }}>{b.label}</span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 12, color: T.secondary }}>
             {agency && <span>{agency}</span>}
-            {time && <span>{time}</span>}
-            {cost && <span style={{ color:T.orange, fontWeight:600 }}>{cost}</span>}
+            {time2 && <span>{time2}</span>}
+            {cost && <span style={{ color: T.orange, fontWeight: 600 }}>{cost}</span>}
           </div>
         </div>
       );
       i++; continue;
     }
 
-    // Development Standards section — pipe-delimited table + EXEMPTION rows
-    if (inSec("development standards")) {
-      if (t.startsWith("ZONING:") && !t.includes("DENSITY")) {
-        els.push(<div key={i} style={{ fontSize:13, fontWeight:600, color:T.text,
-          marginBottom:12, paddingBottom:8, borderBottom:`1px solid ${T.border}` }}>
+    // ── Development Standards table ──
+    if (inSec("standard") || inSec("regulation")) {
+      if (t.startsWith("ZONING:") && !t.includes("|")) {
+        els.push(<div key={i} style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 12, paddingBottom: 8, borderBottom: `1px solid ${T.border}` }}>
           {renderInline(t)}
         </div>);
         i++; continue;
       }
       if (t === "STANDARD | MAX ALLOWED | PROPOSED/TYPICAL | LAMC REF" || t === "STANDARD | MAX ALLOWED | PROPOSED | LAMC REF") {
-        // render table header
-        els.push(<div key={i} style={{ display:"grid",
-          gridTemplateColumns:"2fr 1.8fr 1.5fr 1.2fr",
-          background:T.black, marginBottom:1, borderRadius:"6px 6px 0 0" }}>
-          {["STANDARD","MAX ALLOWED","PROPOSED","LAMC REF"].map((h,hi) => (
-            <div key={hi} style={{ padding:"7px 10px", fontSize:9, fontWeight:700,
-              color:T.orange, fontFamily:"monospace", letterSpacing:"0.08em" }}>{h}</div>
+        els.push(<div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1.8fr 1.5fr 1.2fr", background: T.black, marginBottom: 1, borderRadius: "6px 6px 0 0" }}>
+          {["STANDARD", "MAX ALLOWED", "PROPOSED", "LAMC REF"].map((h, hi) => (
+            <div key={hi} style={{ padding: "7px 10px", fontSize: 9, fontWeight: 700, color: T.orange, letterSpacing: "0.08em" }}>{h}</div>
           ))}
         </div>);
         i++;
-        // Render all following pipe rows as table rows until non-pipe or EXEMPTION/ENCROACHMENT/GRADING etc.
         let rowIdx = 0;
         while (i < lines.length) {
           const rt = lines[i].trim();
-          if (!rt || rt.startsWith("##") || rt.startsWith("EXEMPTION:") ||
-              rt.startsWith("ENCROACHMENT") || rt.startsWith("GRADING:") ||
-              rt.startsWith("BASEMENT:") || rt.startsWith("FIRE SPRINKLERS:") ||
-              rt.startsWith("OFFSET PLAN") || rt.startsWith("SWIMMING POOL:") ||
-              rt.startsWith("PARKING STALLS:") || rt.startsWith("Analysis as of")) break;
+          if (!rt || rt.startsWith("##") || rt.startsWith("EXEMPTION:") || rt.startsWith("ENCROACHMENT") || rt.startsWith("GRADING:") || rt.startsWith("BASEMENT:") || rt.startsWith("FIRE SPRINKLERS:") || rt.startsWith("OFFSET PLAN") || rt.startsWith("SWIMMING POOL:") || rt.startsWith("PARKING STALLS:") || rt.startsWith("Analysis as of")) break;
           if (rt.includes("|") && rt.split("|").length >= 2) {
-            const cells = rt.split("|").map(p=>p.trim());
+            const cells = rt.split("|").map(p => p.trim());
             const [std, maxA, prop, lamc] = cells;
-            els.push(<div key={"dsr"+i} style={{ display:"grid",
-              gridTemplateColumns:"2fr 1.8fr 1.5fr 1.2fr",
-              background: rowIdx%2===0 ? T.white : T.warmGray,
-              borderBottom:`1px solid ${T.border}` }}>
-              <div style={{ padding:"8px 10px", fontSize:12, fontWeight:600, color:T.text }}>{renderInline(std)}</div>
-              <div style={{ padding:"8px 10px", fontSize:12, color:T.green, fontWeight:500 }}>{renderInline(maxA||"")}</div>
-              <div style={{ padding:"8px 10px", fontSize:12, color:T.secondary }}>{renderInline(prop||"")}</div>
-              <div style={{ padding:"8px 10px", fontSize:11, color:T.secondary, fontFamily:"monospace" }}>{lamc||""}</div>
+            els.push(<div key={"dsr" + i} style={{ display: "grid", gridTemplateColumns: "2fr 1.8fr 1.5fr 1.2fr", background: rowIdx % 2 === 0 ? T.white : T.warmGray, borderBottom: `1px solid ${T.border}` }}>
+              <div style={{ padding: "8px 10px", fontSize: 12, fontWeight: 600, color: T.text }}>{renderInline(std)}</div>
+              <div style={{ padding: "8px 10px", fontSize: 12, color: T.green, fontWeight: 500 }}>{renderInline(maxA || "")}</div>
+              <div style={{ padding: "8px 10px", fontSize: 12, color: T.secondary }}>{renderInline(prop || "")}</div>
+              <div style={{ padding: "8px 10px", fontSize: 11, color: T.secondary, fontFamily: "monospace" }}>{lamc || ""}</div>
             </div>);
             rowIdx++;
           }
           i++;
         }
-        els.push(<div key={"dsbot"+i} style={{ height:8 }} />);
         continue;
       }
       if (t.startsWith("EXEMPTION:")) {
         const rest = t.slice(10).trim();
-        const parts = rest.split("|").map(p=>p.trim());
+        const parts = rest.split("|").map(p => p.trim());
         const [desc, amount, lamc] = parts;
-        els.push(<div key={i} style={{ display:"flex", gap:8, alignItems:"flex-start",
-          padding:"7px 10px", background:"#FFF8F0", border:`1px solid ${T.orange}30`,
-          borderRadius:5, marginBottom:4 }}>
-          <span style={{ fontSize:9, fontWeight:700, color:T.orange, fontFamily:"monospace",
-            letterSpacing:"0.08em", minWidth:70, marginTop:1, flexShrink:0 }}>EXEMPT</span>
-          <span style={{ fontSize:12, color:T.text, flex:1, lineHeight:1.5 }}>{renderInline(desc)}</span>
-          {amount && <span style={{ fontSize:11, color:T.orange, fontWeight:600, whiteSpace:"nowrap" }}>{amount}</span>}
-          {lamc && <span style={{ fontSize:10, color:T.secondary, fontFamily:"monospace", whiteSpace:"nowrap" }}>{lamc}</span>}
+        els.push(<div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "7px 10px", background: "#FFF8F0", border: `1px solid ${T.orange}30`, borderRadius: 5, marginBottom: 4 }}>
+          <span style={{ fontSize: 9, fontWeight: 700, color: T.orange, letterSpacing: "0.08em", minWidth: 70, marginTop: 1, flexShrink: 0 }}>EXEMPT</span>
+          <span style={{ fontSize: 12, color: T.text, flex: 1, lineHeight: 1.5 }}>{renderInline(desc)}</span>
+          {amount && <span style={{ fontSize: 11, color: T.orange, fontWeight: 600, whiteSpace: "nowrap" }}>{amount}</span>}
+          {lamc && <span style={{ fontSize: 10, color: T.secondary, fontFamily: "monospace", whiteSpace: "nowrap" }}>{lamc}</span>}
         </div>);
         i++; continue;
       }
-      // Technical spec rows: ENCROACHMENT, GRADING, BASEMENT, FIRE SPRINKLERS, OFFSET, POOL, PARKING
-      if (t.startsWith("ENCROACHMENT PLANE:") || t.startsWith("GRADING:") ||
-          t.startsWith("BASEMENT:") || t.startsWith("FIRE SPRINKLERS:") ||
-          t.startsWith("OFFSET PLAN BREAK:") || t.startsWith("SWIMMING POOL:") ||
-          t.startsWith("PARKING STALLS:")) {
+      // Technical spec rows
+      if (/^(ENCROACHMENT PLANE:|GRADING:|BASEMENT:|FIRE SPRINKLERS:|OFFSET PLAN BREAK:|SWIMMING POOL:|PARKING STALLS:)/i.test(t)) {
         const colonIdx = t.indexOf(":");
-        const label = t.slice(0, colonIdx);
-        const val = t.slice(colonIdx+1).trim();
-        els.push(<div key={i} style={{ display:"flex", gap:10, padding:"6px 0",
-          borderBottom:`1px solid ${T.border}`, alignItems:"flex-start" }}>
-          <span style={{ fontSize:9, fontWeight:700, color:T.secondary, fontFamily:"monospace",
-            letterSpacing:"0.06em", minWidth:110, flexShrink:0, paddingTop:2 }}>{label}</span>
-          <span style={{ fontSize:12, color:T.text, lineHeight:1.6 }}>{renderInline(val)}</span>
+        const lbl = t.slice(0, colonIdx);
+        const val = t.slice(colonIdx + 1).trim();
+        els.push(<div key={i} style={{ display: "flex", gap: 10, padding: "6px 0", borderBottom: `1px solid ${T.border}`, alignItems: "flex-start" }}>
+          <span style={{ fontSize: 9, fontWeight: 700, color: T.secondary, fontFamily: "monospace", minWidth: 110, flexShrink: 0, paddingTop: 2 }}>{lbl}</span>
+          <span style={{ fontSize: 12, color: T.text, lineHeight: 1.6 }}>{renderInline(val)}</span>
         </div>);
         i++; continue;
       }
-      // "Analysis as of" date stamp
       if (t.toLowerCase().startsWith("analysis as of") || t.toLowerCase().startsWith("lamc standards")) {
-        els.push(<div key={i} style={{ fontSize:11, color:T.secondary, fontStyle:"italic",
-          padding:"8px 0", marginTop:4 }}>{renderInline(t)}</div>);
+        els.push(<div key={i} style={{ fontSize: 11, color: T.secondary, fontStyle: "italic", padding: "8px 0", marginTop: 4 }}>{renderInline(t)}</div>);
         i++; continue;
       }
     }
 
-    // Development Opportunity metric cards
-    if (sec.includes("opportunity") || (sec.includes("zoning") && !sec.includes("alert"))) {
+    // ── Development Opportunity metrics ──
+    if (sec.includes("opportunity")) {
       if (t.startsWith("USES PERMITTED:")) {
-        els.push(<div key={i} style={{ background:T.warmGray, border:`1px solid ${T.border}`,
-          borderRadius:6, padding:"10px 14px", marginBottom:8, marginTop:8 }}>
-          <div style={{ fontSize:9, fontWeight:700, color:T.orange, letterSpacing:"0.1em",
-            fontFamily:"monospace", marginBottom:4 }}>USES PERMITTED</div>
-          <div style={{ fontSize:13, color:T.text, lineHeight:1.6 }}>{renderInline(t.slice(15).trim())}</div>
+        els.push(<div key={i} style={{ background: T.warmGray, border: `1px solid ${T.border}`, borderRadius: 6, padding: "10px 14px", marginBottom: 8, marginTop: 8 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: T.orange, letterSpacing: "0.1em", marginBottom: 4 }}>USES PERMITTED</div>
+          <div style={{ fontSize: 13, color: T.text, lineHeight: 1.6 }}>{renderInline(t.slice(15).trim())}</div>
         </div>);
         i++; continue;
       }
-      if (t.startsWith("BUILDABLE AREA:")) {
-        els.push(<div key={i} style={{ background:T.warmGray, border:`1px solid ${T.border}`,
-          borderRadius:6, padding:"8px 12px", marginBottom:6, display:"flex", gap:8 }}>
-          <span style={{ fontSize:9, fontWeight:700, color:T.secondary, letterSpacing:"0.1em",
-            fontFamily:"monospace" }}>BUILDABLE</span>
-          <span style={{ fontSize:13, color:T.text }}>{t.slice(15).trim()}</span>
-        </div>);
-        i++; continue;
+      for (const prefix of ["DENSITY MATH:", "BUILDABLE AREA:", "MAX FLOOR AREA:", "MAX BUILDOUT:", "TOC BONUS:", "ADU:", "EXISTING STRUCTURE:"]) {
+        if (t.startsWith(prefix)) {
+          const val = t.slice(prefix.length).trim();
+          const isHighlight = prefix === "DENSITY MATH:" || prefix === "MAX BUILDOUT:";
+          const color = isHighlight ? T.green : T.text;
+          els.push(<div key={i} style={{ background: isHighlight ? T.green + "10" : T.warmGray, border: `1px solid ${isHighlight ? T.green + "40" : T.border}`, borderRadius: 6, padding: isHighlight ? "12px 14px" : "8px 12px", marginBottom: 6, display: "flex", gap: 8, alignItems: isHighlight ? "flex-start" : "center", flexDirection: isHighlight ? "column" : "row" }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: isHighlight ? T.green : T.secondary, letterSpacing: "0.1em" }}>{prefix.slice(0, -1)}</span>
+            <span style={{ fontSize: isHighlight ? 18 : 13, fontWeight: isHighlight ? 700 : 400, color, fontFamily: isHighlight ? "'Georgia',serif" : "inherit" }}>{val}</span>
+          </div>);
+          i++; break;
+        }
       }
-      if (t.startsWith("MAX FLOOR AREA:")) {
-        els.push(<div key={i} style={{ background:T.warmGray, border:`1px solid ${T.border}`,
-          borderRadius:6, padding:"8px 12px", marginBottom:6, display:"flex", gap:8 }}>
-          <span style={{ fontSize:9, fontWeight:700, color:T.orange, letterSpacing:"0.1em",
-            fontFamily:"monospace" }}>MAX FLOOR</span>
-          <span style={{ fontSize:13, color:T.text, fontWeight:600 }}>{t.slice(15).trim()}</span>
-        </div>);
-        i++; continue;
-      }
-      if (t.startsWith("DENSITY MATH:")) {
-        els.push(<div key={i} style={{ background:"#F0FDF4", border:`2px solid ${T.green}`,
-          borderRadius:8, padding:"14px 16px", marginBottom:10, marginTop:8 }}>
-          <div style={{ fontSize:9, fontWeight:700, color:T.green, letterSpacing:"0.12em",
-            fontFamily:"monospace", marginBottom:4 }}>DENSITY MATH</div>
-          <div style={{ fontSize:20, fontWeight:700, color:T.green,
-            fontFamily:"'Georgia',serif" }}>{t.slice(13).trim()}</div>
-        </div>);
-        i++; continue;
-      }
-      if (t.startsWith("MAX BUILDOUT:")) {
-        els.push(<div key={i} style={{ background:T.orange+"12", border:`2px solid ${T.orange}`,
-          borderRadius:8, padding:"14px 16px", marginBottom:10 }}>
-          <div style={{ fontSize:9, fontWeight:700, color:T.orange, letterSpacing:"0.12em",
-            fontFamily:"monospace", marginBottom:4 }}>MAX BUILDOUT</div>
-          <div style={{ fontSize:20, fontWeight:700, color:T.orange,
-            fontFamily:"'Georgia',serif" }}>{t.slice(13).trim()}</div>
-        </div>);
-        i++; continue;
-      }
-      if (t.startsWith("TOC BONUS:")) {
-        const val = t.slice(10).trim();
-        const eligible = !/not applicable|not eligible/i.test(val);
-        els.push(<div key={i} style={{ background:eligible?T.orange+"10":"#F9FAFB",
-          border:`1px solid ${eligible?T.orange+"40":T.border}`, borderRadius:6,
-          padding:"8px 12px", marginBottom:6, display:"flex", gap:8, alignItems:"center" }}>
-          <span style={{ fontSize:9, fontWeight:700, color:eligible?T.orange:T.secondary,
-            letterSpacing:"0.1em", fontFamily:"monospace" }}>TOC</span>
-          <span style={{ fontSize:13, color:eligible?T.orange:T.secondary }}>{val}</span>
-        </div>);
-        i++; continue;
-      }
-      if (t.startsWith("ADU:")) {
-        els.push(<div key={i} style={{ background:T.warmGray, border:`1px solid ${T.border}`,
-          borderRadius:6, padding:"8px 12px", marginBottom:6, display:"flex", gap:8 }}>
-          <span style={{ fontSize:9, fontWeight:700, color:T.secondary, letterSpacing:"0.1em",
-            fontFamily:"monospace" }}>ADU</span>
-          <span style={{ fontSize:13, color:T.text }}>{t.slice(4).trim()}</span>
-        </div>);
-        i++; continue;
-      }
-      if (t.startsWith("EXISTING STRUCTURE:")) {
-        els.push(<div key={i} style={{ background:T.warmGray, border:`1px solid ${T.border}`,
-          borderRadius:6, padding:"8px 12px", marginBottom:6, display:"flex", gap:8 }}>
-          <span style={{ fontSize:9, fontWeight:700, color:T.secondary, letterSpacing:"0.1em",
-            fontFamily:"monospace" }}>EXISTING</span>
-          <span style={{ fontSize:13, color:T.secondary }}>{t.slice(19).trim()}</span>
-        </div>);
-        i++; continue;
-      }
+      if (i < lines.length && lines[i].trim() === t) { /* didn't match any prefix, fall through */ } else continue;
     }
 
-    // Documents section
-    if (inSec("document")) {
-      const cleanT = t.replace(/^\*\*|\*\*$/g, "");
-      if (cleanT === "DEMO" || cleanT === "BUILDING" || cleanT.startsWith("TECHNICAL")) {
-        els.push(<div key={i} style={{ fontSize:9, fontWeight:700, color:T.orange,
-          textTransform:"uppercase", letterSpacing:"0.12em", fontFamily:"monospace",
-          marginTop:16, marginBottom:6, paddingTop:10, borderTop:`1px solid ${T.border}` }}>
-          {cleanT}
-        </div>);
-        i++; continue;
-      }
-      if (t.includes("|")) {
-        const [name, who, stamp] = t.split("|").map(p=>p.trim());
-        const req = stamp && stamp.toUpperCase().includes("YES");
-        els.push(<div key={i} style={{ display:"flex", gap:10, padding:"8px 0",
-          borderBottom:`1px solid ${T.border}`, alignItems:"center", flexWrap:"wrap" }}>
-          <div style={{ width:18, height:18, background:T.warmGray, borderRadius:4,
-            display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-            <svg width={9} height={9} viewBox="0 0 20 20" fill="none">
-              <path d="M4 10.5L8.5 15L16 6" stroke={T.orange} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <span style={{ fontSize:13, color:T.text, flex:1 }}>{name}</span>
-          <span style={{ fontSize:11, color:T.secondary, minWidth:120 }}>{who}</span>
-          {stamp && <span style={{ fontSize:9, fontWeight:700, letterSpacing:"0.06em",
-            color:"#fff",
-            background:req?"#b91c1c":"#15803d",
-            borderRadius:3, padding:"2px 8px", whiteSpace:"nowrap",
-            fontFamily:"monospace" }}>STAMP: {req?"REQ":"NOT REQ"}</span>}
-        </div>);
-        i++; continue;
-      }
-    }
-
-    // Fee rows
+    // ── Fee summary ──
     if (inSec("fee") && t.includes("|")) {
-      const [name, basis, range] = t.split("|").map(p=>p.trim());
-      const isTotal = (name||"").toUpperCase().includes("TOTAL");
-      els.push(<div key={i} style={{ display:"flex", gap:8, padding:"7px 0",
-        borderBottom:`1px solid ${isTotal?T.orange+"50":T.border}`,
-        background:isTotal?T.orange+"08":"transparent",
-        paddingLeft:isTotal?8:0, paddingRight:isTotal?8:0,
-        borderRadius:isTotal?6:0, marginTop:isTotal?4:0 }}>
-        <span style={{ fontSize:13, color:isTotal?T.orange:T.secondary, flex:1,
-          fontWeight:isTotal?700:400 }}>{name}</span>
-        {basis && !isTotal && <span style={{ fontSize:11, color:T.border, minWidth:120 }}>{basis}</span>}
-        <span style={{ fontSize:13, color:isTotal?T.orange:T.text,
-          fontWeight:isTotal?700:500, whiteSpace:"nowrap" }}>{range}</span>
-      </div>);
+      const pts = t.split("|").map(p => p.trim());
+      const isTotal = (pts[0] || "").toUpperCase().includes("TOTAL");
+      if (isTotal) {
+        els.push(<div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0 4px", marginTop: 4, borderTop: `2px solid ${T.orange}` }}>
+          <span style={{ fontSize: 13, fontWeight: 800, color: T.textHead }}>TOTAL FEES</span>
+          <span style={{ fontSize: 18, fontWeight: 800, color: T.orange, fontFamily: "'Georgia',serif" }}>{pts[1] || ""} {pts[2] || ""}</span>
+        </div>);
+      } else {
+        els.push(<div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${T.border}`, gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{pts[0]}</div>
+            {pts[1] && <div style={{ fontSize: 11, color: T.secondary }}>{pts[1]}</div>}
+          </div>
+          <span style={{ fontSize: 13, fontWeight: 700, color: T.orange, whiteSpace: "nowrap" }}>{pts[2] || pts[1] || ""}</span>
+        </div>);
+      }
       i++; continue;
     }
 
-    // Fee excludes / notes
-    if (inSec("fee") && (t.startsWith("EXCLUDES:") || t.startsWith("Note:"))) {
-      els.push(<p key={i} style={{ fontSize:11, color:T.secondary, lineHeight:1.6,
-        marginTop:8, fontStyle:"italic" }}>{renderInline(t)}</p>);
-      i++; continue;
-    }
-
-    // Timeline — Gantt chart visualization
+    // ── Timeline — Gantt bars ──
     if (inSec("timeline")) {
-      const wm = t.match(/^(Weeks?\s[\d\-–]+)\s*:\s*(.+)$/i);
+      const wm = t.match(/^Weeks?\s([\d]+)\s*[-–]\s*([\d]+)\s*:\s*(.+)$/i);
       if (wm) {
-        // Collect ALL week lines for Gantt
         const ganttItems = [];
         let worstWeek = 0;
         while (i < lines.length) {
@@ -1097,45 +894,31 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
             if (end > worstWeek) worstWeek = end;
             i++; continue;
           }
-          // Single week: "Week 24+: ..."
           const gm2 = gl.match(/^Weeks?\s([\d]+)\+?\s*:\s*(.+)$/i);
           if (gm2) {
             const wk = parseInt(gm2[1]);
-            ganttItems.push({ start: wk, end: wk+1, label: gm2[2].trim() });
-            if (wk+1 > worstWeek) worstWeek = wk+1;
+            ganttItems.push({ start: wk, end: wk + 1, label: gm2[2].trim() });
+            if (wk + 1 > worstWeek) worstWeek = wk + 1;
             i++; continue;
           }
           break;
         }
-        if (ganttItems.length > 0 && worstWeek > 0) {
+        if (ganttItems.length > 0) {
           els.push(
-            <div key={"gantt"+i} style={{ marginBottom:12 }}>
-              {/* Week axis labels */}
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4, paddingLeft:100, fontSize:10, color:T.secondary, fontFamily:"monospace" }}>
-                {Array.from({ length: Math.min(6, Math.ceil(worstWeek/5)+1) }, (_, idx) => {
-                  const wk = Math.round(idx * worstWeek / Math.min(5, Math.ceil(worstWeek/5)));
-                  return <span key={idx}>{wk}</span>;
-                })}
+            <div key={"gantt" + i} style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, paddingLeft: 100, fontSize: 10, color: T.secondary, fontFamily: "monospace" }}>
+                {[0, Math.round(worstWeek / 4), Math.round(worstWeek / 2), Math.round(worstWeek * 3 / 4), worstWeek].map((w, wi) => <span key={wi}>{w}</span>)}
               </div>
-              {/* Bars */}
-              {ganttItems.map((bar, bi) => {
-                const shortLabel = bar.label.length > 14 ? bar.label.slice(0,14)+"…" : bar.label;
-                return (
-                  <div key={"gb"+bi} style={{ display:"flex", alignItems:"center", marginBottom:3, height:24 }}>
-                    <div style={{ width:96, fontSize:10, color:T.secondary, textAlign:"right", paddingRight:8, flexShrink:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{shortLabel}</div>
-                    <div style={{ flex:1, position:"relative", height:20 }}>
-                      <div style={{ position:"absolute",
-                        left:`${(bar.start/worstWeek)*100}%`,
-                        width:`${Math.max(((bar.end-bar.start)/worstWeek)*100, 2)}%`,
-                        height:"100%", background:T.orange+"25",
-                        borderRadius:4, border:`1px solid ${T.orange}50`,
-                        display:"flex", alignItems:"center", paddingLeft:6 }}>
-                        <span style={{ fontSize:9, color:T.orange, fontWeight:600, whiteSpace:"nowrap" }}>{bar.end-bar.start} wks</span>
-                      </div>
+              {ganttItems.map((bar, bi) => (
+                <div key={"gb" + bi} style={{ display: "flex", alignItems: "center", marginBottom: 3, height: 24 }}>
+                  <div style={{ width: 96, fontSize: 10, color: T.secondary, textAlign: "right", paddingRight: 8, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bar.label.length > 16 ? bar.label.slice(0, 16) + "…" : bar.label}</div>
+                  <div style={{ flex: 1, position: "relative", height: 20 }}>
+                    <div style={{ position: "absolute", left: `${(bar.start / worstWeek) * 100}%`, width: `${Math.max(((bar.end - bar.start) / worstWeek) * 100, 3)}%`, height: "100%", background: T.orange + "25", borderRadius: 4, border: `1px solid ${T.orange}50`, display: "flex", alignItems: "center", paddingLeft: 6 }}>
+                      <span style={{ fontSize: 9, color: T.orange, fontWeight: 600, whiteSpace: "nowrap" }}>{bar.end - bar.start} wks</span>
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           );
         }
@@ -1143,135 +926,89 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
       }
       if (t.startsWith("BEST CASE:") || t.startsWith("WORST CASE:")) {
         const isB = t.startsWith("BEST");
-        els.push(<div key={i} style={{ display:"flex", gap:8, alignItems:"center", padding:"6px 0" }}>
-          <span style={{ fontSize:10, fontWeight:700, color:T.secondary, fontFamily:"monospace",
-            letterSpacing:"0.06em", minWidth:90 }}>{isB?"BEST CASE":"WORST CASE"}</span>
-          <span style={{ fontSize:13, color:isB?T.green:T.red, fontWeight:700 }}>
-            {t.slice(t.indexOf(":")+1).trim()}
-          </span>
+        els.push(<div key={i} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0" }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: T.secondary, letterSpacing: "0.06em", minWidth: 90 }}>{isB ? "BEST CASE" : "WORST CASE"}</span>
+          <span style={{ fontSize: 13, color: isB ? T.green : T.red, fontWeight: 700 }}>{t.slice(t.indexOf(":") + 1).trim()}</span>
         </div>);
         i++; continue;
       }
     }
 
-    // Next steps
-    if (sec.includes("next") && /^\d+\./.test(t)) {
-      const rest = t.replace(/^\d+\.\s*/,"");
-      const pi = rest.indexOf("|");
-      const action = pi>0 ? rest.slice(0,pi).trim() : rest;
-      const meta = pi>0 ? rest.slice(pi+1).trim() : "";
-      const num = (t.match(/^\d+/)||[""])[0];
-      els.push(<div key={i} style={{ display:"flex", gap:12, padding:"10px 0",
-        borderBottom:`1px solid ${T.border}`, alignItems:"flex-start" }}>
-        <span style={{ fontSize:10, fontWeight:800, color:T.white, background:T.orange,
-          borderRadius:4, padding:"2px 7px", whiteSpace:"nowrap",
-          flexShrink:0, marginTop:1 }}>{num}</span>
-        <div>
-          <p style={{ fontSize:13, color:T.text, fontWeight:600, margin:0, lineHeight:1.5 }}>
-            {renderInline(action)}
-          </p>
-          {meta && <p style={{ fontSize:12, color:T.secondary, margin:"2px 0 0", lineHeight:1.5 }}>
-            {renderInline(meta)}
-          </p>}
-        </div>
+    // ── Documents ──
+    if (inSec("document")) {
+      if (t.includes("|") && t.split("|").length >= 2) {
+        const [dn, dw, ds] = t.split("|").map(p => p.trim());
+        const isHeader = /^(DEMO|BUILDING|TECHNICAL)/.test(dn);
+        const req = ds && ds.includes("REQ") && !ds.includes("NOT REQ");
+        if (isHeader) {
+          els.push(<div key={i} style={{ fontSize: 11, fontWeight: 700, color: T.orange, letterSpacing: "0.06em", marginTop: 12, marginBottom: 4 }}>{dn}</div>);
+        } else {
+          els.push(<div key={i} style={{ display: "flex", gap: 8, padding: "5px 0", borderBottom: `1px solid ${T.border}`, alignItems: "center", fontSize: 12 }}>
+            <span style={{ flex: 1, color: T.text }}>{dn}</span>
+            <span style={{ color: T.secondary, minWidth: 120 }}>{dw}</span>
+            <span style={{ fontSize: 9, fontWeight: 700, color: T.white, background: req ? T.red : T.green, borderRadius: 3, padding: "1px 6px" }}>STAMP: {req ? "REQ" : "NOT REQ"}</span>
+          </div>);
+        }
+        i++; continue;
+      }
+    }
+
+    // ── Definitions ──
+    if (inSec("definition") && t.includes(":")) {
+      const ci = t.indexOf(":");
+      const term = t.slice(0, ci).trim();
+      const def = t.slice(ci + 1).trim();
+      els.push(<div key={i} style={{ padding: "6px 0", borderBottom: `1px solid ${T.border}`, display: "flex", gap: 10, alignItems: "flex-start" }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: T.orange, fontFamily: "monospace", minWidth: 90, flexShrink: 0, paddingTop: 2 }}>{term}</span>
+        <span style={{ fontSize: 12, color: T.secondary, lineHeight: 1.5 }}>{renderInline(def)}</span>
       </div>);
       i++; continue;
     }
 
-    // Definitions section — render as compact term/definition pairs
-    if (inSec("definition")) {
-      if (t.includes(":")) {
-        const ci = t.indexOf(":");
-        const term = t.slice(0, ci).trim();
-        const def = t.slice(ci + 1).trim();
-        els.push(<div key={i} style={{ padding:"6px 0", borderBottom:`1px solid ${T.border}`,
-          display:"flex", gap:10, alignItems:"flex-start" }}>
-          <span style={{ fontSize:10, fontWeight:700, color:T.orange, fontFamily:"monospace",
-            minWidth:90, flexShrink:0, paddingTop:2 }}>{term}</span>
-          <span style={{ fontSize:12, color:T.secondary, lineHeight:1.5 }}>{renderInline(def)}</span>
-        </div>);
-        i++; continue;
-      }
-    }
-
-    // Terms & Data Sources section — render as compact grid
-    if (inSec("terms")) {
-      if (t.includes("|") && (t.includes(":") || t.includes("("))) {
+    // ── Terms & Data Sources ──
+    if (inSec("terms") || inSec("data source")) {
+      if (t.includes("|")) {
         const items = t.split("|").map(s => s.trim()).filter(Boolean);
-        els.push(<div key={i} style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>
+        els.push(<div key={i} style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
           {items.map((item, idx) => {
-            const ci = item.indexOf(":");
-            if (ci > 0) {
-              const abbr = item.slice(0, ci).trim();
-              const full = item.slice(ci + 1).trim();
-              return <span key={idx} style={{ fontSize:10, padding:"3px 8px", background:T.warmGray,
-                border:`1px solid ${T.border}`, borderRadius:4, lineHeight:1.4 }}>
-                <strong style={{ color:T.orange }}>{abbr}</strong>
-                <span style={{ color:T.secondary }}> {full}</span>
+            const ci2 = item.indexOf(":");
+            if (ci2 > 0) {
+              return <span key={idx} style={{ fontSize: 10, padding: "3px 8px", background: T.warmGray, border: `1px solid ${T.border}`, borderRadius: 4 }}>
+                <strong style={{ color: T.orange }}>{item.slice(0, ci2).trim()}</strong>
+                <span style={{ color: T.secondary }}> {item.slice(ci2 + 1).trim()}</span>
               </span>;
             }
-            return <span key={idx} style={{ fontSize:10, color:T.secondary, padding:"3px 8px",
-              background:T.warmGray, border:`1px solid ${T.border}`, borderRadius:4 }}>{item}</span>;
+            return <span key={idx} style={{ fontSize: 10, color: T.secondary, padding: "3px 8px", background: T.warmGray, border: `1px solid ${T.border}`, borderRadius: 4 }}>{item}</span>;
           })}
         </div>);
         i++; continue;
       }
-      // Data sources line
-      if (t.toLowerCase().startsWith("data source")) {
-        const sources = t.slice(t.indexOf(":") + 1).trim().split("|").map(s => s.trim()).filter(Boolean);
-        els.push(<div key={i} style={{ marginTop:8 }}>
-          <div style={{ fontSize:9, color:T.secondary, fontFamily:"monospace", letterSpacing:"0.08em",
-            marginBottom:6 }}>DATA SOURCES</div>
-          <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-            {sources.map((s, si) => {
-              const urlMatch = s.match(/\(([^)]+)\)/);
-              const label = s.replace(/\([^)]+\)/, "").trim();
-              return <a key={si} href={urlMatch ? (urlMatch[1].startsWith("http") ? urlMatch[1] : "https://" + urlMatch[1]) : "#"}
-                target="_blank" style={{ fontSize:10, color:T.orange, textDecoration:"none",
-                border:`1px solid ${T.orange}30`, borderRadius:4, padding:"3px 8px" }}>
-                {label}
-              </a>;
-            })}
-          </div>
-        </div>);
-        i++; continue;
-      }
     }
 
-    // Legal notice — render as normal section (last in report)
-
-    // Critical path callout
+    // ── Critical Path ──
     if (t.startsWith("CRITICAL PATH:")) {
-      els.push(<div key={i} style={{ padding:"8px 12px", background:T.orange+"10",
-        border:`1px solid ${T.orange}40`, borderRadius:6, marginTop:8,
-        display:"flex", gap:8, alignItems:"center" }}>
-        <span style={{ fontSize:10, fontWeight:700, color:T.orange,
-          fontFamily:"monospace", letterSpacing:"0.08em" }}>CRITICAL PATH</span>
-        <span style={{ fontSize:13, color:T.orange }}>{t.slice(14).trim()}</span>
+      els.push(<div key={i} style={{ padding: "8px 12px", background: T.orange + "10", border: `1px solid ${T.orange}40`, borderRadius: 6, marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: T.orange, letterSpacing: "0.08em" }}>CRITICAL PATH</span>
+        <span style={{ fontSize: 13, color: T.orange, fontWeight: 600 }}>{t.slice(14).trim()}</span>
       </div>);
       i++; continue;
     }
 
-    // Markdown table
+    // ── Markdown table ──
     if (t.startsWith("|")) {
       const tl = [];
       while (i < lines.length && lines[i].trim().startsWith("|")) { tl.push(lines[i].trim()); i++; }
       const data = tl.filter(l => !/^\|[\s\-\:]+\|/.test(l));
       if (data.length >= 2) {
-        const hdrs = data[0].split("|").filter((_,ci,a)=>ci>0&&ci<a.length-1).map(c=>c.trim());
-        const rows = data.slice(1).filter(l=>/^\|[^-]/.test(l));
-        els.push(<div key={"t"+i} style={{ overflowX:"auto", marginBottom:12 }}>
-          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-            <thead><tr>{hdrs.map((h,hi)=><th key={hi} style={{ padding:"8px 12px",
-              textAlign:"left", background:T.black, color:T.orange, fontWeight:700,
-              fontSize:10, letterSpacing:"0.06em", textTransform:"uppercase",
-              fontFamily:"monospace", borderBottom:`2px solid ${T.orange}40` }}>{h}</th>)}</tr></thead>
-            <tbody>{rows.map((row,ri)=>{
-              const cells = row.split("|").filter((_,ci,a)=>ci>0&&ci<a.length-1).map(c=>c.trim());
-              return <tr key={ri} style={{ background:ri%2===0?T.white:T.warmGray }}>
-                {cells.map((c,ci)=><td key={ci} style={{ padding:"8px 12px",
-                  color:ci===0?T.secondary:T.text, fontWeight:ci===0?600:400,
-                  borderBottom:`1px solid ${T.border}`, lineHeight:1.5 }}>{renderInline(c)}</td>)}
+        const hdrs = data[0].split("|").filter((_, ci, a) => ci > 0 && ci < a.length - 1).map(c => c.trim());
+        const rows = data.slice(1).filter(l => /^\|[^-]/.test(l));
+        els.push(<div key={"t" + i} style={{ overflowX: "auto", marginBottom: 12 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead><tr>{hdrs.map((h, hi) => <th key={hi} style={{ padding: "8px 12px", textAlign: "left", background: T.black, color: T.orange, fontWeight: 700, fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: `2px solid ${T.orange}40` }}>{h}</th>)}</tr></thead>
+            <tbody>{rows.map((row, ri) => {
+              const cells = row.split("|").filter((_, ci, a) => ci > 0 && ci < a.length - 1).map(c => c.trim());
+              return <tr key={ri} style={{ background: ri % 2 === 0 ? T.white : T.warmGray }}>
+                {cells.map((c, ci) => <td key={ci} style={{ padding: "8px 12px", color: ci === 0 ? T.secondary : T.text, fontWeight: ci === 0 ? 600 : 400, borderBottom: `1px solid ${T.border}`, lineHeight: 1.5 }}>{renderInline(c)}</td>)}
               </tr>;
             })}</tbody>
           </table>
@@ -1280,105 +1017,319 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
       }
     }
 
-    // Bold standalone
-    if (t.startsWith("**") && t.endsWith("**") && t.length>4) {
-      els.push(<p key={i} style={{ fontSize:14, fontWeight:700, color:T.text,
-        marginTop:10, marginBottom:4 }}>{t.slice(2,-2)}</p>);
+    // ── Standalone bold ──
+    if (t.startsWith("**") && t.endsWith("**") && t.length > 4) {
+      els.push(<p key={i} style={{ fontSize: 14, fontWeight: 700, color: T.text, marginTop: 10, marginBottom: 4 }}>{t.slice(2, -2)}</p>);
       i++; continue;
     }
 
-    // Bullet list
+    // ── Bullet list ──
     if (t.startsWith("- ") || t.startsWith("* ")) {
       lk++;
       const items = [];
-      while (i<lines.length && (lines[i].trim().startsWith("- ")||lines[i].trim().startsWith("* "))) {
-        items.push(<li key={i} style={{ fontSize:13, color:T.text, lineHeight:1.7,
-          marginBottom:2 }}>{renderInline(lines[i].trim().slice(2))}</li>);
+      while (i < lines.length && (lines[i].trim().startsWith("- ") || lines[i].trim().startsWith("* "))) {
+        items.push(<li key={i} style={{ fontSize: 13, color: T.text, lineHeight: 1.7, marginBottom: 2 }}>{renderInline(lines[i].trim().slice(2))}</li>);
         i++;
       }
-      els.push(<ul key={"ul"+lk} style={{ paddingLeft:18, marginBottom:8 }}>{items}</ul>);
+      els.push(<ul key={"ul" + lk} style={{ paddingLeft: 18, marginBottom: 8 }}>{items}</ul>);
       continue;
     }
 
-    // Numbered list
-    if (/^\d+\.\s/.test(t) && !sec.includes("next")) {
+    // ── Numbered list ──
+    if (/^\d+\.\s/.test(t)) {
       lk++;
       const items = [];
-      while (i<lines.length && /^\d+\.\s/.test(lines[i].trim())) {
-        items.push(<li key={i} style={{ fontSize:13, color:T.text, lineHeight:1.7,
-          marginBottom:2 }}>{renderInline(lines[i].trim().replace(/^\d+\.\s+/,""))}</li>);
+      while (i < lines.length && /^\d+\.\s/.test(lines[i].trim())) {
+        items.push(<li key={i} style={{ fontSize: 13, color: T.text, lineHeight: 1.7, marginBottom: 2 }}>{renderInline(lines[i].trim().replace(/^\d+\.\s+/, ""))}</li>);
         i++;
       }
-      els.push(<ol key={"ol"+lk} start={1} style={{ paddingLeft:22, marginBottom:8,
-        listStyleType:"decimal" }}>{items}</ol>);
+      els.push(<ol key={"ol" + lk} start={1} style={{ paddingLeft: 22, marginBottom: 8, listStyleType: "decimal" }}>{items}</ol>);
       continue;
     }
 
-    els.push(<p key={i} style={{ fontSize:13, color:T.secondary, lineHeight:1.8,
-      marginBottom:3 }}>{renderInline(t)}</p>);
+    // ── Catch-all paragraph ──
+    els.push(<p key={i} style={{ fontSize: 13, color: T.secondary, lineHeight: 1.8, marginBottom: 3 }}>{renderInline(t)}</p>);
     i++;
   }
 
-  // ── Post-process: group elements by section markers, wrap each in a white card ──
-  const sections = [];
-  let curEls = [];
-  let curMarker = null;
+  return <>{els}</>;
+}
 
-  for (const el of els) {
-    if (el && el.__section) {
-      // Flush previous section
-      if (curMarker && curEls.length > 0) {
-        sections.push(
-          <div key={"secwrap-"+curMarker.id} style={{ marginBottom:24 }}>
-            <div id={curMarker.id} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12, scrollMarginTop:70 }}>
-              <div style={{ width:4, height:20, background:T.orange, borderRadius:2, flexShrink:0 }} />
-              <h2 style={{ fontSize:15, fontWeight:700, color:T.textHead, margin:0, fontFamily:"'Georgia',serif", textTransform:"uppercase", letterSpacing:"0.04em" }}>
-                {curMarker.title}
-              </h2>
+// ── Section Header with accent bar ───────────────────────────────────────
+function SectionHeader2({ title, id, count }) {
+  return (
+    <div id={id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, scrollMarginTop: 70 }}>
+      <div style={{ width: 4, height: 20, background: T.orange, borderRadius: 2, flexShrink: 0 }} />
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: T.textHead, margin: 0, fontFamily: "'Georgia',serif", textTransform: "uppercase", letterSpacing: "0.04em", flex: 1 }}>
+        {title}
+      </h2>
+      {count !== undefined && (
+        <span style={{ fontSize: 11, fontWeight: 600, background: T.warmGray, color: T.secondary, borderRadius: 10, padding: "2px 10px" }}>{count}</span>
+      )}
+    </div>
+  );
+}
+
+// ── White card wrapper ───────────────────────────────────────────────────
+function SectionCard({ children }) {
+  return (
+    <div style={{ background: T.white, borderRadius: 12, border: `1px solid ${T.border}`, padding: "20px 24px" }}>
+      {children}
+    </div>
+  );
+}
+
+// ── Main Report Body — renders sections with cards ───────────────────────
+function ReportBody({ text, parcel, projectType, jurisdiction }) {
+  const sections = parseReportSections(text);
+  const kpis = extractKPIs(text);
+
+  // Helper: compute density scenarios
+  const z = (parcel?.zoning || "").toUpperCase();
+  const base = /^R1|^RS|^RE/.test(z) ? 1 : /^RD/.test(z) ? 2 : /^R4/.test(z) ? Math.floor((parcel?.lotSizeSf || 0) / 400) : Math.floor((parcel?.lotSizeSf || 0) / 800);
+  const hasToc = parcel?.toc && parcel.toc !== "None";
+  const tocMulti = parcel?.toc === "Tier 4" ? 1.80 : parcel?.toc === "Tier 3" ? 1.70 : parcel?.toc === "Tier 2" ? 1.50 : parcel?.toc === "Tier 1" ? 1.35 : 1;
+  const tocUnits = hasToc ? Math.floor(base * tocMulti) : base;
+  const adus = /^R[2-5]|^RD/.test(z) ? 2 : 1;
+  const maxTotal = Math.max(base, tocUnits) + adus + 1;
+
+  // Alert counts
+  const reqMatch = (kpis.alerts || "").match(/(\d+)\s*required/i);
+  const facMatch = (kpis.alerts || "").match(/(\d+)\s*factor/i);
+  const benMatch = (kpis.alerts || "").match(/(\d+)\s*benefit/i);
+  // Fallback: count from old format
+  const reqCount = reqMatch ? parseInt(reqMatch[1]) : (kpis.alerts.match(/(\d+)\s*action/i) || [0, 0])[1];
+  const facCount = facMatch ? parseInt(facMatch[1]) : (kpis.alerts.match(/(\d+)\s*caution/i) || [0, 0])[1];
+  const benCount = benMatch ? parseInt(benMatch[1]) : (kpis.alerts.match(/(\d+)\s*(?:info|note|benefit)/i) || [0, 0])[1];
+
+  return (
+    <div style={{ padding: "16px 16px 0" }}>
+      {sections.map((section, si) => {
+        const sn = section.name.toLowerCase();
+
+        // ── PROJECT OVERVIEW ──
+        if (sn.includes("project overview") || sn.includes("deal")) {
+          return (
+            <div key={si} style={{ marginBottom: 24 }}>
+              <SectionHeader2 title={section.name} id={section.id} />
+              <SectionCard>
+                {/* Stats grid */}
+                <div className="overview-stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
+                  {[
+                    { label: "ZONING", value: parcel?.zoning || "—", sub: (kpis.zoning || "").split("|").pop()?.trim() || "" },
+                    { label: "LOT SIZE", value: parcel?.lotSizeSf ? parcel.lotSizeSf.toLocaleString() + " sf" : "—", sub: parcel?.apn ? "APN " + parcel.apn : "" },
+                    { label: "EXISTING", value: (parcel?.existingBuildingSqft || "—") + " sf / " + (parcel?.existingUnits || "—") + " unit", sub: parcel?.yearBuilt ? "Built " + parcel.yearBuilt : "" },
+                    { label: "JURISDICTION", value: jurisdiction?.short || "City of LA", sub: jurisdiction?.agency || "LADBS" },
+                  ].map((s, si2) => (
+                    <div key={si2} style={{ background: T.warmGray, borderRadius: 8, padding: "10px 12px" }}>
+                      <div style={{ fontSize: 9, color: T.secondary, letterSpacing: "0.1em", marginBottom: 4 }}>{s.label}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: T.textHead, fontFamily: "'Georgia',serif" }}>{s.value}</div>
+                      <div style={{ fontSize: 10, color: T.secondary }}>{s.sub}</div>
+                    </div>
+                  ))}
+                </div>
+                {parcel?.yearBuilt && parcel?.heReplacement && (
+                  <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#92400E", lineHeight: 1.6 }}>
+                    <strong>Existing structure:</strong> {parcel.yearBuilt}, {parcel.existingUnits || "?"} unit{(parcel.existingUnits || 0) > 1 ? "s" : ""}, {parcel.existingBuildingSqft || "?"} sf{parcel.rso ? ", RSO" : ", non-RSO"} — demolition triggers HE Replacement
+                  </div>
+                )}
+              </SectionCard>
             </div>
-            {curMarker.noCard ? (
-              <div>{curEls}</div>
-            ) : (
-              <div style={{ background:T.white, borderRadius:12, border:`1px solid ${T.border}`, padding:"20px 24px" }}>
-                {curEls}
+          );
+        }
+
+        // ── DEVELOPMENT OPPORTUNITY ──
+        if (sn.includes("opportunity")) {
+          return (
+            <div key={si} style={{ marginBottom: 24 }}>
+              <SectionHeader2 title={section.name} id={section.id} />
+              <SectionCard>
+                {/* Density scenarios */}
+                {parcel?.lotSizeSf > 0 && (
+                  <div className="scenario-cards" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+                    {[
+                      { label: "BASE ZONING", units: base, sub: `${parcel.zoning} zone · by-right` },
+                      ...(hasToc ? [{ label: `WITH ${parcel.toc.toUpperCase()}`, units: tocUnits, sub: `${Math.round((tocMulti - 1) * 100)}% density bonus`, badge: "TOC" }] : []),
+                      { label: "MAX BUILDOUT", units: maxTotal, sub: `${Math.max(base, tocUnits)} primary + ${adus} ADU + 1 JADU`, highlight: true, badge: "BEST CASE" },
+                    ].map((card, ci) => (
+                      <div key={ci} style={{ flex: "1 1 200px", background: card.highlight ? T.orange + "08" : T.white, border: `1px solid ${card.highlight ? T.gold + "80" : T.border}`, borderLeft: card.highlight ? `4px solid ${T.gold}` : undefined, borderRadius: card.highlight ? 0 : 10, padding: "16px 18px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: card.highlight ? T.orange : T.secondary, letterSpacing: "0.06em" }}>{card.label}</div>
+                          {card.badge && <span style={{ fontSize: 9, fontWeight: 700, background: T.orange, color: T.white, borderRadius: 4, padding: "2px 8px" }}>{card.badge}</span>}
+                        </div>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: T.textHead, fontFamily: "'Georgia',serif", marginBottom: 2 }}>{card.units}</div>
+                        <div style={{ fontSize: 12, color: T.secondary, lineHeight: 1.5 }}>{card.sub}</div>
+                        <div style={{ marginTop: 10, height: 5, background: T.warmGray, borderRadius: 3, overflow: "hidden" }}>
+                          <div style={{ width: `${(card.units / maxTotal) * 100}%`, height: "100%", background: card.highlight ? T.gold : T.border, borderRadius: 3 }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Claude's analysis for this section */}
+                <SectionLines lines={section.lines} sectionName={section.name} />
+              </SectionCard>
+            </div>
+          );
+        }
+
+        // ── ZONE ALERTS ──
+        if (sn.includes("alert")) {
+          return (
+            <div key={si} style={{ marginBottom: 24 }}>
+              <SectionHeader2 title={section.name} id={section.id} />
+              <SectionCard>
+                {/* Summary bar */}
+                <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                  {[
+                    { label: "Required", count: reqCount, color: T.red, bg: "#FEF2F2" },
+                    { label: "Factors", count: facCount, color: T.yellow, bg: "#FFFBEB" },
+                    { label: "Benefits", count: benCount, color: T.green, bg: "#F0FDF4" },
+                  ].map((g, gi) => (
+                    <div key={gi} style={{ flex: 1, background: g.bg, borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 22, fontWeight: 700, color: g.color, fontFamily: "'Georgia',serif" }}>{g.count}</span>
+                      <span style={{ fontSize: 12, color: g.color, fontWeight: 600 }}>{g.label}</span>
+                    </div>
+                  ))}
+                </div>
+                <SectionLines lines={section.lines} sectionName={section.name} />
+              </SectionCard>
+            </div>
+          );
+        }
+
+        // ── PARCEL SURVEY — uses existing visual cards ──
+        if (sn.includes("parcel survey")) {
+          return (
+            <div key={si} style={{ marginBottom: 24 }}>
+              <SectionHeader2 title={section.name} id={section.id} />
+              <div className="survey-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "flex-start" }}>
+                <div><ParcelSurveyCards parcel={parcel} /></div>
+                <div><ProjectSummary parcel={parcel} projectType={projectType} scoreCards={extractKPIs(text)} /></div>
               </div>
-            )}
+            </div>
+          );
+        }
+
+        // ── ALL OTHER SECTIONS — generic white card ──
+        return (
+          <div key={si} style={{ marginBottom: 24 }}>
+            <SectionHeader2 title={section.name} id={section.id} />
+            <SectionCard>
+              <SectionLines lines={section.lines} sectionName={section.name} />
+            </SectionCard>
           </div>
         );
-      } else if (curEls.length > 0) {
-        // Elements before first section (shouldn't happen, but safety)
-        sections.push(<div key="pre-sections">{curEls}</div>);
-      }
-      curMarker = el;
-      curEls = [];
-    } else {
-      curEls.push(el);
-    }
-  }
-  // Flush last section
-  if (curMarker && curEls.length > 0) {
-    sections.push(
-      <div key={"secwrap-"+curMarker.id} style={{ marginBottom:24 }}>
-        <div id={curMarker.id} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12, scrollMarginTop:70 }}>
-          <div style={{ width:4, height:20, background:T.orange, borderRadius:2, flexShrink:0 }} />
-          <h2 style={{ fontSize:15, fontWeight:700, color:T.textHead, margin:0, fontFamily:"'Georgia',serif", textTransform:"uppercase", letterSpacing:"0.04em" }}>
-            {curMarker.title}
-          </h2>
-        </div>
-        {curMarker.noCard ? (
-          <div>{curEls}</div>
-        ) : (
-          <div style={{ background:T.white, borderRadius:12, border:`1px solid ${T.border}`, padding:"20px 24px" }}>
-            {curEls}
-          </div>
-        )}
-      </div>
-    );
-  } else if (curEls.length > 0) {
-    sections.push(<div key="trailing">{curEls}</div>);
+      })}
+    </div>
+  );
+}
+
+// ── Report Hero — dark card ──────────────────────────────────────────────
+function ReportHero({ address, parcel, projectType, jurisdiction, resultText }) {
+  const kpis = extractKPIs(resultText);
+  const vc = kpis.verdict === "GO" ? T.green : kpis.verdict === "COMPLEX" ? T.red : T.yellow;
+  const label = getLabel(projectType);
+  const d = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+  // Max buildout from parcel
+  const z = (parcel?.zoning || "").toUpperCase();
+  let maxBuildout = "—";
+  if (parcel?.lotSizeSf > 0) {
+    const base = /^R1|^RS|^RE/.test(z) ? 1 : /^RD/.test(z) ? 2 : /^R4/.test(z) ? Math.floor(parcel.lotSizeSf / 400) : Math.floor(parcel.lotSizeSf / 800);
+    const tocMulti = parcel.toc === "Tier 4" ? 1.80 : parcel.toc === "Tier 3" ? 1.70 : parcel.toc === "Tier 2" ? 1.50 : parcel.toc === "Tier 1" ? 1.35 : 1;
+    const primary = Math.max(base, Math.floor(base * tocMulti));
+    const adus = /^R[2-5]|^RD/.test(z) ? 2 : 1;
+    maxBuildout = `${primary + adus + 1} units`;
   }
 
-  return sections;
+  // Parse alert counts
+  const al = kpis.alerts || "";
+  const rc = (al.match(/(\d+)\s*(?:required|action)/i) || [0, "0"])[1];
+  const fc = (al.match(/(\d+)\s*(?:factor|caution)/i) || [0, "0"])[1];
+  const bc = (al.match(/(\d+)\s*(?:benefit|info|note)/i) || [0, "0"])[1];
+
+  return (
+    <div style={{ background: T.black, borderRadius: 16, overflow: "hidden", marginBottom: 8 }}>
+      {/* Top bar */}
+      <div style={{ padding: "16px 28px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <Logo size={22} light />
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 10, color: T.secondary, letterSpacing: "0.1em" }}>PERMIT ANALYSIS REPORT</div>
+          <div style={{ fontSize: 11, color: "#D6D3D1" }}>{d}</div>
+        </div>
+      </div>
+
+      {/* Address */}
+      <div style={{ padding: "14px 28px 4px" }}>
+        <div style={{ fontSize: 24, fontWeight: 700, color: T.white, fontFamily: "'Georgia',serif", lineHeight: 1.2, letterSpacing: "-0.02em" }}>{address}</div>
+      </div>
+
+      {/* Tags */}
+      <div style={{ padding: "8px 28px 12px", display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 11, fontWeight: 600, background: T.orange, color: T.white, borderRadius: 6, padding: "3px 10px" }}>{label}</span>
+        {parcel?.hasData && (
+          <span style={{ fontSize: 11, fontWeight: 600, background: T.green + "22", color: T.green, borderRadius: 6, padding: "3px 10px", border: `1px solid ${T.green}44`, display: "flex", alignItems: "center", gap: 4 }}>
+            <svg width={10} height={10} viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke={T.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            ZIMAS verified
+          </span>
+        )}
+        <span style={{ fontSize: 11, color: "#D6D3D1", background: "#ffffff12", borderRadius: 6, padding: "3px 10px" }}>
+          {jurisdiction?.short || "City of LA"} · {parcel?.zoning || "—"} · {parcel?.lotSizeSf ? parcel.lotSizeSf.toLocaleString() + " sf" : "—"}
+        </span>
+      </div>
+
+      {/* Verdict bar */}
+      {kpis.verdict && (
+        <div style={{ background: vc + "18", borderTop: `1px solid ${vc}33`, padding: "12px 28px", display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: T.white, background: vc, borderRadius: 5, padding: "3px 12px", letterSpacing: "0.06em" }}>{kpis.verdict}</span>
+          <span style={{ fontSize: 13, color: "#E7E5E4", lineHeight: 1.4, flex: 1 }}>{kpis.verdictDesc}</span>
+        </div>
+      )}
+
+      {/* KPI strip */}
+      <div className="hero-kpi-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", borderTop: "1px solid #ffffff12" }}>
+        {[
+          { label: "MAX BUILDOUT", value: maxBuildout, color: T.gold },
+          { label: "EST. FEES", value: kpis.fees || "—", color: T.gold },
+          { label: "TIMELINE", value: (kpis.timeline || "—").replace("week critical path", "wks").replace("weeks", "wks"), color: T.white },
+          { label: "ALERTS", value: `${rc} required`, sub: `${fc} factors · ${bc} benefits`, color: parseInt(rc) > 0 ? T.red : T.green },
+        ].map((kpi, ki) => (
+          <div key={ki} style={{ padding: "14px 18px", borderRight: ki < 3 ? "1px solid #ffffff08" : "none" }}>
+            <div style={{ fontSize: 9, color: T.secondary, letterSpacing: "0.1em", marginBottom: 5 }}>{kpi.label}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: kpi.color, fontFamily: "'Georgia',serif", marginBottom: 1 }}>{kpi.value}</div>
+            {kpi.sub && <div style={{ fontSize: 10, color: T.secondary }}>{kpi.sub}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Sticky Section Nav ───────────────────────────────────────────────────
+function SectionNav() {
+  const navSections = [
+    { id: "sec-project-overview", label: "Overview" },
+    { id: "sec-development-opportunity", label: "Opportunity" },
+    { id: "sec-zone-alerts", label: "Alerts" },
+    { id: "sec-regulations", label: "Standards" },
+    { id: "sec-permitting", label: "Permits" },
+    { id: "sec-parcel-survey", label: "Survey" },
+  ];
+  return (
+    <div style={{ position: "sticky", top: 0, zIndex: 100, background: T.cream, padding: "8px 0" }} className="no-print">
+      <div className="section-nav-bar" style={{ display: "flex", gap: 4, background: T.white, borderRadius: 10, padding: 4, border: `1px solid ${T.border}` }}>
+        {navSections.map(s => (
+          <a key={s.id} href={"#" + s.id}
+            style={{ flex: 1, padding: "8px 4px", border: "none", borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: "pointer", textDecoration: "none", textAlign: "center", background: "transparent", color: T.secondary, transition: "all 0.2s", fontFamily: "'DM Sans',sans-serif" }}
+            onMouseEnter={e => { e.target.style.background = T.orange; e.target.style.color = T.white }}
+            onMouseLeave={e => { e.target.style.background = "transparent"; e.target.style.color = T.secondary }}>
+            {s.label}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // ── Acronym Legend ────────────────────────────────────────────────────────
@@ -1410,12 +1361,12 @@ function AcronymLegend({ jurisdiction }) {
   return (
     <div style={{ margin:0 }}>
       <button onClick={() => setOpen(!open)} style={{
-        width:"100%", background:"#ffffff12", border:"none", padding:"10px 16px",
+        width:"100%", background:"#ffffff10", border:"none", padding:"10px 16px",
         display:"flex", justifyContent:"space-between", alignItems:"center",
         cursor:"pointer", fontFamily:"'DM Sans',sans-serif", borderRadius:6 }}>
-        <span style={{ fontSize:11, fontWeight:700, color:"#D6D3D1", fontFamily:"monospace",
+        <span style={{ fontSize:11, fontWeight:700, color:""#D6D3D1"", fontFamily:"monospace",
           letterSpacing:"0.1em" }}>TERMS & DATA SOURCES</span>
-        <span style={{ fontSize:11, color:"#A8A29E" }}>{open ? "▲ Hide" : "▼ Show"}</span>
+        <span style={{ fontSize:11, color:""#A8A29E"" }}>{open ? "▲ Hide" : "▼ Show"}</span>
       </button>
       {open && (
         <div style={{ padding:"16px 0 0" }}>
@@ -1425,11 +1376,11 @@ function AcronymLegend({ jurisdiction }) {
                 borderBottom:"1px solid #ffffff10", alignItems:"flex-start" }}>
                 <span style={{ fontSize:10, fontWeight:700, color:T.orange,
                   fontFamily:"monospace", minWidth:50, flexShrink:0, paddingTop:1 }}>{term}</span>
-                <span style={{ fontSize:11, color:"#D6D3D1", lineHeight:1.5 }}>{def}</span>
+                <span style={{ fontSize:11, color:""#D6D3D1"", lineHeight:1.5 }}>{def}</span>
               </div>
             ))}
           </div>
-          <div style={{ fontSize:10, color:"#A8A29E", fontFamily:"monospace",
+          <div style={{ fontSize:10, color:""#A8A29E"", fontFamily:"monospace",
             letterSpacing:"0.08em", marginBottom:6 }}>DATA SOURCES</div>
           <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
             {sources.map(([label, url, href]) => (
@@ -1448,207 +1399,6 @@ function AcronymLegend({ jurisdiction }) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// ── Report Hero — dark card with address, verdict, KPIs ──────────────────
-function ReportHero({ address, parcel, projectType, jurisdiction, resultText }) {
-  // Extract KPIs from Claude's output
-  let verdict = "", verdictDesc = "", fees = "", timeline = "", alertLine = "";
-  for (const line of (resultText||"").split("\n")) {
-    const t = line.trim().replace(/\*\*/g,"");
-    if (t.startsWith("VERDICT:")) { const pts = t.slice(8).trim().split("|").map(p=>p.trim()); verdict = pts[0]; verdictDesc = pts[1]||""; }
-    if (t.startsWith("PERMITS:")) { const pts = t.slice(8).trim().split("|").map(p=>p.trim()); fees = pts[0]; timeline = pts[1]||""; }
-    if (t.startsWith("ALERTS:")) alertLine = t.slice(7).trim();
-  }
-  const vc = verdict==="GO" ? T.green : verdict==="COMPLEX" ? T.red : T.yellow;
-  const label = getLabel(projectType);
-  const d = new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"});
-
-  // Parse alert counts
-  const reqMatch = alertLine.match(/(\d+)\s*required/i);
-  const facMatch = alertLine.match(/(\d+)\s*factor/i);
-  const benMatch = alertLine.match(/(\d+)\s*benefit/i);
-  const reqCount = reqMatch ? reqMatch[1] : "0";
-  const facCount = facMatch ? facMatch[1] : "0";
-  const benCount = benMatch ? benMatch[1] : "0";
-
-  // Density from parcel
-  const z = (parcel?.zoning || "").toUpperCase();
-  let maxBuildout = "—";
-  if (parcel?.lotSizeSf > 0) {
-    const base = /^R1|^RS|^RE/.test(z) ? 1 : /^RD/.test(z) ? 2 : /^R4/.test(z) ? Math.floor(parcel.lotSizeSf/400) : Math.floor(parcel.lotSizeSf/800);
-    const tocMulti = parcel.toc === "Tier 4" ? 1.80 : parcel.toc === "Tier 3" ? 1.70 : parcel.toc === "Tier 2" ? 1.50 : parcel.toc === "Tier 1" ? 1.35 : 1;
-    const tocUnits = Math.floor(base * tocMulti);
-    const primary = Math.max(base, tocUnits);
-    const adus = /^R[2-5]|^RD/.test(z) ? 2 : 1;
-    const jadus = /^R[2-5]|^RD/.test(z) ? 1 : 1;
-    maxBuildout = `${primary + adus + jadus} units`;
-  }
-
-  return (
-    <div style={{ background:T.black, borderRadius:"12px 12px 0 0", overflow:"hidden" }}>
-      {/* Top bar */}
-      <div style={{ padding:"16px 28px 0", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-        <Logo size={22} light />
-        <div style={{ textAlign:"right" }}>
-          <div style={{ fontSize:10, color:T.muted, letterSpacing:"0.1em" }}>PERMIT ANALYSIS REPORT</div>
-          <div style={{ fontSize:11, color:"#D6D3D1" }}>{d}</div>
-        </div>
-      </div>
-
-      {/* Address */}
-      <div style={{ padding:"14px 28px 4px" }}>
-        <div style={{ fontSize:24, fontWeight:700, color:T.white, fontFamily:"'Georgia',serif", lineHeight:1.2, letterSpacing:"-0.02em" }}>
-          {address}
-        </div>
-      </div>
-
-      {/* Tags */}
-      <div style={{ padding:"8px 28px 12px", display:"flex", gap:6, flexWrap:"wrap" }}>
-        <span style={{ fontSize:11, fontWeight:600, background:T.orange, color:T.white, borderRadius:6, padding:"3px 10px" }}>{label}</span>
-        {parcel?.hasData && (
-          <span style={{ fontSize:11, fontWeight:600, background:T.green+"22", color:T.green, borderRadius:6, padding:"3px 10px", border:`1px solid ${T.green}44`,
-            display:"flex", alignItems:"center", gap:4 }}>
-            <svg width={10} height={10} viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke={T.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            ZIMAS verified
-          </span>
-        )}
-        <span style={{ fontSize:11, color:"#D6D3D1", background:"#ffffff12", borderRadius:6, padding:"3px 10px" }}>
-          {jurisdiction?.short||"City of LA"} · {parcel?.zoning||"—"} · {parcel?.lotSizeSf ? parcel.lotSizeSf.toLocaleString()+" sf" : "—"}
-        </span>
-      </div>
-
-      {/* Verdict bar */}
-      {verdict && (
-        <div style={{ background:vc+"18", borderTop:`1px solid ${vc}33`, padding:"12px 28px", display:"flex", alignItems:"center", gap:12 }}>
-          <span style={{ fontSize:11, fontWeight:800, color:T.white, background:vc, borderRadius:5, padding:"3px 12px", letterSpacing:"0.06em" }}>{verdict}</span>
-          <span style={{ fontSize:13, color:"#E7E5E4", lineHeight:1.4, flex:1 }}>{verdictDesc}</span>
-        </div>
-      )}
-
-      {/* KPI strip */}
-      <div className="hero-kpi-grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", borderTop:"1px solid #ffffff12" }}>
-        {[
-          { label:"MAX BUILDOUT", value:maxBuildout, color:T.gold },
-          { label:"EST. FEES", value:fees||"—", color:T.gold },
-          { label:"TIMELINE", value:(timeline||"—").replace("week critical path","wks").replace("weeks","wks"), color:T.white },
-          { label:"ALERTS", value:`${reqCount} required`, sub:`${facCount} factors · ${benCount} benefits`, color:parseInt(reqCount)>0?T.red:T.green },
-        ].map((kpi, i) => (
-          <div key={i} style={{ padding:"14px 18px", borderRight:i<3?"1px solid #ffffff08":"none" }}>
-            <div style={{ fontSize:9, color:T.muted, letterSpacing:"0.1em", marginBottom:5 }}>{kpi.label}</div>
-            <div style={{ fontSize:18, fontWeight:700, color:kpi.color, fontFamily:"'Georgia',serif", marginBottom:1 }}>{kpi.value}</div>
-            {kpi.sub && <div style={{ fontSize:10, color:T.muted }}>{kpi.sub}</div>}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Section Header with accent bar ───────────────────────────────────────
-function SectionHead({ title, id, count }) {
-  return (
-    <div id={id} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14, scrollMarginTop:70 }}>
-      <div style={{ width:4, height:20, background:T.orange, borderRadius:2, flexShrink:0 }} />
-      <h2 style={{ fontSize:15, fontWeight:700, color:T.textHead, margin:0, fontFamily:"'Georgia',serif", textTransform:"uppercase", letterSpacing:"0.04em", flex:1 }}>
-        {title}
-      </h2>
-      {count !== undefined && (
-        <span style={{ fontSize:11, fontWeight:600, background:T.warmGray, color:T.secondary, borderRadius:10, padding:"2px 10px" }}>{count}</span>
-      )}
-    </div>
-  );
-}
-
-// ── Sticky Section Nav ───────────────────────────────────────────────────
-function SectionNav({ activeSection }) {
-  const sections = [
-    { id:"sec-project-overview", label:"Overview" },
-    { id:"sec-development-opportunity", label:"Opportunity" },
-    { id:"sec-zone-alerts", label:"Alerts" },
-    { id:"sec-regulations", label:"Standards" },
-    { id:"sec-permitting", label:"Permits" },
-    { id:"sec-parcel-survey", label:"Survey" },
-  ];
-  return (
-    <div style={{ position:"sticky", top:0, zIndex:100, background:T.cream, padding:"8px 0" }} className="no-print">
-      <div className="section-nav-bar" style={{ display:"flex", gap:4, background:T.white, borderRadius:10, padding:4, border:`1px solid ${T.border}` }}>
-        {sections.map(s => (
-          <a key={s.id} href={"#"+s.id}
-            style={{ flex:1, padding:"8px 4px", border:"none", borderRadius:8, fontSize:11,
-              fontWeight:600, cursor:"pointer", textDecoration:"none", textAlign:"center",
-              background:"transparent", color:T.secondary, transition:"all 0.2s",
-              fontFamily:"'DM Sans',sans-serif" }}
-            onMouseEnter={e=>{e.target.style.background=T.orange;e.target.style.color=T.white}}
-            onMouseLeave={e=>{e.target.style.background="transparent";e.target.style.color=T.secondary}}>
-            {s.label}
-          </a>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Alerts Summary Bar ───────────────────────────────────────────────────
-function AlertsSummaryBar({ resultText }) {
-  const alertLine = (resultText||"").split("\n").find(l => l.trim().replace(/\*\*/g,"").startsWith("ALERTS:")) || "";
-  const t = alertLine.replace(/\*\*/g,"").slice(alertLine.indexOf("ALERTS:")+7).trim();
-  const reqMatch = t.match(/(\d+)\s*required/i);
-  const facMatch = t.match(/(\d+)\s*factor/i);
-  const benMatch = t.match(/(\d+)\s*benefit/i);
-  const counts = [
-    { label:"Required", count:reqMatch?parseInt(reqMatch[1]):0, color:T.red, bg:"#FEF2F2" },
-    { label:"Factors", count:facMatch?parseInt(facMatch[1]):0, color:T.yellow, bg:"#FFFBEB" },
-    { label:"Benefits", count:benMatch?parseInt(benMatch[1]):0, color:T.green, bg:"#F0FDF4" },
-  ];
-  return (
-    <div style={{ display:"flex", gap:10, marginBottom:16 }}>
-      {counts.map((g,i) => (
-        <div key={i} style={{ flex:1, background:g.bg, borderRadius:8, padding:"10px 14px", display:"flex", alignItems:"center", gap:10 }}>
-          <span style={{ fontSize:22, fontWeight:700, color:g.color, fontFamily:"'Georgia',serif" }}>{g.count}</span>
-          <span style={{ fontSize:12, color:g.color, fontWeight:600 }}>{g.label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── Density Scenario Cards ───────────────────────────────────────────────
-function DensityScenarios({ parcel }) {
-  if (!parcel?.lotSizeSf) return null;
-  const z = (parcel.zoning || "").toUpperCase();
-  const base = /^R1|^RS|^RE/.test(z) ? 1 : /^RD/.test(z) ? 2 : /^R4/.test(z) ? Math.floor(parcel.lotSizeSf/400) : Math.floor(parcel.lotSizeSf/800);
-  const hasToc = parcel.toc && parcel.toc !== "None";
-  const tocMulti = parcel.toc === "Tier 4" ? 1.80 : parcel.toc === "Tier 3" ? 1.70 : parcel.toc === "Tier 2" ? 1.50 : parcel.toc === "Tier 1" ? 1.35 : 1;
-  const tocUnits = hasToc ? Math.floor(base * tocMulti) : base;
-  const adus = /^R[2-5]|^RD/.test(z) ? 2 : 1;
-  const jadus = 1;
-  const maxTotal = Math.max(base, tocUnits) + adus + jadus;
-
-  const Card = ({ label, units, sub, highlight, badge }) => (
-    <div style={{ flex:"1 1 180px", background:T.white, border:`1px solid ${highlight ? T.gold+"80" : T.border}`,
-      borderLeft:highlight ? `4px solid ${T.gold}` : `1px solid ${T.border}`,
-      borderRadius:highlight ? 0 : 10, padding:"16px 18px" }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-        <div style={{ fontSize:10, fontWeight:700, color:highlight ? T.orange : T.secondary, letterSpacing:"0.06em" }}>{label}</div>
-        {badge && <span style={{ fontSize:9, fontWeight:700, background:T.orange, color:T.white, borderRadius:4, padding:"2px 8px" }}>{badge}</span>}
-      </div>
-      <div style={{ fontSize:28, fontWeight:700, color:highlight ? T.textHead : T.textHead, fontFamily:"'Georgia',serif", marginBottom:2 }}>{units}</div>
-      <div style={{ fontSize:12, color:T.secondary, lineHeight:1.5 }}>{sub}</div>
-      {/* Progress bar */}
-      <div style={{ marginTop:10, height:5, background:T.warmGray, borderRadius:3, overflow:"hidden" }}>
-        <div style={{ width:`${(units/maxTotal)*100}%`, height:"100%", background:highlight ? T.gold : T.border, borderRadius:3 }} />
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="scenario-cards" style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:16 }}>
-      <Card label="BASE ZONING" units={base} sub={`${parcel.zoning} zone · by-right`} />
-      {hasToc && <Card label={`WITH ${parcel.toc.toUpperCase()}`} units={tocUnits} sub={`${Math.round((tocMulti-1)*100)}% density bonus`} badge="TOC" />}
-      <Card label="MAX BUILDOUT" units={maxTotal} sub={`${Math.max(base,tocUnits)} primary + ${adus} ADU + ${jadus} JADU`} highlight badge="BEST CASE" />
     </div>
   );
 }
@@ -1954,7 +1704,7 @@ export default function Listo() {
     let parcelHtml = "";
     if (parcel?.hasData) {
       const vBadge = (val) => val !== undefined && val !== null
-        ? `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:${T.green}18;color:${T.green};font-family:monospace">✓ ZIMAS</span>`
+        ? `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:${T.green}18;color:${T.green}">✓ ZIMAS</span>`
         : `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#FEF3C7;color:#92400E;font-family:monospace">NOT VERIFIED</span>`;
       const pRow = (label, val) => `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F3F4F6;font-size:11px"><span>${label}</span><span style="font-weight:600">${val !== null && val !== undefined ? val + " " + vBadge(val) : vBadge(null)}</span></div>`;
       const flagBadge = (val, flagged) => val ? `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:${flagged?"#FEE2E2;color:#991B1B":"#D1FAE5;color:#065F46"};font-family:monospace">${typeof val === "string" ? val : "YES"}</span>` : `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#F3F4F6;color:#78716C;font-family:monospace">NO</span>`;
@@ -2044,15 +1794,15 @@ export default function Listo() {
         bodyHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:${c}15;border:2px solid ${c};border-radius:8px;margin:8px 0"><span style="font-size:10px;font-weight:800;color:#fff;background:${c};border-radius:4px;padding:2px 10px">${w}</span><span style="font-size:12px;color:#44403C">${d}</span></div>`;
         continue;
       }
-      // Zone Alerts with REQUIRED/FACTOR/BENEFIT
+      // Zone Alerts with ACTION REQUIRED/CAUTION/NOTE
       if (t.includes("|") && /^(REQUIRED|ACTION REQUIRED|CRITICAL|FACTOR|CAUTION|BENEFIT|NOTE|INFO|CLEAR)\s*\|/.test(t)) {
         const pts=t.split("|").map(p=>p.trim());
         const [sev,name2,dollar,time]=pts;
         const levelMap2={"REQUIRED":"red","ACTION REQUIRED":"red","CRITICAL":"red","FACTOR":"yellow","CAUTION":"yellow","BENEFIT":"green","NOTE":"green","INFO":"green","CLEAR":"green"};
         const lv=levelMap2[sev]||"green";
         const displayLabel = lv === "red" ? "REQUIRED" : lv === "yellow" ? "FACTOR" : "BENEFIT";
-        const cs={"red":["#FEF2F2","#b91c1c"],"yellow":["#FFFBEB","#b45309"],"green":["#F0FDF4","#15803d"]};
-        const [bg,bc]=cs[lv]||["#F9FAFB","#78716C"];
+        const cs={"REQUIRED":["#FEF2F2","#b91c1c"],"ACTION REQUIRED":["#FEF2F2","#b91c1c"],CRITICAL:["#FEF2F2","#b91c1c"],"FACTOR":["#FFFBEB","#b45309"],CAUTION:["#FFFBEB","#b45309"],"BENEFIT":["#F0FDF4","#15803d"],NOTE:["#F0FDF4","#15803d"],INFO:["#F0FDF4","#15803d"],CLEAR:["#F0FDF4","#15803d"]};
+        const [bg,bc]=cs[sev]||["#F9FAFB","#78716C"];
         bodyHtml += `<div style="padding:8px 12px;margin:6px 0;border-radius:6px;border-left:3px solid ${bc};background:${bg}"><span style="font-size:9px;font-weight:800;color:#fff;background:${bc};border-radius:3px;padding:1px 6px;margin-right:8px">${displayLabel}</span><strong>${name2||""}</strong>${dollar?` <span style="color:#78716C;font-size:11px">· ${dollar}</span>`:""}${time?` <span style="color:#78716C;font-size:11px">· ${time}</span>`:""}</div>`;
         continue;
       }
@@ -2239,9 +1989,9 @@ ${bodyHtml}
             <Logo size={28} light />
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <span style={{ fontSize:11, color:"#A8A29E", fontStyle:"italic",
+            <span style={{ fontSize:11, color:""#A8A29E"", fontStyle:"italic",
               fontFamily:"'DM Sans',sans-serif" }}>Know before you build.</span>
-            <span style={{ fontSize:10, color:"#78716C", border:"1px solid #ffffff15",
+            <span style={{ fontSize:10, color:""#78716C"", border:"1px solid #ffffff15",
               borderRadius:20, padding:"3px 10px", fontFamily:"monospace" }}>
               {coverageText}
             </span>
@@ -2272,7 +2022,7 @@ ${bodyHtml}
                   color:T.cream, lineHeight:1.1, marginBottom:20, fontWeight:700 }}>
                   Know before<br />you <span style={{ color:T.orange }}>build.</span>
                 </h1>
-                <p style={{ fontSize:16, color:"#A8A29E", maxWidth:480,
+                <p style={{ fontSize:16, color:""#A8A29E"", maxWidth:480,
                   lineHeight:1.8, marginBottom:0, fontFamily:"'DM Sans',sans-serif",
                   fontWeight:300 }}>
                   Instant permit intelligence for LA area contractors and investors.
@@ -2288,7 +2038,7 @@ ${bodyHtml}
               <div style={{ background:T.black, padding:"14px 24px",
                 display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <Logo size={22} light />
-                <span style={{ fontSize:10, color:"#78716C", fontFamily:"monospace" }}>
+                <span style={{ fontSize:10, color:""#78716C"", fontFamily:"monospace" }}>
                   FREE · AI-POWERED
                 </span>
               </div>
@@ -2534,7 +2284,7 @@ ${bodyHtml}
                 </div>
                 <div style={{ fontSize:22, fontFamily:"'Georgia',serif",
                   color:T.cream, marginBottom:8 }}>Working on it...</div>
-                <div style={{ fontSize:13, color:"#A8A29E",
+                <div style={{ fontSize:13, color:""#A8A29E"",
                   fontFamily:"'DM Sans',sans-serif", marginBottom:28 }}>
                   Checking zones, overlays, and permit pathways
                 </div>
@@ -2543,7 +2293,7 @@ ${bodyHtml}
                   {LOADING_STEPS.map((step, idx) => (
                     <div key={idx} style={{ display:"flex", gap:10, alignItems:"center" }}>
                       <div style={{ width:16, height:16, borderRadius:"50%",
-                        background: idx <= loadingStep ? T.green : "#ffffff12",
+                        background: idx <= loadingStep ? T.green : "#ffffff15",
                         display:"flex", alignItems:"center", justifyContent:"center",
                         flexShrink:0, transition:"background 0.3s" }}>
                         {idx <= loadingStep && (
@@ -2553,7 +2303,7 @@ ${bodyHtml}
                           </svg>
                         )}
                       </div>
-                      <span style={{ fontSize:12, color: idx <= loadingStep ? T.cream : "#78716C",
+                      <span style={{ fontSize:12, color: idx <= loadingStep ? T.cream : ""#78716C"",
                         fontFamily:"'DM Sans',sans-serif", textAlign:"left" }}>{step}</span>
                     </div>
                   ))}
@@ -2571,122 +2321,77 @@ ${bodyHtml}
 
             {result && (
               <div>
-                {/* ── HERO CARD ── */}
-                <ReportHero
-                  address={editStreet || address}
-                  parcel={parcel}
-                  projectType={projectType}
-                  jurisdiction={jurisdiction}
-                  resultText={result}
-                />
+                {/* Hero Card */}
+                <ReportHero address={editStreet || address} parcel={parcel} projectType={projectType} jurisdiction={jurisdiction} resultText={result} />
 
-                {/* ── STICKY NAV ── */}
+                {/* Sticky Nav */}
                 <SectionNav />
 
-                {/* ── REPORT BODY — cream background, white section cards ── */}
-                <div style={{ background:T.cream, padding:"4px 0 0", borderRadius:"0 0 12px 12px" }}>
-                  <div style={{ padding:"0 16px" }}>
-                    <ReportMarkdown text={result} jurisdiction={jurisdiction} parcel={parcel} projectType={projectType} />
-                  </div>
+                {/* Report Body — cream bg, white section cards */}
+                <div style={{ background: T.cream, padding: "8px 0 0" }}>
+                  <ReportBody text={result} parcel={parcel} projectType={projectType} jurisdiction={jurisdiction} />
 
-                  {/* ── FOOTER ── */}
-                  <div style={{ margin:"8px 16px 0", background:T.black,
-                    borderRadius:10, padding:"18px 24px" }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
-                      flexWrap:"wrap", gap:12, marginBottom:12 }} className="no-print">
-                      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                        <div style={{ position:"relative" }}>
+                  {/* Footer */}
+                  <div style={{ margin: "0 16px", background: T.black, borderRadius: 12, padding: "20px 24px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 14 }} className="no-print">
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <div style={{ position: "relative" }}>
                           <button onClick={handleShare}
-                            style={{ display:"flex", alignItems:"center", gap:8,
-                              background:T.gold, color:T.black, border:"none",
-                              borderRadius:8, padding:"10px 20px", fontSize:13,
-                              fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                            <svg width={14} height={14} viewBox="0 0 24 24" fill="none"
-                              stroke="currentColor" strokeWidth={2}>
-                              <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
-                            </svg>
+                            style={{ display: "flex", alignItems: "center", gap: 8, background: T.gold, color: T.black, border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
+                            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" /></svg>
                             Share Report
                           </button>
                           {shareToast && (
-                            <div style={{ position:"absolute", bottom:"calc(100% + 8px)", left:"50%",
-                              transform:"translateX(-50%)", background:T.black, color:T.gold,
-                              fontSize:11, padding:"5px 12px", borderRadius:6, whiteSpace:"nowrap",
-                              fontFamily:"'DM Sans',sans-serif", border:`1px solid ${T.gold}40` }}>
+                            <div style={{ position: "absolute", bottom: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)", background: T.black, color: T.gold, fontSize: 11, padding: "5px 12px", borderRadius: 6, whiteSpace: "nowrap", fontFamily: "'DM Sans',sans-serif", border: `1px solid ${T.gold}40` }}>
                               ✓ Copied to clipboard
                             </div>
                           )}
                         </div>
                         <button onClick={handlePrint}
-                          style={{ display:"flex", alignItems:"center", gap:8,
-                            background:"transparent", color:"#D6D3D1", border:"1px solid #ffffff20",
-                            borderRadius:8, padding:"10px 20px", fontSize:13,
-                            fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" strokeWidth={2}>
-                            <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                          </svg>
+                          style={{ display: "flex", alignItems: "center", gap: 8, background: "transparent", color: "#D6D3D1", border: "1px solid #ffffff20", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
+                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                           Export PDF
                         </button>
                       </div>
-                      <button onClick={() => window.open(jurisdiction?.applyUrl || jurisdiction?.agencyUrl || "https://www.ladbs.org/permits-inspections/apply-for-a-permit","_blank")}
-                        style={{ display:"flex", alignItems:"center", gap:6,
-                          background:"transparent", border:"none",
-                          color:"#A8A29E", padding:"10px 0",
-                          fontSize:12, cursor:"pointer", fontFamily:"'DM Sans',sans-serif",
-                          textDecoration:"underline", textUnderlineOffset:2 }}>
-                        Apply at {jurisdiction?.agency||"LADBS"} →
+                      <button onClick={() => window.open(jurisdiction?.applyUrl || jurisdiction?.agencyUrl || "https://www.ladbs.org/permits-inspections/apply-for-a-permit", "_blank")}
+                        style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: T.secondary, padding: "10px 0", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans',sans-serif", textDecoration: "underline", textUnderlineOffset: 2 }}>
+                        Apply at {jurisdiction?.agency || "LADBS"} →
                       </button>
                     </div>
-                    <div style={{ fontSize:10, color:"#A8A29E", lineHeight:1.6 }}>
-                      AI-generated guidance based on publicly available LA permit data. Always verify with your jurisdiction before submitting.
-                      This is not legal advice. Data sourced from ZIMAS (ArcGIS), LA County Assessor, and Census/Nominatim geocoding.
+                    <div style={{ fontSize: 10, color: T.secondary, lineHeight: 1.6 }}>
+                      AI-generated guidance based on publicly available LA permit data. Always verify with your jurisdiction before submitting. This is not legal advice.
                     </div>
-                    <div style={{ fontSize:10, color:"#78716C", marginTop:6 }}>
+                    <div style={{ fontSize: 10, color: T.secondary, marginTop: 6 }}>
                       listo.zone · Not affiliated with the City of Los Angeles, Santa Monica, Beverly Hills, Malibu, or LADBS
                     </div>
                   </div>
 
-                  {/* ── FEEDBACK ── */}
-                  <div style={{ padding:"16px 16px 20px" }} className="no-print">
+                  {/* Feedback */}
+                  <div style={{ padding: "16px 16px 20px" }} className="no-print">
                     {!fbDone ? (<>
-                      <div style={{ fontSize:13, color:T.secondary, marginBottom:10,
-                        fontFamily:"'DM Sans',sans-serif" }}>Was this analysis accurate and useful?</div>
-                      <div style={{ display:"flex", gap:8, marginBottom:fbOpen?14:0 }}>
+                      <div style={{ fontSize: 13, color: T.secondary, marginBottom: 10, fontFamily: "'DM Sans',sans-serif" }}>Was this analysis accurate and useful?</div>
+                      <div style={{ display: "flex", gap: 8, marginBottom: fbOpen ? 14 : 0 }}>
                         <button onClick={() => { setFbState("up"); submitFeedback("up"); }}
-                          style={{ fontSize:13, background:fbState==="up"?"#F0FDF4":T.white,
-                            border:`1px solid ${fbState==="up"?"#BBF7D0":T.border}`,
-                            color:fbState==="up"?T.green:T.secondary, borderRadius:8,
-                            padding:"8px 16px", cursor:"pointer",
-                            fontFamily:"'DM Sans',sans-serif" }}>
+                          style={{ fontSize: 13, background: fbState === "up" ? "#F0FDF4" : T.white, border: `1px solid ${fbState === "up" ? "#BBF7D0" : T.border}`, color: fbState === "up" ? T.green : T.secondary, borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
                           ✓ Accurate
                         </button>
                         <button onClick={() => { setFbState("down"); setFbOpen(true); }}
-                          style={{ fontSize:13, background:fbState==="down"?"#FEF2F2":T.white,
-                            border:`1px solid ${fbState==="down"?"#FECACA":T.border}`,
-                            color:fbState==="down"?T.red:T.secondary, borderRadius:8,
-                            padding:"8px 16px", cursor:"pointer",
-                            fontFamily:"'DM Sans',sans-serif" }}>
+                          style={{ fontSize: 13, background: fbState === "down" ? "#FEF2F2" : T.white, border: `1px solid ${fbState === "down" ? "#FECACA" : T.border}`, color: fbState === "down" ? T.red : T.secondary, borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
                           Something's wrong
                         </button>
                       </div>
                       {fbOpen && (
-                        <div style={{ marginTop:12 }}>
-                          <textarea style={{ width:"100%", border:`1px solid ${T.border}`,
-                            borderRadius:8, padding:"11px 14px", fontSize:13,
-                            color:T.text, height:80, resize:"vertical",
-                            fontFamily:"'DM Sans',sans-serif" }}
+                        <div style={{ marginTop: 12 }}>
+                          <textarea style={{ width: "100%", border: `1px solid ${T.border}`, borderRadius: 8, padding: "11px 14px", fontSize: 13, color: T.text, height: 80, resize: "vertical", fontFamily: "'DM Sans',sans-serif" }}
                             placeholder="What was wrong or missing?"
-                            value={fbComment} onChange={e=>setFbComment(e.target.value)} />
-                          <button className="btn-primary"
-                            style={{ width:"auto", padding:"10px 24px", fontSize:13, marginTop:8 }}
-                            onClick={() => submitFeedback("down", fbComment)}>
+                            value={fbComment} onChange={e => setFbComment(e.target.value)} />
+                          <button className="btn-primary" style={{ width: "auto", padding: "10px 24px", fontSize: 13, marginTop: 8 }} onClick={() => submitFeedback("down", fbComment)}>
                             Submit Feedback
                           </button>
                         </div>
                       )}
                     </>) : (
-                      <div style={{ fontSize:13, color:T.green,
-                        fontFamily:"'DM Sans',sans-serif" }}>
+                      <div style={{ fontSize: 13, color: T.green, fontFamily: "'DM Sans',sans-serif" }}>
                         Thanks — feedback received. This helps us improve accuracy.
                       </div>
                     )}
