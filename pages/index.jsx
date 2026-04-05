@@ -1364,9 +1364,9 @@ function AcronymLegend({ jurisdiction }) {
         width:"100%", background:"#ffffff10", border:"none", padding:"10px 16px",
         display:"flex", justifyContent:"space-between", alignItems:"center",
         cursor:"pointer", fontFamily:"'DM Sans',sans-serif", borderRadius:6 }}>
-        <span style={{ fontSize:11, fontWeight:700, color:""#D6D3D1"", fontFamily:"monospace",
+        <span style={{ fontSize:11, fontWeight:700, color:"#D6D3D1", fontFamily:"monospace",
           letterSpacing:"0.1em" }}>TERMS & DATA SOURCES</span>
-        <span style={{ fontSize:11, color:""#A8A29E"" }}>{open ? "▲ Hide" : "▼ Show"}</span>
+        <span style={{ fontSize:11, color:"#A8A29E" }}>{open ? "▲ Hide" : "▼ Show"}</span>
       </button>
       {open && (
         <div style={{ padding:"16px 0 0" }}>
@@ -1376,11 +1376,11 @@ function AcronymLegend({ jurisdiction }) {
                 borderBottom:"1px solid #ffffff10", alignItems:"flex-start" }}>
                 <span style={{ fontSize:10, fontWeight:700, color:T.orange,
                   fontFamily:"monospace", minWidth:50, flexShrink:0, paddingTop:1 }}>{term}</span>
-                <span style={{ fontSize:11, color:""#D6D3D1"", lineHeight:1.5 }}>{def}</span>
+                <span style={{ fontSize:11, color:"#D6D3D1", lineHeight:1.5 }}>{def}</span>
               </div>
             ))}
           </div>
-          <div style={{ fontSize:10, color:""#A8A29E"", fontFamily:"monospace",
+          <div style={{ fontSize:10, color:"#A8A29E", fontFamily:"monospace",
             letterSpacing:"0.08em", marginBottom:6 }}>DATA SOURCES</div>
           <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
             {sources.map(([label, url, href]) => (
@@ -1989,9 +1989,9 @@ ${bodyHtml}
             <Logo size={28} light />
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <span style={{ fontSize:11, color:""#A8A29E"", fontStyle:"italic",
+            <span style={{ fontSize:11, color:"#A8A29E", fontStyle:"italic",
               fontFamily:"'DM Sans',sans-serif" }}>Know before you build.</span>
-            <span style={{ fontSize:10, color:""#78716C"", border:"1px solid #ffffff15",
+            <span style={{ fontSize:10, color:"#78716C", border:"1px solid #ffffff15",
               borderRadius:20, padding:"3px 10px", fontFamily:"monospace" }}>
               {coverageText}
             </span>
@@ -2022,7 +2022,7 @@ ${bodyHtml}
                   color:T.cream, lineHeight:1.1, marginBottom:20, fontWeight:700 }}>
                   Know before<br />you <span style={{ color:T.orange }}>build.</span>
                 </h1>
-                <p style={{ fontSize:16, color:""#A8A29E"", maxWidth:480,
+                <p style={{ fontSize:16, color:"#A8A29E", maxWidth:480,
                   lineHeight:1.8, marginBottom:0, fontFamily:"'DM Sans',sans-serif",
                   fontWeight:300 }}>
                   Instant permit intelligence for LA area contractors and investors.
@@ -2038,7 +2038,7 @@ ${bodyHtml}
               <div style={{ background:T.black, padding:"14px 24px",
                 display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <Logo size={22} light />
-                <span style={{ fontSize:10, color:""#78716C"", fontFamily:"monospace" }}>
+                <span style={{ fontSize:10, color:"#78716C", fontFamily:"monospace" }}>
                   FREE · AI-POWERED
                 </span>
               </div>
@@ -2284,7 +2284,7 @@ ${bodyHtml}
                 </div>
                 <div style={{ fontSize:22, fontFamily:"'Georgia',serif",
                   color:T.cream, marginBottom:8 }}>Working on it...</div>
-                <div style={{ fontSize:13, color:""#A8A29E"",
+                <div style={{ fontSize:13, color:"#A8A29E",
                   fontFamily:"'DM Sans',sans-serif", marginBottom:28 }}>
                   Checking zones, overlays, and permit pathways
                 </div>
@@ -2303,7 +2303,7 @@ ${bodyHtml}
                           </svg>
                         )}
                       </div>
-                      <span style={{ fontSize:12, color: idx <= loadingStep ? T.cream : ""#78716C"",
+                      <span style={{ fontSize:12, color: idx <= loadingStep ? T.cream : "#78716C",
                         fontFamily:"'DM Sans',sans-serif", textAlign:"left" }}>{step}</span>
                     </div>
                   ))}
