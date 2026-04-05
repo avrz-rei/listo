@@ -676,82 +676,89 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
       sec = t.slice(3).toLowerCase();
       subsec = ""; // reset subsection
       const id = "sec-" + sec.replace(/[^a-z0-9]+/g,"-").replace(/-+$/,"");
+
+      // Section divider + accent-bar header
       els.push(
-        <div key={"h2"+i} id={id} style={{ marginTop:28, marginBottom:12, scrollMarginTop:80,
-          paddingBottom:8, borderBottom:`2px solid ${T.orange}30` }}>
-          <h2 style={{ fontFamily:"'Georgia',serif", fontSize:17, fontWeight:700,
-            color:T.black, margin:0, textTransform:"uppercase", letterSpacing:"0.05em" }}>
-            {t.slice(3)}
-          </h2>
+        <div key={"h2"+i} id={id} style={{ marginTop:24, marginBottom:14, scrollMarginTop:70 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ width:4, height:20, background:T.orange, borderRadius:2, flexShrink:0 }} />
+            <h2 style={{ fontFamily:"'Georgia',serif", fontSize:15, fontWeight:700,
+              color:T.textHead, margin:0, textTransform:"uppercase", letterSpacing:"0.04em", flex:1 }}>
+              {t.slice(3)}
+            </h2>
+          </div>
         </div>
       );
-      // Insert score cards after Project Overview header
+
+      // ── Project Overview: show quick stats grid, skip KPIs (hero has them) ──
       if ((sec.includes("project overview") || sec.includes("deal")) && !scoreCardsRendered) {
         scoreCardsRendered = true;
         i++;
-        // Skip to end of deal summary KPI lines, then render score cards
-        const kpiEls = [];
+        // Parse KPI lines for the stats grid
+        const kpiData = {};
         while (i < lines.length && !lines[i].trim().startsWith("## ")) {
           const ktRaw = lines[i].trim();
           if (!ktRaw) { i++; continue; }
-          // Strip bold markers (**) so "**VERDICT**: ..." matches "VERDICT:"
           const kt = ktRaw.replace(/\*\*/g, "");
-          if (kt.startsWith("VERDICT:")) {
-            const pts = kt.slice(8).trim().split("|").map(p=>p.trim());
-            const word = pts[0], desc = pts[1]||"";
-            const col = word==="GO" ? T.green : word==="COMPLEX" ? T.red : T.yellow;
-            kpiEls.push(
-              <div key={"v"+i} style={{ display:"flex", alignItems:"center", gap:10,
-                padding:"10px 14px", background: col+"15", border:`1px solid ${col}40`,
-                borderRadius:8, marginBottom:8 }}>
-                <span style={{ fontSize:11, fontWeight:800, color:T.white,
-                  background:col, borderRadius:4, padding:"2px 10px",
-                  letterSpacing:"0.08em" }}>{word}</span>
-                <span style={{ fontSize:13, color:T.text, lineHeight:1.5 }}>{desc}</span>
-              </div>
-            );
-          } else if (kt.startsWith("PROJECT:")) {
-            kpiEls.push(
-              <div key={"proj"+i} style={{ display:"flex", gap:10, padding:"7px 0",
-                borderBottom:`2px solid ${T.orange}`, alignItems:"center", marginBottom:4 }}>
-                <span style={{ fontSize:10, fontWeight:700, color:T.orange,
-                  textTransform:"uppercase", letterSpacing:"0.08em", minWidth:70,
-                  fontFamily:"monospace" }}>PROJECT</span>
-                <span style={{ fontSize:14, color:T.black, fontWeight:700,
-                  fontFamily:"'Georgia',serif" }}>{kt.slice(8).trim()}</span>
-              </div>
-            );
-          } else {
-            const KPI = ["ZONING:","UNITS:","PERMITS:","ALERTS:","DATA:"];
-            const kpi = KPI.find(k => kt.startsWith(k));
-            if (kpi) {
-              const label = kpi.slice(0,-1), val = kt.slice(kpi.length).trim();
-              kpiEls.push(
-                <div key={"k"+i} style={{ display:"flex", gap:10, padding:"7px 0",
-                  borderBottom:`1px solid ${T.border}`, alignItems:"flex-start" }}>
-                  <span style={{ fontSize:10, fontWeight:700, color:label==="ALERTS"?T.red:T.secondary,
-                    textTransform:"uppercase", letterSpacing:"0.08em", minWidth:70,
-                    paddingTop:2, flexShrink:0, fontFamily:"monospace" }}>{label}</span>
-                  <span style={{ fontSize:13, color:T.text, lineHeight:1.5, flex:1 }}>{renderInline(val)}</span>
-                </div>
-              );
-            }
-          }
+          if (kt.startsWith("VERDICT:")) { const pts = kt.slice(8).trim().split("|").map(p=>p.trim()); kpiData.verdict = pts[0]; kpiData.verdictDesc = pts[1]||""; }
+          if (kt.startsWith("PROJECT:")) kpiData.project = kt.slice(8).trim();
+          if (kt.startsWith("ZONING:")) kpiData.zoning = kt.slice(7).trim();
+          if (kt.startsWith("UNITS:")) kpiData.units = kt.slice(6).trim();
+          if (kt.startsWith("PERMITS:")) kpiData.permits = kt.slice(8).trim();
+          if (kt.startsWith("ALERTS:")) kpiData.alerts = kt.slice(7).trim();
+          if (kt.startsWith("DATA:")) kpiData.data = kt.slice(5).trim();
           i++;
         }
-        els.push(<div key="kpis">{kpiEls}</div>);
-        els.push(renderScoreCardsBlock());
+
+        // Quick stats card
+        els.push(
+          <div key="overview-card" style={{ background:T.white, borderRadius:10, border:`1px solid ${T.border}`, padding:"18px 20px", marginBottom:8 }}>
+            {/* Stat grid */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:10, marginBottom:14 }}>
+              {[
+                { label:"ZONING", value:parcel?.zoning||"—", sub:(kpiData.zoning||"").split("|").pop()?.trim()||"" },
+                { label:"LOT SIZE", value:parcel?.lotSizeSf ? parcel.lotSizeSf.toLocaleString()+" sf" : "—", sub:parcel?.apn ? "APN "+parcel.apn : "" },
+                { label:"EXISTING", value:(parcel?.existingBuildingSqft||"—")+" sf / "+(parcel?.existingUnits||"—")+" unit"+(parcel?.existingUnits>1?"s":""), sub:parcel?.yearBuilt ? "Built "+parcel.yearBuilt : "" },
+                { label:"JURISDICTION", value:jurisdiction?.short||"City of LA", sub:jurisdiction?.agency||"LADBS" },
+              ].map((s,si) => (
+                <div key={si} style={{ background:T.warmGray, borderRadius:8, padding:"10px 12px" }}>
+                  <div style={{ fontSize:9, color:T.secondary, letterSpacing:"0.1em", fontFamily:"monospace", marginBottom:4 }}>{s.label}</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:T.textHead, fontFamily:"'Georgia',serif" }}>{s.value}</div>
+                  <div style={{ fontSize:10, color:T.secondary }}>{s.sub}</div>
+                </div>
+              ))}
+            </div>
+            {/* Existing structure note */}
+            {parcel?.yearBuilt && parcel?.heReplacement && (
+              <div style={{ background:"#FFFBEB", border:`1px solid #FDE68A`, borderRadius:8, padding:"10px 14px", fontSize:12, color:"#92400E", lineHeight:1.6 }}>
+                <strong>Existing structure:</strong> {parcel.yearBuilt}, {parcel.existingUnits||"?"} unit{parcel.existingUnits>1?"s":""}, {parcel.existingBuildingSqft||"?"} sf{parcel.rso ? ", RSO" : ", non-RSO"} — demolition triggers HE Replacement (1:1 housing replacement per Housing Crisis Act)
+              </div>
+            )}
+          </div>
+        );
         continue;
       }
-      // Insert visual parcel survey cards + project summary side by side
+
+      // ── Development Opportunity: inject density scenario cards ──
+      if (sec.includes("opportunity") && parcel) {
+        els.push(<DensityScenarios key="density-scenarios" parcel={parcel} />);
+        i++; continue;
+      }
+
+      // ── Zone Alerts: inject summary bar ──
+      if (sec.includes("alert")) {
+        els.push(<AlertsSummaryBar key="alerts-summary" resultText={text} />);
+        i++; continue;
+      }
+
+      // ── Parcel Survey: render visual cards + project summary side by side ──
       if (sec.includes("parcel survey") && parcel) {
         els.push(
-          <div key="survey-summary" style={{ display:"flex", gap:16, alignItems:"flex-start",
-            flexWrap:"wrap" }}>
-            <div style={{ flex:"1 1 340px", minWidth:300 }}>
+          <div key="survey-summary" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, alignItems:"flex-start" }}>
+            <div>
               <ParcelSurveyCards key="parcel-cards" parcel={parcel} />
             </div>
-            <div style={{ flex:"1 1 280px", minWidth:260 }}>
+            <div>
               <ProjectSummary parcel={parcel} projectType={projectType} scoreCards={sc} />
             </div>
           </div>
@@ -765,7 +772,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
 
     if (t.startsWith("### ")) {
       subsec = t.slice(4).toLowerCase();
-      els.push(<h3 key={i} style={{ fontSize:13, fontWeight:700, color:T.black,
+      els.push(<h3 key={i} style={{ fontSize:13, fontWeight:700, color:T.textHead,
         margin:"14px 0 8px", background:T.warmGray, padding:"4px 10px", borderRadius:4 }}>
         {renderInline(t.slice(4))}
       </h3>);
@@ -1353,6 +1360,207 @@ function AcronymLegend({ jurisdiction }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Report Hero — dark card with address, verdict, KPIs ──────────────────
+function ReportHero({ address, parcel, projectType, jurisdiction, resultText }) {
+  // Extract KPIs from Claude's output
+  let verdict = "", verdictDesc = "", fees = "", timeline = "", alertLine = "";
+  for (const line of (resultText||"").split("\n")) {
+    const t = line.trim().replace(/\*\*/g,"");
+    if (t.startsWith("VERDICT:")) { const pts = t.slice(8).trim().split("|").map(p=>p.trim()); verdict = pts[0]; verdictDesc = pts[1]||""; }
+    if (t.startsWith("PERMITS:")) { const pts = t.slice(8).trim().split("|").map(p=>p.trim()); fees = pts[0]; timeline = pts[1]||""; }
+    if (t.startsWith("ALERTS:")) alertLine = t.slice(7).trim();
+  }
+  const vc = verdict==="GO" ? T.green : verdict==="COMPLEX" ? T.red : T.yellow;
+  const label = getLabel(projectType);
+  const d = new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"});
+
+  // Parse alert counts
+  const reqMatch = alertLine.match(/(\d+)\s*required/i);
+  const facMatch = alertLine.match(/(\d+)\s*factor/i);
+  const benMatch = alertLine.match(/(\d+)\s*benefit/i);
+  const reqCount = reqMatch ? reqMatch[1] : "0";
+  const facCount = facMatch ? facMatch[1] : "0";
+  const benCount = benMatch ? benMatch[1] : "0";
+
+  // Density from parcel
+  const z = (parcel?.zoning || "").toUpperCase();
+  let maxBuildout = "—";
+  if (parcel?.lotSizeSf > 0) {
+    const base = /^R1|^RS|^RE/.test(z) ? 1 : /^RD/.test(z) ? 2 : /^R4/.test(z) ? Math.floor(parcel.lotSizeSf/400) : Math.floor(parcel.lotSizeSf/800);
+    const tocMulti = parcel.toc === "Tier 4" ? 1.80 : parcel.toc === "Tier 3" ? 1.70 : parcel.toc === "Tier 2" ? 1.50 : parcel.toc === "Tier 1" ? 1.35 : 1;
+    const tocUnits = Math.floor(base * tocMulti);
+    const primary = Math.max(base, tocUnits);
+    const adus = /^R[2-5]|^RD/.test(z) ? 2 : 1;
+    const jadus = /^R[2-5]|^RD/.test(z) ? 1 : 1;
+    maxBuildout = `${primary + adus + jadus} units`;
+  }
+
+  return (
+    <div style={{ background:T.black, borderRadius:"12px 12px 0 0", overflow:"hidden" }}>
+      {/* Top bar */}
+      <div style={{ padding:"16px 28px 0", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+        <Logo size={22} light />
+        <div style={{ textAlign:"right" }}>
+          <div style={{ fontSize:10, color:T.muted, letterSpacing:"0.1em", fontFamily:"monospace" }}>PERMIT ANALYSIS REPORT</div>
+          <div style={{ fontSize:11, color:"#D6D3D1" }}>{d}</div>
+        </div>
+      </div>
+
+      {/* Address */}
+      <div style={{ padding:"14px 28px 4px" }}>
+        <div style={{ fontSize:24, fontWeight:700, color:T.white, fontFamily:"'Georgia',serif", lineHeight:1.2, letterSpacing:"-0.02em" }}>
+          {address}
+        </div>
+      </div>
+
+      {/* Tags */}
+      <div style={{ padding:"8px 28px 12px", display:"flex", gap:6, flexWrap:"wrap" }}>
+        <span style={{ fontSize:11, fontWeight:600, background:T.orange, color:T.white, borderRadius:6, padding:"3px 10px" }}>{label}</span>
+        {parcel?.hasData && (
+          <span style={{ fontSize:11, fontWeight:600, background:T.green+"22", color:T.green, borderRadius:6, padding:"3px 10px", border:`1px solid ${T.green}44`,
+            display:"flex", alignItems:"center", gap:4 }}>
+            <svg width={10} height={10} viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke={T.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            ZIMAS verified
+          </span>
+        )}
+        <span style={{ fontSize:11, color:"#D6D3D1", background:"#ffffff12", borderRadius:6, padding:"3px 10px" }}>
+          {jurisdiction?.short||"City of LA"} · {parcel?.zoning||"—"} · {parcel?.lotSizeSf ? parcel.lotSizeSf.toLocaleString()+" sf" : "—"}
+        </span>
+      </div>
+
+      {/* Verdict bar */}
+      {verdict && (
+        <div style={{ background:vc+"18", borderTop:`1px solid ${vc}33`, padding:"12px 28px", display:"flex", alignItems:"center", gap:12 }}>
+          <span style={{ fontSize:11, fontWeight:800, color:T.white, background:vc, borderRadius:5, padding:"3px 12px", letterSpacing:"0.06em" }}>{verdict}</span>
+          <span style={{ fontSize:13, color:"#E7E5E4", lineHeight:1.4, flex:1 }}>{verdictDesc}</span>
+        </div>
+      )}
+
+      {/* KPI strip */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", borderTop:"1px solid #ffffff12" }}>
+        {[
+          { label:"MAX BUILDOUT", value:maxBuildout, color:T.gold },
+          { label:"EST. FEES", value:fees||"—", color:T.gold },
+          { label:"TIMELINE", value:(timeline||"—").replace("week critical path","wks").replace("weeks","wks"), color:T.white },
+          { label:"ALERTS", value:`${reqCount} required`, sub:`${facCount} factors · ${benCount} benefits`, color:parseInt(reqCount)>0?T.red:T.green },
+        ].map((kpi, i) => (
+          <div key={i} style={{ padding:"14px 18px", borderRight:i<3?"1px solid #ffffff08":"none" }}>
+            <div style={{ fontSize:9, color:T.muted, letterSpacing:"0.1em", fontFamily:"monospace", marginBottom:5 }}>{kpi.label}</div>
+            <div style={{ fontSize:18, fontWeight:700, color:kpi.color, fontFamily:"'Georgia',serif", marginBottom:1 }}>{kpi.value}</div>
+            {kpi.sub && <div style={{ fontSize:10, color:T.muted }}>{kpi.sub}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Section Header with accent bar ───────────────────────────────────────
+function SectionHead({ title, id, count }) {
+  return (
+    <div id={id} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14, scrollMarginTop:70 }}>
+      <div style={{ width:4, height:20, background:T.orange, borderRadius:2, flexShrink:0 }} />
+      <h2 style={{ fontSize:15, fontWeight:700, color:T.textHead, margin:0, fontFamily:"'Georgia',serif", textTransform:"uppercase", letterSpacing:"0.04em", flex:1 }}>
+        {title}
+      </h2>
+      {count !== undefined && (
+        <span style={{ fontSize:11, fontWeight:600, background:T.warmGray, color:T.secondary, borderRadius:10, padding:"2px 10px" }}>{count}</span>
+      )}
+    </div>
+  );
+}
+
+// ── Sticky Section Nav ───────────────────────────────────────────────────
+function SectionNav({ activeSection }) {
+  const sections = [
+    { id:"sec-project-overview", label:"Overview" },
+    { id:"sec-development-opportunity", label:"Opportunity" },
+    { id:"sec-zone-alerts", label:"Alerts" },
+    { id:"sec-regulations", label:"Standards" },
+    { id:"sec-permitting", label:"Permits" },
+    { id:"sec-parcel-survey", label:"Survey" },
+  ];
+  return (
+    <div style={{ position:"sticky", top:0, zIndex:100, background:T.cream, padding:"8px 0" }} className="no-print">
+      <div style={{ display:"flex", gap:4, background:T.white, borderRadius:10, padding:4, border:`1px solid ${T.border}` }}>
+        {sections.map(s => (
+          <a key={s.id} href={"#"+s.id}
+            style={{ flex:1, padding:"8px 4px", border:"none", borderRadius:8, fontSize:11,
+              fontWeight:600, cursor:"pointer", textDecoration:"none", textAlign:"center",
+              background:"transparent", color:T.secondary, transition:"all 0.2s",
+              fontFamily:"'DM Sans',sans-serif" }}
+            onMouseEnter={e=>{e.target.style.background=T.orange;e.target.style.color=T.white}}
+            onMouseLeave={e=>{e.target.style.background="transparent";e.target.style.color=T.secondary}}>
+            {s.label}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Alerts Summary Bar ───────────────────────────────────────────────────
+function AlertsSummaryBar({ resultText }) {
+  const alertLine = (resultText||"").split("\n").find(l => l.trim().replace(/\*\*/g,"").startsWith("ALERTS:")) || "";
+  const t = alertLine.replace(/\*\*/g,"").slice(alertLine.indexOf("ALERTS:")+7).trim();
+  const reqMatch = t.match(/(\d+)\s*required/i);
+  const facMatch = t.match(/(\d+)\s*factor/i);
+  const benMatch = t.match(/(\d+)\s*benefit/i);
+  const counts = [
+    { label:"Required", count:reqMatch?parseInt(reqMatch[1]):0, color:T.red, bg:"#FEF2F2" },
+    { label:"Factors", count:facMatch?parseInt(facMatch[1]):0, color:T.yellow, bg:"#FFFBEB" },
+    { label:"Benefits", count:benMatch?parseInt(benMatch[1]):0, color:T.green, bg:"#F0FDF4" },
+  ];
+  return (
+    <div style={{ display:"flex", gap:10, marginBottom:16 }}>
+      {counts.map((g,i) => (
+        <div key={i} style={{ flex:1, background:g.bg, borderRadius:8, padding:"10px 14px", display:"flex", alignItems:"center", gap:10 }}>
+          <span style={{ fontSize:22, fontWeight:700, color:g.color, fontFamily:"'Georgia',serif" }}>{g.count}</span>
+          <span style={{ fontSize:12, color:g.color, fontWeight:600 }}>{g.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Density Scenario Cards ───────────────────────────────────────────────
+function DensityScenarios({ parcel }) {
+  if (!parcel?.lotSizeSf) return null;
+  const z = (parcel.zoning || "").toUpperCase();
+  const base = /^R1|^RS|^RE/.test(z) ? 1 : /^RD/.test(z) ? 2 : /^R4/.test(z) ? Math.floor(parcel.lotSizeSf/400) : Math.floor(parcel.lotSizeSf/800);
+  const hasToc = parcel.toc && parcel.toc !== "None";
+  const tocMulti = parcel.toc === "Tier 4" ? 1.80 : parcel.toc === "Tier 3" ? 1.70 : parcel.toc === "Tier 2" ? 1.50 : parcel.toc === "Tier 1" ? 1.35 : 1;
+  const tocUnits = hasToc ? Math.floor(base * tocMulti) : base;
+  const adus = /^R[2-5]|^RD/.test(z) ? 2 : 1;
+  const jadus = 1;
+  const maxTotal = Math.max(base, tocUnits) + adus + jadus;
+
+  const Card = ({ label, units, sub, highlight, badge }) => (
+    <div style={{ flex:"1 1 180px", background:T.white, border:`1px solid ${highlight ? T.gold+"80" : T.border}`,
+      borderLeft:highlight ? `4px solid ${T.gold}` : `1px solid ${T.border}`,
+      borderRadius:highlight ? 0 : 10, padding:"16px 18px" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+        <div style={{ fontSize:10, fontWeight:700, color:highlight ? T.orange : T.secondary, letterSpacing:"0.06em", fontFamily:"monospace" }}>{label}</div>
+        {badge && <span style={{ fontSize:9, fontWeight:700, background:T.orange, color:T.white, borderRadius:4, padding:"2px 8px" }}>{badge}</span>}
+      </div>
+      <div style={{ fontSize:28, fontWeight:700, color:highlight ? T.textHead : T.textHead, fontFamily:"'Georgia',serif", marginBottom:2 }}>{units}</div>
+      <div style={{ fontSize:12, color:T.secondary, lineHeight:1.5 }}>{sub}</div>
+      {/* Progress bar */}
+      <div style={{ marginTop:10, height:5, background:T.warmGray, borderRadius:3, overflow:"hidden" }}>
+        <div style={{ width:`${(units/maxTotal)*100}%`, height:"100%", background:highlight ? T.gold : T.border, borderRadius:3 }} />
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:16 }}>
+      <Card label="BASE ZONING" units={base} sub={`${parcel.zoning} zone · by-right`} />
+      {hasToc && <Card label={`WITH ${parcel.toc.toUpperCase()}`} units={tocUnits} sub={`${Math.round((tocMulti-1)*100)}% density bonus`} badge="TOC" />}
+      <Card label="MAX BUILDOUT" units={maxTotal} sub={`${Math.max(base,tocUnits)} primary + ${adus} ADU + ${jadus} JADU`} highlight badge="BEST CASE" />
     </div>
   );
 }
@@ -2267,171 +2475,127 @@ ${bodyHtml}
             )}
 
             {result && (
-              <div style={{ background:T.white, border:`1px solid ${T.border}`,
-                borderRadius:12, overflow:"hidden" }}>
-                {/* Report header — black */}
-                <div style={{ background:T.black, padding:"18px 28px",
-                  display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                  <Logo size={22} light />
-                  <div style={{ textAlign:"right" }}>
-                    <div style={{ fontSize:10, color:"#78716C",
-                      fontFamily:"monospace" }}>PERMIT ANALYSIS REPORT</div>
-                    <div style={{ fontSize:12, color:"#A8A29E",
-                      fontFamily:"monospace" }}>
-                      {new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})}
-                    </div>
+              <div>
+                {/* ── HERO CARD ── */}
+                <ReportHero
+                  address={editStreet || address}
+                  parcel={parcel}
+                  projectType={projectType}
+                  jurisdiction={jurisdiction}
+                  resultText={result}
+                />
+
+                {/* ── STICKY NAV ── */}
+                <SectionNav />
+
+                {/* ── REPORT BODY — cream background, white section cards ── */}
+                <div style={{ background:T.cream, padding:"4px 0 0", borderRadius:"0 0 12px 12px" }}>
+                  <div style={{ padding:"0 16px" }}>
+                    <ReportMarkdown text={result} jurisdiction={jurisdiction} parcel={parcel} projectType={projectType} />
                   </div>
-                </div>
 
-                {/* Address bar — orange */}
-                <div style={{ background:T.orange, padding:"16px 28px" }}>
-                  <div style={{ fontSize:10, color:"#D6D3D1", fontFamily:"monospace",
-                    letterSpacing:"0.12em", marginBottom:4 }}>PROPERTY</div>
-                  <div style={{ fontSize:18, fontFamily:"'Georgia',serif",
-                    color:T.white, fontWeight:700 }}>{editStreet || address}</div>
-                  <div style={{ fontSize:13, color:"#D6D3D1",
-                    fontFamily:"'DM Sans',sans-serif", marginTop:2,
-                    display:"flex", gap:12, flexWrap:"wrap", alignItems:"center" }}>
-                    <span>{getLabel(projectType)}</span>
-                    {jurisdiction && <span>· {jurisdiction.short}</span>}
-                    {parcel?.zoning && <span>· {parcel.zoning}</span>}
-                    {parcel?.lotSizeSf && <span>· {parcel.lotSizeSf.toLocaleString()} sf</span>}
-                    {parcel?.apn && <span>· APN {parcel.apn}</span>}
-                    <span style={{ fontSize:10, background:"#ffffff20",
-                      borderRadius:10, padding:"1px 8px" }}>
-                      {parcel?.hasData ? "ZIMAS verified" : "ZIP estimates"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Section nav */}
-                <div style={{ borderBottom:`1px solid ${T.border}`,
-                  padding:"10px 28px 8px", display:"flex", flexWrap:"wrap",
-                  gap:6 }} className="no-print">
-                  {["Overview","Opportunity","Standards","Survey","Alerts","Permits",
-                    "Fees","Timeline","Steps","Terms","Legal"].map((sec, idx) => {
-                    const fullNames = ["Project Overview","Development Opportunity","Development Standards","Parcel Survey","Zone Alerts","Permit Roadmap","Fee Summary","Timeline","Next Steps","Terms & Data Sources","Legal Notice"];
-                    return (
-                    <a key={sec}
-                      href={"#sec-"+fullNames[idx].toLowerCase().replace(/[^a-z0-9]+/g,"-")}
-                      style={{ fontSize:10, color:T.secondary, padding:"4px 10px",
-                        textDecoration:"none",
-                        fontFamily:"monospace", letterSpacing:"0.04em",
-                        border:`1px solid ${T.border}`, borderRadius:4,
-                        background:T.warmGray }}
-                      onMouseEnter={e=>{e.target.style.color=T.orange;e.target.style.borderColor=T.orange}}
-                      onMouseLeave={e=>{e.target.style.color=T.secondary;e.target.style.borderColor=T.border}}>
-                      {sec}
-                    </a>
-                  );})}
-                </div>
-
-                {/* Report body */}
-                <div style={{ padding:"28px 28px 0" }}>
-                  <ReportMarkdown text={result} jurisdiction={jurisdiction} parcel={parcel} projectType={projectType} />
-                </div>
-
-                {/* Listo footer */}
-                <div style={{ margin:"24px 28px 0", background:T.black,
-                  borderRadius:10, padding:"16px 24px", textAlign:"center" }}>
-                  <div style={{ fontSize:10, color:"#A8A29E", lineHeight:1.6, margin:0 }}>
-                    Data sourced from City of Los Angeles ZIMAS (ArcGIS), LA County Assessor,
-                    and Census/Nominatim geocoding. Data provided "as is" per ZIMAS terms at zimas.lacity.org.
-                  </div>
-                </div>
-
-                {/* CTAs — Share + PDF */}
-                <div style={{ padding:"16px 28px", display:"flex",
-                  justifyContent:"space-between", alignItems:"center",
-                  flexWrap:"wrap", gap:10 }} className="no-print">
-                  <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-                    <div style={{ position:"relative" }}>
-                      <button onClick={handleShare}
-                        style={{ display:"flex", alignItems:"center", gap:8,
-                          background:T.gold, color:T.black, border:"none",
-                          borderRadius:8, padding:"10px 20px", fontSize:13,
-                          fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none"
-                          stroke="currentColor" strokeWidth={2}>
-                          <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
-                        </svg>
-                        Share Report
-                      </button>
-                      {shareToast && (
-                        <div style={{ position:"absolute", bottom:"calc(100% + 8px)", left:"50%",
-                          transform:"translateX(-50%)", background:T.black, color:T.gold,
-                          fontSize:11, padding:"5px 12px", borderRadius:6, whiteSpace:"nowrap",
-                          fontFamily:"'DM Sans',sans-serif", border:`1px solid ${T.gold}40` }}>
-                          ✓ Copied to clipboard
+                  {/* ── FOOTER ── */}
+                  <div style={{ margin:"8px 16px 0", background:T.black,
+                    borderRadius:10, padding:"18px 24px" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+                      flexWrap:"wrap", gap:12, marginBottom:12 }} className="no-print">
+                      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                        <div style={{ position:"relative" }}>
+                          <button onClick={handleShare}
+                            style={{ display:"flex", alignItems:"center", gap:8,
+                              background:T.gold, color:T.black, border:"none",
+                              borderRadius:8, padding:"10px 20px", fontSize:13,
+                              fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                            <svg width={14} height={14} viewBox="0 0 24 24" fill="none"
+                              stroke="currentColor" strokeWidth={2}>
+                              <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
+                            </svg>
+                            Share Report
+                          </button>
+                          {shareToast && (
+                            <div style={{ position:"absolute", bottom:"calc(100% + 8px)", left:"50%",
+                              transform:"translateX(-50%)", background:T.black, color:T.gold,
+                              fontSize:11, padding:"5px 12px", borderRadius:6, whiteSpace:"nowrap",
+                              fontFamily:"'DM Sans',sans-serif", border:`1px solid ${T.gold}40` }}>
+                              ✓ Copied to clipboard
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <button onClick={handlePrint}
-                      style={{ display:"flex", alignItems:"center", gap:8,
-                        background:T.warmGray, color:T.text, border:`1px solid ${T.border}`,
-                        borderRadius:8, padding:"10px 20px", fontSize:13,
-                        fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" strokeWidth={2}>
-                        <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                      </svg>
-                      Export PDF
-                    </button>
-                  </div>
-                  <button onClick={() => window.open(jurisdiction?.applyUrl || jurisdiction?.agencyUrl || "https://www.ladbs.org/permits-inspections/apply-for-a-permit","_blank")}
-                    style={{ display:"flex", alignItems:"center", gap:6,
-                      background:"transparent", border:`1px solid ${T.border}`,
-                      color:T.secondary, borderRadius:8, padding:"10px 16px",
-                      fontSize:12, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-                    Apply at {jurisdiction?.agency||"LADBS"} →
-                  </button>
-                </div>
-
-                {/* Feedback */}
-                <div style={{ padding:"16px 28px 24px", borderTop:`1px solid ${T.border}` }}
-                  className="no-print">
-                  {!fbDone ? (<>
-                    <div style={{ fontSize:13, color:T.secondary, marginBottom:10,
-                      fontFamily:"'DM Sans',sans-serif" }}>Was this analysis accurate and useful?</div>
-                    <div style={{ display:"flex", gap:8, marginBottom:fbOpen?14:0 }}>
-                      <button onClick={() => { setFbState("up"); submitFeedback("up"); }}
-                        style={{ fontSize:13, background:fbState==="up"?"#F0FDF4":T.white,
-                          border:`1px solid ${fbState==="up"?"#BBF7D0":T.border}`,
-                          color:fbState==="up"?T.green:T.secondary, borderRadius:8,
-                          padding:"8px 16px", cursor:"pointer",
-                          fontFamily:"'DM Sans',sans-serif" }}>
-                        ✓ Accurate
-                      </button>
-                      <button onClick={() => { setFbState("down"); setFbOpen(true); }}
-                        style={{ fontSize:13, background:fbState==="down"?"#FEF2F2":T.white,
-                          border:`1px solid ${fbState==="down"?"#FECACA":T.border}`,
-                          color:fbState==="down"?T.red:T.secondary, borderRadius:8,
-                          padding:"8px 16px", cursor:"pointer",
-                          fontFamily:"'DM Sans',sans-serif" }}>
-                        Something's wrong
-                      </button>
-                    </div>
-                    {fbOpen && (
-                      <div style={{ marginTop:12 }}>
-                        <textarea style={{ width:"100%", border:`1px solid ${T.border}`,
-                          borderRadius:8, padding:"11px 14px", fontSize:13,
-                          color:T.text, height:80, resize:"vertical",
-                          fontFamily:"'DM Sans',sans-serif" }}
-                          placeholder="What was wrong or missing?"
-                          value={fbComment} onChange={e=>setFbComment(e.target.value)} />
-                        <button className="btn-primary"
-                          style={{ width:"auto", padding:"10px 24px", fontSize:13, marginTop:8 }}
-                          onClick={() => submitFeedback("down", fbComment)}>
-                          Submit Feedback
+                        <button onClick={handlePrint}
+                          style={{ display:"flex", alignItems:"center", gap:8,
+                            background:"transparent", color:"#D6D3D1", border:"1px solid #ffffff20",
+                            borderRadius:8, padding:"10px 20px", fontSize:13,
+                            fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                          <svg width={14} height={14} viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" strokeWidth={2}>
+                            <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                          </svg>
+                          Export PDF
                         </button>
                       </div>
-                    )}
-                  </>) : (
-                    <div style={{ fontSize:13, color:T.green,
-                      fontFamily:"'DM Sans',sans-serif" }}>
-                      Thanks — feedback received. This helps us improve accuracy.
+                      <button onClick={() => window.open(jurisdiction?.applyUrl || jurisdiction?.agencyUrl || "https://www.ladbs.org/permits-inspections/apply-for-a-permit","_blank")}
+                        style={{ display:"flex", alignItems:"center", gap:6,
+                          background:"transparent", border:"none",
+                          color:"#A8A29E", padding:"10px 0",
+                          fontSize:12, cursor:"pointer", fontFamily:"'DM Sans',sans-serif",
+                          textDecoration:"underline", textUnderlineOffset:2 }}>
+                        Apply at {jurisdiction?.agency||"LADBS"} →
+                      </button>
                     </div>
-                  )}
+                    <div style={{ fontSize:10, color:"#A8A29E", lineHeight:1.6 }}>
+                      AI-generated guidance based on publicly available LA permit data. Always verify with your jurisdiction before submitting.
+                      This is not legal advice. Data sourced from ZIMAS (ArcGIS), LA County Assessor, and Census/Nominatim geocoding.
+                    </div>
+                    <div style={{ fontSize:10, color:"#78716C", marginTop:6 }}>
+                      listo.zone · Not affiliated with the City of Los Angeles, Santa Monica, Beverly Hills, Malibu, or LADBS
+                    </div>
+                  </div>
+
+                  {/* ── FEEDBACK ── */}
+                  <div style={{ padding:"16px 16px 20px" }} className="no-print">
+                    {!fbDone ? (<>
+                      <div style={{ fontSize:13, color:T.secondary, marginBottom:10,
+                        fontFamily:"'DM Sans',sans-serif" }}>Was this analysis accurate and useful?</div>
+                      <div style={{ display:"flex", gap:8, marginBottom:fbOpen?14:0 }}>
+                        <button onClick={() => { setFbState("up"); submitFeedback("up"); }}
+                          style={{ fontSize:13, background:fbState==="up"?"#F0FDF4":T.white,
+                            border:`1px solid ${fbState==="up"?"#BBF7D0":T.border}`,
+                            color:fbState==="up"?T.green:T.secondary, borderRadius:8,
+                            padding:"8px 16px", cursor:"pointer",
+                            fontFamily:"'DM Sans',sans-serif" }}>
+                          ✓ Accurate
+                        </button>
+                        <button onClick={() => { setFbState("down"); setFbOpen(true); }}
+                          style={{ fontSize:13, background:fbState==="down"?"#FEF2F2":T.white,
+                            border:`1px solid ${fbState==="down"?"#FECACA":T.border}`,
+                            color:fbState==="down"?T.red:T.secondary, borderRadius:8,
+                            padding:"8px 16px", cursor:"pointer",
+                            fontFamily:"'DM Sans',sans-serif" }}>
+                          Something's wrong
+                        </button>
+                      </div>
+                      {fbOpen && (
+                        <div style={{ marginTop:12 }}>
+                          <textarea style={{ width:"100%", border:`1px solid ${T.border}`,
+                            borderRadius:8, padding:"11px 14px", fontSize:13,
+                            color:T.text, height:80, resize:"vertical",
+                            fontFamily:"'DM Sans',sans-serif" }}
+                            placeholder="What was wrong or missing?"
+                            value={fbComment} onChange={e=>setFbComment(e.target.value)} />
+                          <button className="btn-primary"
+                            style={{ width:"auto", padding:"10px 24px", fontSize:13, marginTop:8 }}
+                            onClick={() => submitFeedback("down", fbComment)}>
+                            Submit Feedback
+                          </button>
+                        </div>
+                      )}
+                    </>) : (
+                      <div style={{ fontSize:13, color:T.green,
+                        fontFamily:"'DM Sans',sans-serif" }}>
+                        Thanks — feedback received. This helps us improve accuracy.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
