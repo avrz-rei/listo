@@ -311,7 +311,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
       borderLeft:`4px solid ${color}`, marginBottom:12, overflow:"hidden" }}>
       <div style={{ padding:"10px 16px", background:"#FAFAFA", borderBottom:"1px solid #F3F4F6" }}>
         <span style={{ fontSize:11, fontWeight:700, color, textTransform:"uppercase",
-          letterSpacing:"0.08em", fontFamily:"monospace" }}>{title}</span>
+          letterSpacing:"0.08em" }}>{title}</span>
       </div>
       <div style={{ padding:"8px 16px" }}>{children}</div>
     </div>
@@ -380,7 +380,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
           display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8,
           border:`2px solid ${T.orange}30` }}>
           <div>
-            <div style={{ fontSize:10, color:T.orange, fontFamily:"monospace", letterSpacing:"0.1em" }}>DENSITY</div>
+            <div style={{ fontSize:10, color:T.orange, letterSpacing:"0.1em" }}>DENSITY</div>
             <div style={{ fontSize:16, fontWeight:700, color:T.textHead, fontFamily:"Georgia,serif", marginTop:2 }}>
               {densityText}
             </div>
@@ -395,7 +395,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
       })()}
 
       {/* Housing */}
-      <Card title="Housing" color="#7C3AED">
+      <Card title="Housing" color={T.orange}>
         <Row label="RSO (Rent Stabilization)" value={parcel.rso !== undefined ? (parcel.rso ? "Yes" : "No") : null} />
         <Row label="TOC (Transit Oriented Communities)" value={parcel.toc || null} />
         <Row label="HE Replacement Required" value={parcel.heReplacement !== undefined ? (parcel.heReplacement ? "Yes" : "No") : null} flagged={parcel.heReplacement === true} />
@@ -422,7 +422,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
       </Card>
 
       {/* Planning & Zoning Overlays */}
-      <Card title="Planning & Zoning Overlays" color="#2563EB">
+      <Card title="Planning & Zoning Overlays" color={T.secondary}>
         <Row label="Specific Plan" value={parcel.specificPlan || null} />
         <Row label="HPOZ (Historic Preservation)" value={parcel.hpoz === true ? "Yes" : parcel.hpoz === false ? "No" : null} />
         <Row label="CDO (Community Design Overlay)" value={parcel.cdo === true ? "Yes" : parcel.cdo === false ? "No" : null} />
@@ -430,12 +430,12 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
         <Row label="Community Plan" value={parcel.communityPlan || null} />
         {parcel.ziCodes?.length > 0 && (
           <div style={{ marginTop:8 }}>
-            <div style={{ fontSize:10, color:T.secondary, fontFamily:"monospace", marginBottom:4,
+            <div style={{ fontSize:10, color:T.secondary, marginBottom:4,
               letterSpacing:"0.08em" }}>ZONING INFORMATION ({parcel.ziCodes.length})</div>
             <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
               {parcel.ziCodes.map((zi,i) => (
-                <span key={i} style={{ fontSize:10, background:"#EFF6FF", color:"#1E40AF",
-                  border:"1px solid #BFDBFE", borderRadius:4, padding:"3px 8px" }}>
+                <span key={i} style={{ fontSize:10, background:T.orange+"10", color:T.orange,
+                  border:`1px solid ${T.orange}40`, borderRadius:4, padding:"3px 8px" }}>
                   {zi}
                 </span>
               ))}
@@ -444,12 +444,12 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
         )}
         {parcel.overlayLayers?.length > 0 && (
           <div style={{ marginTop:8 }}>
-            <div style={{ fontSize:10, color:T.secondary, fontFamily:"monospace", marginBottom:4,
+            <div style={{ fontSize:10, color:T.secondary, marginBottom:4,
               letterSpacing:"0.08em" }}>ALL DETECTED OVERLAYS ({parcel.overlayLayers.length})</div>
             <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
               {parcel.overlayLayers.map((o,i) => (
-                <span key={i} style={{ fontSize:10, background:"#EFF6FF", color:"#1E40AF",
-                  border:"1px solid #BFDBFE", borderRadius:4, padding:"2px 6px" }}>
+                <span key={i} style={{ fontSize:10, background:T.orange+"10", color:T.orange,
+                  border:`1px solid ${T.orange}40`, borderRadius:4, padding:"2px 6px" }}>
                   {o.layerName}
                 </span>
               ))}
@@ -532,7 +532,7 @@ function ProjectSummary({ parcel, projectType, scoreCards }) {
   const SRow = ({ label: l, value: v, highlight, small }) => (
     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start",
       padding: small ? "4px 0" : "6px 0", borderBottom:`1px solid ${T.border}`, gap:8 }}>
-      <span style={{ fontSize:11, color:T.secondary, fontFamily:"monospace", letterSpacing:"0.04em",
+      <span style={{ fontSize:11, color:T.secondary, letterSpacing:"0.04em",
         flexShrink:0, paddingTop:1 }}>{l}</span>
       <span style={{ fontSize:12, color: highlight ? T.orange : T.text, fontWeight: highlight ? 700 : 400,
         textAlign:"right", lineHeight:1.4 }}>{v || "—"}</span>
@@ -555,7 +555,7 @@ function ProjectSummary({ parcel, projectType, scoreCards }) {
       <div style={{ background:T.orange, padding:"12px 16px", display:"flex",
         justifyContent:"space-between", alignItems:"center" }}>
         <div style={{ fontSize:11, fontWeight:700, color:T.white, letterSpacing:"0.06em",
-          fontFamily:"monospace" }}>PROJECT SUMMARY</div>
+          fontFamily:"'DM Sans',sans-serif" }}>PROJECT SUMMARY</div>
         <span style={{ fontSize:12, fontWeight:700, color:T.white,
           fontFamily:"'Georgia',serif" }}>{label}</span>
       </div>
@@ -574,10 +574,10 @@ function ProjectSummary({ parcel, projectType, scoreCards }) {
           <div style={{ marginTop:10 }}>
             <div style={{ fontSize:9, color:T.orange, fontFamily:"monospace",
               letterSpacing:"0.1em", marginBottom:6 }}>STATE LAW ELIGIBILITY</div>
-            {sb79Proxy && <StateLawBadge name="SB 79 — Transit upzoning (eff. July 2026)" status="LIKELY" color="#2563eb" />}
-            {sb35Eligible && <StateLawBadge name="SB 35/423 — Streamlined ministerial" status="LIKELY" color="#2563eb" />}
+            {sb79Proxy && <StateLawBadge name="SB 79 — Transit upzoning (eff. July 2026)" status="LIKELY" color={T.yellow} />}
+            {sb35Eligible && <StateLawBadge name="SB 35/423 — Streamlined ministerial" status="LIKELY" color={T.yellow} />}
             {sb684Eligible && <StateLawBadge name="SB 684 — Ministerial ≤10 units" status="ELIGIBLE" color="#15803d" />}
-            {sb1123Eligible && <StateLawBadge name="SB 1123 — Starter homes (vacant SF lot)" status="LIKELY" color="#2563eb" />}
+            {sb1123Eligible && <StateLawBadge name="SB 1123 — Starter homes (vacant SF lot)" status="LIKELY" color={T.yellow} />}
             {sb9Eligible && <StateLawBadge name="SB 9 — Duplex + lot split" status="ELIGIBLE" color="#15803d" />}
             {ab2011Eligible && <StateLawBadge name="AB 2011 — Housing on commercial" status="CHECK" color="#b45309" />}
             {hasAB2097 && <StateLawBadge name="AB 2097 — No parking minimum" status="YES" color="#15803d" />}
@@ -671,75 +671,60 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
     const line = lines[i];
     const t = line.trim();
 
-    // Section headers
+    // Section headers — push marker for post-processing into cards
     if (t.startsWith("## ")) {
       sec = t.slice(3).toLowerCase();
       subsec = ""; // reset subsection
       const id = "sec-" + sec.replace(/[^a-z0-9]+/g,"-").replace(/-+$/,"");
+      const noCard = sec.includes("parcel survey"); // survey uses its own card grid
 
-      // Section divider + accent-bar header
-      els.push(
-        <div key={"h2"+i} id={id} style={{ marginTop:24, marginBottom:14, scrollMarginTop:70 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={{ width:4, height:20, background:T.orange, borderRadius:2, flexShrink:0 }} />
-            <h2 style={{ fontFamily:"'Georgia',serif", fontSize:15, fontWeight:700,
-              color:T.textHead, margin:0, textTransform:"uppercase", letterSpacing:"0.04em", flex:1 }}>
-              {t.slice(3)}
-            </h2>
-          </div>
-        </div>
-      );
+      // Push a marker (not a React element) — post-processing wraps in cards
+      els.push({ __section: true, id, title: t.slice(3), noCard });
 
-      // ── Project Overview: show quick stats grid, skip KPIs (hero has them) ──
+      // ── Project Overview: inject stats grid, skip KPIs (hero has them) ──
       if ((sec.includes("project overview") || sec.includes("deal")) && !scoreCardsRendered) {
         scoreCardsRendered = true;
         i++;
-        // Parse KPI lines for the stats grid
+        // Parse KPI lines
         const kpiData = {};
         while (i < lines.length && !lines[i].trim().startsWith("## ")) {
           const ktRaw = lines[i].trim();
           if (!ktRaw) { i++; continue; }
           const kt = ktRaw.replace(/\*\*/g, "");
           if (kt.startsWith("VERDICT:")) { const pts = kt.slice(8).trim().split("|").map(p=>p.trim()); kpiData.verdict = pts[0]; kpiData.verdictDesc = pts[1]||""; }
-          if (kt.startsWith("PROJECT:")) kpiData.project = kt.slice(8).trim();
           if (kt.startsWith("ZONING:")) kpiData.zoning = kt.slice(7).trim();
           if (kt.startsWith("UNITS:")) kpiData.units = kt.slice(6).trim();
-          if (kt.startsWith("PERMITS:")) kpiData.permits = kt.slice(8).trim();
-          if (kt.startsWith("ALERTS:")) kpiData.alerts = kt.slice(7).trim();
-          if (kt.startsWith("DATA:")) kpiData.data = kt.slice(5).trim();
           i++;
         }
-
-        // Quick stats card
+        // Stats grid
         els.push(
-          <div key="overview-card" style={{ background:T.white, borderRadius:10, border:`1px solid ${T.border}`, padding:"18px 20px", marginBottom:8 }}>
-            {/* Stat grid */}
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:10, marginBottom:14 }}>
-              {[
-                { label:"ZONING", value:parcel?.zoning||"—", sub:(kpiData.zoning||"").split("|").pop()?.trim()||"" },
-                { label:"LOT SIZE", value:parcel?.lotSizeSf ? parcel.lotSizeSf.toLocaleString()+" sf" : "—", sub:parcel?.apn ? "APN "+parcel.apn : "" },
-                { label:"EXISTING", value:(parcel?.existingBuildingSqft||"—")+" sf / "+(parcel?.existingUnits||"—")+" unit"+(parcel?.existingUnits>1?"s":""), sub:parcel?.yearBuilt ? "Built "+parcel.yearBuilt : "" },
-                { label:"JURISDICTION", value:jurisdiction?.short||"City of LA", sub:jurisdiction?.agency||"LADBS" },
-              ].map((s,si) => (
-                <div key={si} style={{ background:T.warmGray, borderRadius:8, padding:"10px 12px" }}>
-                  <div style={{ fontSize:9, color:T.secondary, letterSpacing:"0.1em", fontFamily:"monospace", marginBottom:4 }}>{s.label}</div>
-                  <div style={{ fontSize:14, fontWeight:700, color:T.textHead, fontFamily:"'Georgia',serif" }}>{s.value}</div>
-                  <div style={{ fontSize:10, color:T.secondary }}>{s.sub}</div>
-                </div>
-              ))}
-            </div>
-            {/* Existing structure note */}
-            {parcel?.yearBuilt && parcel?.heReplacement && (
-              <div style={{ background:"#FFFBEB", border:`1px solid #FDE68A`, borderRadius:8, padding:"10px 14px", fontSize:12, color:"#92400E", lineHeight:1.6 }}>
-                <strong>Existing structure:</strong> {parcel.yearBuilt}, {parcel.existingUnits||"?"} unit{parcel.existingUnits>1?"s":""}, {parcel.existingBuildingSqft||"?"} sf{parcel.rso ? ", RSO" : ", non-RSO"} — demolition triggers HE Replacement (1:1 housing replacement per Housing Crisis Act)
+          <div key="overview-stats" className="overview-stats-grid" style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:10, marginBottom:14 }}>
+            {[
+              { label:"ZONING", value:parcel?.zoning||"—", sub:(kpiData.zoning||"").split("|").pop()?.trim()||"" },
+              { label:"LOT SIZE", value:parcel?.lotSizeSf ? parcel.lotSizeSf.toLocaleString()+" sf" : "—", sub:parcel?.apn ? "APN "+parcel.apn : "" },
+              { label:"EXISTING", value:(parcel?.existingBuildingSqft||"—")+" sf / "+(parcel?.existingUnits||"—")+" unit", sub:parcel?.yearBuilt ? "Built "+parcel.yearBuilt : "" },
+              { label:"JURISDICTION", value:jurisdiction?.short||"City of LA", sub:jurisdiction?.agency||"LADBS" },
+            ].map((s,si) => (
+              <div key={si} style={{ background:T.warmGray, borderRadius:8, padding:"10px 12px" }}>
+                <div style={{ fontSize:9, color:T.secondary, letterSpacing:"0.1em", marginBottom:4 }}>{s.label}</div>
+                <div style={{ fontSize:14, fontWeight:700, color:T.textHead, fontFamily:"'Georgia',serif" }}>{s.value}</div>
+                <div style={{ fontSize:10, color:T.secondary }}>{s.sub}</div>
               </div>
-            )}
+            ))}
           </div>
         );
+        // Existing structure warning
+        if (parcel?.yearBuilt && parcel?.heReplacement) {
+          els.push(
+            <div key="he-warning" style={{ background:"#FFFBEB", border:"1px solid #FDE68A", borderRadius:8, padding:"10px 14px", fontSize:12, color:"#92400E", lineHeight:1.6 }}>
+              <strong>Existing structure:</strong> {parcel.yearBuilt}, {parcel.existingUnits||"?"} unit{(parcel.existingUnits||0)>1?"s":""}, {parcel.existingBuildingSqft||"?"} sf{parcel.rso ? ", RSO" : ", non-RSO"} — demolition triggers HE Replacement
+            </div>
+          );
+        }
         continue;
       }
 
-      // ── Development Opportunity: inject density scenario cards ──
+      // ── Development Opportunity: inject scenario cards ──
       if (sec.includes("opportunity") && parcel) {
         els.push(<DensityScenarios key="density-scenarios" parcel={parcel} />);
         i++; continue;
@@ -751,16 +736,12 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
         i++; continue;
       }
 
-      // ── Parcel Survey: render visual cards + project summary side by side ──
+      // ── Parcel Survey: visual cards + project summary side by side ──
       if (sec.includes("parcel survey") && parcel) {
         els.push(
-          <div key="survey-summary" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, alignItems:"flex-start" }}>
-            <div>
-              <ParcelSurveyCards key="parcel-cards" parcel={parcel} />
-            </div>
-            <div>
-              <ProjectSummary parcel={parcel} projectType={projectType} scoreCards={sc} />
-            </div>
+          <div key="survey-grid" className="survey-grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, alignItems:"flex-start" }}>
+            <div><ParcelSurveyCards parcel={parcel} /></div>
+            <div><ProjectSummary parcel={parcel} projectType={projectType} scoreCards={sc} /></div>
           </div>
         );
         i++;
@@ -852,7 +833,7 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
       const badgeStyle = {
         OTC:    { bg:T.green+"20",  color:T.green,  border:T.green+"40",  label:"OTC" },
         SPECIAL:{ bg:T.orange+"20", color:T.orange, border:T.orange+"40", label:"SPECIAL" },
-        DEFAULT:{ bg:"#EFF6FF",     color:"#2563eb", border:"#BFDBFE",    label:"PLAN CHECK" },
+        DEFAULT:{ bg:T.warmGray,     color:T.secondary, border:T.border,    label:"PLAN CHECK" },
       };
       const b = isOTC ? badgeStyle.OTC : isSpecial ? badgeStyle.SPECIAL : badgeStyle.DEFAULT;
       els.push(
@@ -1012,12 +993,12 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
       if (t.startsWith("TOC BONUS:")) {
         const val = t.slice(10).trim();
         const eligible = !/not applicable|not eligible/i.test(val);
-        els.push(<div key={i} style={{ background:eligible?"#EFF6FF":"#F9FAFB",
-          border:`1px solid ${eligible?"#BFDBFE":T.border}`, borderRadius:6,
+        els.push(<div key={i} style={{ background:eligible?T.orange+"10":"#F9FAFB",
+          border:`1px solid ${eligible?T.orange+"40":T.border}`, borderRadius:6,
           padding:"8px 12px", marginBottom:6, display:"flex", gap:8, alignItems:"center" }}>
-          <span style={{ fontSize:9, fontWeight:700, color:eligible?"#2563eb":T.secondary,
+          <span style={{ fontSize:9, fontWeight:700, color:eligible?T.orange:T.secondary,
             letterSpacing:"0.1em", fontFamily:"monospace" }}>TOC</span>
-          <span style={{ fontSize:13, color:eligible?"#1d4ed8":T.secondary }}>{val}</span>
+          <span style={{ fontSize:13, color:eligible?T.orange:T.secondary }}>{val}</span>
         </div>);
         i++; continue;
       }
@@ -1100,17 +1081,65 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
       i++; continue;
     }
 
-    // Timeline
+    // Timeline — Gantt chart visualization
     if (inSec("timeline")) {
       const wm = t.match(/^(Weeks?\s[\d\-–]+)\s*:\s*(.+)$/i);
       if (wm) {
-        els.push(<div key={i} style={{ display:"flex", gap:12, padding:"7px 0",
-          borderBottom:`1px solid ${T.border}`, alignItems:"flex-start" }}>
-          <span style={{ fontSize:11, fontWeight:700, color:T.orange, fontFamily:"monospace",
-            whiteSpace:"nowrap", minWidth:80, paddingTop:2, flexShrink:0 }}>{wm[1]}</span>
-          <span style={{ fontSize:13, color:T.text, lineHeight:1.6 }}>{renderInline(wm[2])}</span>
-        </div>);
-        i++; continue;
+        // Collect ALL week lines for Gantt
+        const ganttItems = [];
+        let worstWeek = 0;
+        while (i < lines.length) {
+          const gl = lines[i].trim();
+          const gm = gl.match(/^Weeks?\s([\d]+)\s*[-–]\s*([\d]+)\s*:\s*(.+)$/i);
+          if (gm) {
+            const start = parseInt(gm[1]), end = parseInt(gm[2]);
+            ganttItems.push({ start, end, label: gm[3].trim() });
+            if (end > worstWeek) worstWeek = end;
+            i++; continue;
+          }
+          // Single week: "Week 24+: ..."
+          const gm2 = gl.match(/^Weeks?\s([\d]+)\+?\s*:\s*(.+)$/i);
+          if (gm2) {
+            const wk = parseInt(gm2[1]);
+            ganttItems.push({ start: wk, end: wk+1, label: gm2[2].trim() });
+            if (wk+1 > worstWeek) worstWeek = wk+1;
+            i++; continue;
+          }
+          break;
+        }
+        if (ganttItems.length > 0 && worstWeek > 0) {
+          els.push(
+            <div key={"gantt"+i} style={{ marginBottom:12 }}>
+              {/* Week axis labels */}
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4, paddingLeft:100, fontSize:10, color:T.secondary, fontFamily:"monospace" }}>
+                {Array.from({ length: Math.min(6, Math.ceil(worstWeek/5)+1) }, (_, idx) => {
+                  const wk = Math.round(idx * worstWeek / Math.min(5, Math.ceil(worstWeek/5)));
+                  return <span key={idx}>{wk}</span>;
+                })}
+              </div>
+              {/* Bars */}
+              {ganttItems.map((bar, bi) => {
+                const shortLabel = bar.label.length > 14 ? bar.label.slice(0,14)+"…" : bar.label;
+                return (
+                  <div key={"gb"+bi} style={{ display:"flex", alignItems:"center", marginBottom:3, height:24 }}>
+                    <div style={{ width:96, fontSize:10, color:T.secondary, textAlign:"right", paddingRight:8, flexShrink:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{shortLabel}</div>
+                    <div style={{ flex:1, position:"relative", height:20 }}>
+                      <div style={{ position:"absolute",
+                        left:`${(bar.start/worstWeek)*100}%`,
+                        width:`${Math.max(((bar.end-bar.start)/worstWeek)*100, 2)}%`,
+                        height:"100%", background:T.orange+"25",
+                        borderRadius:4, border:`1px solid ${T.orange}50`,
+                        display:"flex", alignItems:"center", paddingLeft:6 }}>
+                        <span style={{ fontSize:9, color:T.orange, fontWeight:600, whiteSpace:"nowrap" }}>{bar.end-bar.start} wks</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        }
+        continue;
       }
       if (t.startsWith("BEST CASE:") || t.startsWith("WORST CASE:")) {
         const isB = t.startsWith("BEST");
@@ -1213,12 +1242,12 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
 
     // Critical path callout
     if (t.startsWith("CRITICAL PATH:")) {
-      els.push(<div key={i} style={{ padding:"8px 12px", background:"#EFF6FF",
-        border:"1px solid #BFDBFE", borderRadius:6, marginTop:8,
+      els.push(<div key={i} style={{ padding:"8px 12px", background:T.orange+"10",
+        border:`1px solid ${T.orange}40`, borderRadius:6, marginTop:8,
         display:"flex", gap:8, alignItems:"center" }}>
-        <span style={{ fontSize:10, fontWeight:700, color:"#2563eb",
+        <span style={{ fontSize:10, fontWeight:700, color:T.orange,
           fontFamily:"monospace", letterSpacing:"0.08em" }}>CRITICAL PATH</span>
-        <span style={{ fontSize:13, color:"#1d4ed8" }}>{t.slice(14).trim()}</span>
+        <span style={{ fontSize:13, color:T.orange }}>{t.slice(14).trim()}</span>
       </div>);
       i++; continue;
     }
@@ -1290,7 +1319,66 @@ function ReportMarkdown({ text, jurisdiction, parcel, projectType }) {
     i++;
   }
 
-  return els;
+  // ── Post-process: group elements by section markers, wrap each in a white card ──
+  const sections = [];
+  let curEls = [];
+  let curMarker = null;
+
+  for (const el of els) {
+    if (el && el.__section) {
+      // Flush previous section
+      if (curMarker && curEls.length > 0) {
+        sections.push(
+          <div key={"secwrap-"+curMarker.id} style={{ marginBottom:24 }}>
+            <div id={curMarker.id} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12, scrollMarginTop:70 }}>
+              <div style={{ width:4, height:20, background:T.orange, borderRadius:2, flexShrink:0 }} />
+              <h2 style={{ fontSize:15, fontWeight:700, color:T.textHead, margin:0, fontFamily:"'Georgia',serif", textTransform:"uppercase", letterSpacing:"0.04em" }}>
+                {curMarker.title}
+              </h2>
+            </div>
+            {curMarker.noCard ? (
+              <div>{curEls}</div>
+            ) : (
+              <div style={{ background:T.white, borderRadius:12, border:`1px solid ${T.border}`, padding:"20px 24px" }}>
+                {curEls}
+              </div>
+            )}
+          </div>
+        );
+      } else if (curEls.length > 0) {
+        // Elements before first section (shouldn't happen, but safety)
+        sections.push(<div key="pre-sections">{curEls}</div>);
+      }
+      curMarker = el;
+      curEls = [];
+    } else {
+      curEls.push(el);
+    }
+  }
+  // Flush last section
+  if (curMarker && curEls.length > 0) {
+    sections.push(
+      <div key={"secwrap-"+curMarker.id} style={{ marginBottom:24 }}>
+        <div id={curMarker.id} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12, scrollMarginTop:70 }}>
+          <div style={{ width:4, height:20, background:T.orange, borderRadius:2, flexShrink:0 }} />
+          <h2 style={{ fontSize:15, fontWeight:700, color:T.textHead, margin:0, fontFamily:"'Georgia',serif", textTransform:"uppercase", letterSpacing:"0.04em" }}>
+            {curMarker.title}
+          </h2>
+        </div>
+        {curMarker.noCard ? (
+          <div>{curEls}</div>
+        ) : (
+          <div style={{ background:T.white, borderRadius:12, border:`1px solid ${T.border}`, padding:"20px 24px" }}>
+            {curEls}
+          </div>
+        )}
+      </div>
+    );
+  } else if (curEls.length > 0) {
+    sections.push(<div key="trailing">{curEls}</div>);
+  }
+
+  return sections;
 }
 
 // ── Acronym Legend ────────────────────────────────────────────────────────
@@ -1405,7 +1493,7 @@ function ReportHero({ address, parcel, projectType, jurisdiction, resultText }) 
       <div style={{ padding:"16px 28px 0", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
         <Logo size={22} light />
         <div style={{ textAlign:"right" }}>
-          <div style={{ fontSize:10, color:T.muted, letterSpacing:"0.1em", fontFamily:"monospace" }}>PERMIT ANALYSIS REPORT</div>
+          <div style={{ fontSize:10, color:T.muted, letterSpacing:"0.1em" }}>PERMIT ANALYSIS REPORT</div>
           <div style={{ fontSize:11, color:"#D6D3D1" }}>{d}</div>
         </div>
       </div>
@@ -1441,7 +1529,7 @@ function ReportHero({ address, parcel, projectType, jurisdiction, resultText }) 
       )}
 
       {/* KPI strip */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", borderTop:"1px solid #ffffff12" }}>
+      <div className="hero-kpi-grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", borderTop:"1px solid #ffffff12" }}>
         {[
           { label:"MAX BUILDOUT", value:maxBuildout, color:T.gold },
           { label:"EST. FEES", value:fees||"—", color:T.gold },
@@ -1449,7 +1537,7 @@ function ReportHero({ address, parcel, projectType, jurisdiction, resultText }) 
           { label:"ALERTS", value:`${reqCount} required`, sub:`${facCount} factors · ${benCount} benefits`, color:parseInt(reqCount)>0?T.red:T.green },
         ].map((kpi, i) => (
           <div key={i} style={{ padding:"14px 18px", borderRight:i<3?"1px solid #ffffff08":"none" }}>
-            <div style={{ fontSize:9, color:T.muted, letterSpacing:"0.1em", fontFamily:"monospace", marginBottom:5 }}>{kpi.label}</div>
+            <div style={{ fontSize:9, color:T.muted, letterSpacing:"0.1em", marginBottom:5 }}>{kpi.label}</div>
             <div style={{ fontSize:18, fontWeight:700, color:kpi.color, fontFamily:"'Georgia',serif", marginBottom:1 }}>{kpi.value}</div>
             {kpi.sub && <div style={{ fontSize:10, color:T.muted }}>{kpi.sub}</div>}
           </div>
@@ -1486,7 +1574,7 @@ function SectionNav({ activeSection }) {
   ];
   return (
     <div style={{ position:"sticky", top:0, zIndex:100, background:T.cream, padding:"8px 0" }} className="no-print">
-      <div style={{ display:"flex", gap:4, background:T.white, borderRadius:10, padding:4, border:`1px solid ${T.border}` }}>
+      <div className="section-nav-bar" style={{ display:"flex", gap:4, background:T.white, borderRadius:10, padding:4, border:`1px solid ${T.border}` }}>
         {sections.map(s => (
           <a key={s.id} href={"#"+s.id}
             style={{ flex:1, padding:"8px 4px", border:"none", borderRadius:8, fontSize:11,
@@ -1544,7 +1632,7 @@ function DensityScenarios({ parcel }) {
       borderLeft:highlight ? `4px solid ${T.gold}` : `1px solid ${T.border}`,
       borderRadius:highlight ? 0 : 10, padding:"16px 18px" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-        <div style={{ fontSize:10, fontWeight:700, color:highlight ? T.orange : T.secondary, letterSpacing:"0.06em", fontFamily:"monospace" }}>{label}</div>
+        <div style={{ fontSize:10, fontWeight:700, color:highlight ? T.orange : T.secondary, letterSpacing:"0.06em" }}>{label}</div>
         {badge && <span style={{ fontSize:9, fontWeight:700, background:T.orange, color:T.white, borderRadius:4, padding:"2px 8px" }}>{badge}</span>}
       </div>
       <div style={{ fontSize:28, fontWeight:700, color:highlight ? T.textHead : T.textHead, fontFamily:"'Georgia',serif", marginBottom:2 }}>{units}</div>
@@ -1557,7 +1645,7 @@ function DensityScenarios({ parcel }) {
   );
 
   return (
-    <div style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:16 }}>
+    <div className="scenario-cards" style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:16 }}>
       <Card label="BASE ZONING" units={base} sub={`${parcel.zoning} zone · by-right`} />
       {hasToc && <Card label={`WITH ${parcel.toc.toUpperCase()}`} units={tocUnits} sub={`${Math.round((tocMulti-1)*100)}% density bonus`} badge="TOC" />}
       <Card label="MAX BUILDOUT" units={maxTotal} sub={`${Math.max(base,tocUnits)} primary + ${adus} ADU + ${jadus} JADU`} highlight badge="BEST CASE" />
@@ -1866,7 +1954,7 @@ export default function Listo() {
     let parcelHtml = "";
     if (parcel?.hasData) {
       const vBadge = (val) => val !== undefined && val !== null
-        ? `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#D1FAE5;color:#065F46;font-family:monospace">VERIFIED</span>`
+        ? `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:${T.green}18;color:${T.green};font-family:monospace">✓ ZIMAS</span>`
         : `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#FEF3C7;color:#92400E;font-family:monospace">NOT VERIFIED</span>`;
       const pRow = (label, val) => `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F3F4F6;font-size:11px"><span>${label}</span><span style="font-weight:600">${val !== null && val !== undefined ? val + " " + vBadge(val) : vBadge(null)}</span></div>`;
       const flagBadge = (val, flagged) => val ? `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:${flagged?"#FEE2E2;color:#991B1B":"#D1FAE5;color:#065F46"};font-family:monospace">${typeof val === "string" ? val : "YES"}</span>` : `<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#F3F4F6;color:#78716C;font-family:monospace">NO</span>`;
@@ -1906,18 +1994,18 @@ export default function Listo() {
             ${hRow("Airport Hazard", parcel.airportHazard === false ? false : parcel.airportHazard || null, !!parcel.airportHazard && parcel.airportHazard !== false)}
           </div>
         </div>
-        <div style="border:1px solid #E5E7EB;border-left:4px solid #2563EB;border-radius:8px;margin:8px 0;overflow:hidden">
-          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#2563EB;text-transform:uppercase;letter-spacing:0.08em;font-family:monospace">PLANNING & ZONING</div>
+        <div style="border:1px solid #E5E7EB;border-left:4px solid #78716C;border-radius:8px;margin:8px 0;overflow:hidden">
+          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#78716C;text-transform:uppercase;letter-spacing:0.08em;font-family:monospace">PLANNING & ZONING</div>
           <div style="padding:6px 14px">
             ${pRow("Specific Plan", parcel.specificPlan || null)}
             ${pRow("HPOZ", parcel.hpoz === true ? "Yes" : parcel.hpoz === false ? "No" : null)}
             ${pRow("General Plan", parcel.generalPlanLandUse || null)}
             ${pRow("Community Plan", parcel.communityPlan || null)}
-            ${parcel.ziCodes?.length ? '<div style="margin-top:6px"><div style="font-size:9px;color:#78716C;font-family:monospace;margin-bottom:3px">ZONING INFORMATION (' + parcel.ziCodes.length + ')</div>' + parcel.ziCodes.map(zi => '<div style="font-size:9px;color:#1E40AF;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:3px;padding:2px 6px;margin:2px 0">' + zi + '</div>').join('') + '</div>' : ''}
+            ${parcel.ziCodes?.length ? '<div style="margin-top:6px"><div style="font-size:9px;color:#78716C;font-family:monospace;margin-bottom:3px">ZONING INFORMATION (' + parcel.ziCodes.length + ')</div>' + parcel.ziCodes.map(zi => '<div style="font-size:9px;color:#E8620A;background:#E8620A15;border:1px solid #E8620A40;border-radius:3px;padding:2px 6px;margin:2px 0">' + zi + '</div>').join('') + '</div>' : ''}
           </div>
         </div>
-        <div style="border:1px solid #E5E7EB;border-left:4px solid #7C3AED;border-radius:8px;margin:8px 0;overflow:hidden">
-          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:0.08em;font-family:monospace">HOUSING</div>
+        <div style="border:1px solid #E5E7EB;border-left:4px solid #E8620A;border-radius:8px;margin:8px 0;overflow:hidden">
+          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#E8620A;text-transform:uppercase;letter-spacing:0.08em;font-family:monospace">HOUSING</div>
           <div style="padding:6px 14px">
             ${hRow("RSO", parcel.rso !== undefined ? (parcel.rso ? "Yes" : "No") : null, false)}
             ${hRow("TOC", parcel.toc || null, false)}
@@ -2017,7 +2105,7 @@ export default function Listo() {
       }
       if (/^EXEMPTION:/i.test(t)){const rest=t.slice(10).trim();const pts=rest.split("|").map(p=>p.trim());bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:9px;font-weight:700;color:#fff;background:${T.orange};border-radius:3px;padding:1px 6px;margin-top:1px">EXEMPT</span><span style="flex:1">${pts[0]||""}</span><span style="color:${T.orange};font-weight:600">${pts[1]||""}</span><span style="color:#78716C;font-size:11px">${pts[2]||""}</span></div>`;continue;}
       if (/^(ENCROACHMENT|GRADING:|BASEMENT:|FIRE SPRINKLERS:|OFFSET PLAN|SWIMMING POOL:|PARKING STALLS:)/i.test(t)){const ci=t.indexOf(":");const lbl=t.slice(0,ci).trim();bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:9px;font-weight:700;color:#78716C;font-family:monospace;min-width:120px;padding-top:1px">${lbl}</span><span style="color:#44403C">${t.slice(ci+1).trim()}</span></div>`;continue;}
-      if (/^CRITICAL PATH:/i.test(t)){bodyHtml+=`<div style="padding:8px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;margin:8px 0;display:flex;gap:8px;align-items:center"><span style="font-size:10px;font-weight:700;color:#2563eb;font-family:monospace">CRITICAL PATH</span><span style="font-size:13px;color:#1d4ed8">${t.slice(14).trim()}</span></div>`;continue;}
+      if (/^CRITICAL PATH:/i.test(t)){bodyHtml+=`<div style="padding:8px 12px;background:#E8620A15;border:1px solid #E8620A40;border-radius:6px;margin:8px 0;display:flex;gap:8px;align-items:center"><span style="font-size:10px;font-weight:700;color:#E8620A;font-family:monospace">CRITICAL PATH</span><span style="font-size:13px;color:#E8620A">${t.slice(14).trim()}</span></div>`;continue;}
       if (/^(DENSITY MATH|TOC|MAX BUILDOUT|EXISTING|BEST CASE|WORST CASE)/i.test(t)){const ci=t.indexOf(":")||t.indexOf(" ");const lbl=t.slice(0,ci).trim();const val=t.slice(ci+1).trim();bodyHtml+=`<div style="padding:6px 12px;margin:4px 0;background:#F9FAFB;border-radius:6px;border-left:3px solid ${T.orange}"><span style="font-size:9px;font-weight:700;color:${T.orange};font-family:monospace;margin-right:8px">${lbl}</span><span style="font-size:13px;color:#1A1714;font-weight:600">${val}</span></div>`;continue;}
       if (/^Weeks?\s[\d\-–]+:/i.test(t)){const ci=t.indexOf(":");bodyHtml+=`<div style="display:flex;gap:12px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-weight:700;color:${T.orange};min-width:80px;font-size:11px;font-family:monospace">${t.slice(0,ci)}</span><span style="color:#44403C">${t.slice(ci+1).trim()}</span></div>`;continue;}
       if (/^\d+\./.test(t)){const rest2=t.replace(/^\d+\.\s*/,"");const pi=rest2.indexOf("|");const act=pi>0?rest2.slice(0,pi).trim():rest2;const me=pi>0?rest2.slice(pi+1).trim():"";const n2=(t.match(/^\d+/)||[""])[0];bodyHtml+=`<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #E2D9D0;align-items:flex-start"><span style="font-size:10px;font-weight:800;color:#fff;background:${T.orange};border-radius:4px;padding:2px 6px;white-space:nowrap;margin-top:1px">${n2}</span><div><strong style="font-size:12px">${act}</strong>${me?`<span style="display:block;font-size:11px;color:#78716C;margin-top:2px">${me}</span>`:""}</div></div>`;continue;}
@@ -2133,6 +2221,13 @@ ${bodyHtml}
         .fade-up{animation:fadeUp 0.35s ease forwards}
         .pulse{animation:pulse 1.4s ease-in-out infinite}
         @media print{.no-print{display:none!important}}
+        @media(max-width:640px){
+          .hero-kpi-grid{grid-template-columns:1fr 1fr!important}
+          .overview-stats-grid{grid-template-columns:1fr 1fr!important}
+          .scenario-cards{flex-direction:column!important}
+          .survey-grid{grid-template-columns:1fr!important}
+          .section-nav-bar{overflow-x:auto;-webkit-overflow-scrolling:touch}
+        }
       `}</style>
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
