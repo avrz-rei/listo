@@ -686,7 +686,7 @@ function buildSystem(jurisdictionKey) {
     "  HIGH = entitlement likely required, complex regulatory environment, significant pre-application work",
     "ZONING: [exact code] | [permitted uses 6 words]",
     "UNITS: Use the DENSITY BY ZONE table — R1 = 1 unit/lot, R2/R3 = lot/800, R4 = lot/400, RD = 2 units/lot, R5 = no limit. Do NOT default to lot/800 for R1 zones.",
-    "PERMITS: $[low]-$[high] | [N]-[N] week critical path",
+    "PERMITS: $[low]K-$[high]K | [N]-[N] week critical path (use K for thousands, e.g. $36K-$92K)",
     "ALERTS: [N] required | [N] factors | [N] benefits",
     "DATA: [ZIMAS verified | ZIP estimate]",
     "",
@@ -782,8 +782,6 @@ function buildSystem(jurisdictionKey) {
     "## Terms & Data Sources",
     "APN: Assessor Parcel Number | OTC: Over the Counter | FAR: Floor Area Ratio | RSO: Rent Stabilization Ordinance | HPOZ: Historic Preservation Overlay Zone | TOC: Transit Oriented Communities | JADU: Junior Accessory Dwelling Unit | LAMC: LA Municipal Code | CBC: California Building Code | LADBS: LA Dept of Building and Safety | BOE: Bureau of Engineering | CCC: California Coastal Commission | CDP: Coastal Development Permit | CGS: California Geological Survey",
     "Data sources: ZIMAS (zimas.lacity.org) | LA County Assessor (portal.assessor.lacounty.gov) | CGS Seismic Hazards (maps.conservation.ca.gov) | Census/Nominatim geocoding | LAMC (library.municode.com/ca/los_angeles) | LADBS (ladbs.org)",
-    "",
-    "AI-generated guidance based on publicly available LA permit data. Always verify with your jurisdiction before submitting. This is not legal advice. Listo makes no warranties regarding accuracy or completeness. Data provided 'as is' per ZIMAS terms.",
   ].filter(s => s !== "").join("\n");
 }
 
