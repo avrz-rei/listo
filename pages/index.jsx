@@ -278,7 +278,7 @@ function ParcelSurveyCards({ parcel }) {
     if (flagged || yes === true) return (
       <span style={{ fontSize:10, fontWeight:600, padding:"2px 8px", borderRadius:4,
         background: flagged ? "#FEE2E2" : "#D1FAE5", color: flagged ? "#991B1B" : "#065F46",
-        fontFamily:"monospace" }}>{flagged ? "YES — ACTION" : typeof value === "string" ? value : "YES"}</span>
+        fontFamily:"monospace" }}>{flagged ? "YES" : typeof value === "string" ? value : "YES"}</span>
     );
     return (
       <span style={{ fontSize:10, fontWeight:600, padding:"2px 8px", borderRadius:4,
@@ -368,26 +368,59 @@ function ParcelSurveyCards({ parcel }) {
 
       {/* Planning & Zoning */}
       <Card title="Planning & Zoning" color="#2563eb">
-        <Row label="General Plan" value={parcel.generalPlanLandUse || null} />
-        <Row label="Community Plan" value={parcel.communityPlan || null} />
-        <Row label="Specific Plan" value={parcel.specificPlan || null} />
-        <Row label="Coastal Zone" value={parcel.coastalZone === "Yes" ? parcel.coastalZoneType || "Yes" : parcel.coastalZone === "No" ? "No" : null} flagged={parcel.coastalZone === "Yes"} />
-        <Row label="TOC" value={parcel.toc || null} />
-        <Row label="HPOZ" value={parcel.hpoz === true ? "Yes" : parcel.hpoz === false ? "No" : null} />
-        <Row label="CDO" value={parcel.cdo === true ? "Yes" : parcel.cdo === false ? "No" : null} />
-        {parcel.ziCodes?.length > 0 && (
-          <div style={{ marginTop:8 }}>
-            <div style={{ fontSize:10, color:T.secondary, letterSpacing:"0.08em", marginBottom:4 }}>ZI CODES ({parcel.ziCodes.length})</div>
-            <div style={{ display:"flex", flexWrap:"wrap", gap:3 }}>
-              {parcel.ziCodes.map((zi,idx) => (
-                <span key={idx} style={{ fontSize:9, background:T.orange+"10", color:T.orange,
-                  border:`1px solid ${T.orange}40`, borderRadius:3, padding:"2px 6px", fontFamily:"monospace" }}>
-                  {zi}
-                </span>
+        {(() => {
+          const ziCodes = parcel.ziCodes || [];
+          const ziUsed = new Set();
+          const findZi = (keywords) => {
+            const matches = ziCodes.filter((zi, idx) => !ziUsed.has(idx) && keywords.some(k => zi.toLowerCase().includes(k)));
+            matches.forEach(m => ziUsed.add(ziCodes.indexOf(m)));
+            return matches;
+          };
+          // Pre-compute all matches upfront
+          const fields = [
+            { label: "General Plan", value: parcel.generalPlanLandUse || null, zi: findZi(["general plan"]) },
+            { label: "Community Plan", value: parcel.communityPlan || null, zi: findZi(["community"]) },
+            { label: "Specific Plan", value: parcel.specificPlan || null, zi: findZi(["specific", "venice", "coastal transportation"]) },
+            { label: "Coastal Zone", value: parcel.coastalZone === "Yes" ? parcel.coastalZoneType || "Yes" : parcel.coastalZone === "No" ? "No" : null, flagged: parcel.coastalZone === "Yes", zi: findZi(["coastal"]) },
+            { label: "TOC", value: parcel.toc || null, zi: findZi(["transit", "toc", "2452", "2462", "2427"]) },
+            { label: "HPOZ", value: parcel.hpoz === true ? "Yes" : parcel.hpoz === false ? "No" : null, zi: findZi(["historic", "hpoz"]) },
+            { label: "CDO", value: parcel.cdo === true ? "Yes" : parcel.cdo === false ? "No" : null, zi: findZi(["design overlay", "cdo"]) },
+          ];
+          const remainingZi = ziCodes.filter((_, idx) => !ziUsed.has(idx));
+          const ZiPill = ({ code }) => (
+            <span style={{ fontSize: 8, background: T.orange + "10", color: T.orange, border: `1px solid ${T.orange}40`, borderRadius: 3, padding: "1px 4px", fontFamily: "monospace", whiteSpace: "nowrap" }}>{code.split(" ")[0]}</span>
+          );
+          return (
+            <>
+              {fields.map((f, fi) => (
+                <div key={fi} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #F3F4F6", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: "#374151" }}>{f.label}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    {typeof f.value === "string" || typeof f.value === "number" ? (
+                      <>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>{f.value}</span>
+                        <span style={{ fontSize: 9, fontWeight: 600, padding: "2px 6px", borderRadius: 3, background: T.green + "18", color: T.green, display: "flex", alignItems: "center", gap: 3 }}>
+                          <svg width={9} height={9} viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke={T.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          ZIMAS
+                        </span>
+                      </>
+                    ) : f.value !== undefined && f.value !== null ? (
+                      <Badge yes={f.value} value={f.value} flagged={f.flagged} />
+                    ) : (
+                      <Badge />
+                    )}
+                    {f.zi.map((zi, ri) => <ZiPill key={ri} code={zi} />)}
+                  </div>
+                </div>
               ))}
-            </div>
-          </div>
-        )}
+              {remainingZi.length > 0 && (
+                <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 3, paddingTop: 4 }}>
+                  {remainingZi.map((zi, idx) => <ZiPill key={idx} code={zi} />)}
+                </div>
+              )}
+            </>
+          );
+        })()}
       </Card>
 
       {/* Housing */}
@@ -493,23 +526,35 @@ function SectionLines({ lines, sectionName }) {
 
   while (i < lines.length) {
     const line = lines[i];
-    const t = line.trim();
+    const t = line.trim().replace(/\*\*/g, "");
     if (!t || t === "---") { els.push(<div key={i} style={{ height: 5 }} />); i++; continue; }
 
     // Subsection headers
     if (t.startsWith("### ")) {
       subsec = t.slice(4).toLowerCase();
-      els.push(<h3 key={i} style={{ fontSize: 13, fontWeight: 700, color: T.textHead,
-        margin: "14px 0 8px", background: T.warmGray, padding: "4px 10px", borderRadius: 4 }}>
+      // Fee Summary gets orange label style
+      if (subsec.includes("fee")) {
+        els.push(<div key={i} style={{ fontSize: 10, fontWeight: 700, color: T.orange, letterSpacing: "0.1em", marginTop: 16, marginBottom: 8 }}>
+          {t.slice(4).toUpperCase()}
+        </div>);
+        i++; continue;
+      }
+      els.push(<h3 key={i} style={{ fontSize: 12, fontWeight: 700, color: T.textHead,
+        margin: "12px 0 6px", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ width: 3, height: 14, background: T.orange, borderRadius: 2 }} />
         {renderInline(t.slice(4))}
       </h3>);
       i++; continue;
     }
     if (t.startsWith("#### ")) {
-      els.push(<h3 key={i} style={{ fontSize: 12, fontWeight: 700, color: T.orange,
-        margin: "10px 0 6px", letterSpacing: "0.05em" }}>
-        {t.slice(5)}
-      </h3>);
+      els.push(<div key={i} style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0 4px" }}>
+        <span style={{ width: 18, height: 18, borderRadius: "50%", background: T.orange + "20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: T.orange, fontWeight: 800 }}>
+          {t.match(/\d/) ? t.match(/\d/)[0] : ""}
+        </span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: T.orange, letterSpacing: "0.06em" }}>
+          {t.slice(5)}
+        </span>
+      </div>);
       i++; continue;
     }
 
@@ -517,8 +562,8 @@ function SectionLines({ lines, sectionName }) {
     if (sec.includes("alert") && t.includes("|") && t.split("|").length >= 2) {
       const pts = t.split("|").map(p => p.trim());
       const [sev, name, dollar, time] = pts;
-      const levelMap = { "REQUIRED": "amber", "ACTION REQUIRED": "amber", "CRITICAL": "amber", "FACTOR": "blue", "CAUTION": "blue", "BENEFIT": "green", "NOTE": "green", "INFO": "green", "CLEAR": "green" };
-      const level = levelMap[sev] || "green";
+      const sevClean = sev.replace(/[^A-Z ]/gi, "").trim().toUpperCase();
+      const level = /REQUIRED|ACTION|CRITICAL/.test(sevClean) ? "amber" : /FACTOR|CAUTION/.test(sevClean) ? "blue" : "green";
       const displayLabel = level === "amber" ? "REQUIRED" : level === "blue" ? "FACTOR" : "BENEFIT";
       const cfg = level === "amber"
         ? { bg: "#FFFBEB", border: "#FDE68A", color: T.yellow }
@@ -534,6 +579,18 @@ function SectionLines({ lines, sectionName }) {
       if (i + 1 < lines.length && !lines[i + 1].trim().includes("|") && lines[i + 1].trim()) {
         desc = lines[i + 1].trim(); i++;
       }
+      // Parse source from description (e.g. "...required — ZIMAS" or "...NOT VERIFIED")
+      let descText = desc;
+      let source = "";
+      const dashIdx = desc.lastIndexOf("—");
+      if (dashIdx > 0) {
+        const after = desc.slice(dashIdx + 1).trim();
+        if (/ZIMAS|CGS|Assessor|NOT VERIFIED/i.test(after)) {
+          descText = desc.slice(0, dashIdx).trim();
+          source = after;
+        }
+      }
+      const isVerified = source && !/NOT VERIFIED/i.test(source);
       els.push(<div key={i} style={{ marginBottom: 4 }}>
         <div style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 8, padding: "10px 14px", display: "flex", gap: 12, alignItems: "flex-start" }}>
           <div style={{ width: 24, height: 24, borderRadius: 6, background: cfg.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
@@ -541,16 +598,24 @@ function SectionLines({ lines, sectionName }) {
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-              {name && <div style={{ fontSize: 14, fontWeight: 600, color: T.textHead }}>{name}</div>}
+              {name && <div style={{ fontSize: 13, fontWeight: 600, color: T.textHead }}>{name}</div>}
               {dollar && dollar !== "Variable" && dollar !== "Benefit" && dollar !== "None" && (
-                <span style={{ fontSize: 13, fontWeight: 700, color: cfg.color, whiteSpace: "nowrap" }}>{dollar}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: cfg.color, whiteSpace: "nowrap" }}>{dollar}</span>
               )}
             </div>
-            {desc && <div style={{ fontSize: 13, color: T.text, lineHeight: 1.6, marginTop: 4 }}>{desc}</div>}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 9, fontWeight: 800, color: T.white, background: cfg.color, borderRadius: 4, padding: "3px 10px", letterSpacing: "0.06em" }}>{displayLabel}</span>
+            {descText && <div style={{ fontSize: 12, color: T.text, lineHeight: 1.5, marginTop: 2 }}>{descText}</div>}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 9, fontWeight: 800, color: T.white, background: cfg.color, borderRadius: 4, padding: "2px 8px", letterSpacing: "0.06em" }}>{displayLabel}</span>
               {time && time !== "—" && time !== "Variable" && (
                 <span style={{ fontSize: 11, color: T.secondary }}>+{time}</span>
+              )}
+              {source && (
+                <span style={{ fontSize: 9, fontWeight: 600, padding: "2px 6px", borderRadius: 3,
+                  background: isVerified ? T.green + "18" : "#FEF3C7", color: isVerified ? T.green : "#92400E",
+                  display: "flex", alignItems: "center", gap: 3 }}>
+                  {isVerified && <svg width={9} height={9} viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke={T.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                  {source}
+                </span>
               )}
             </div>
           </div>
@@ -560,8 +625,14 @@ function SectionLines({ lines, sectionName }) {
     }
 
     // ── Permit roadmap cards ──
-    if ((inSec("roadmap") || inSec("road map") || inSec("permit")) && t.includes("|") && t.split("|").length >= 3) {
-      const [name2, type, agency, time2, cost] = t.split("|").map(p => p.trim());
+    if ((inSec("roadmap") || inSec("road map") || (inSec("permit") && !inSec("fee") && !inSec("document"))) && t.includes("|") && t.split("|").length >= 3) {
+      const parts = t.split("|").map(p => p.trim());
+      const name2 = parts[0];
+      const type = parts[1];
+      // Detect cost vs time: cost starts with $, time has "week" or is N-N format
+      const remaining = parts.slice(2);
+      const costField = remaining.find(p => p.startsWith("$")) || "";
+      const timeField = remaining.find(p => /week|wk|\d+\s*[-–]\s*\d+/i.test(p) && !p.startsWith("$")) || "";
       const typeUpper = (type || "").toUpperCase();
       const b = typeUpper === "OTC"
         ? { bg: T.green + "20", color: T.green, border: T.green + "40", label: "OTC" }
@@ -569,11 +640,11 @@ function SectionLines({ lines, sectionName }) {
         ? { bg: "#FFFBEB", color: T.yellow, border: "#FDE68A", label: "SPECIAL" }
         : { bg: "#EFF6FF", color: "#2563eb", border: "#BFDBFE", label: "PLAN CHECK" };
       els.push(
-        <div key={i} style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 8, padding: "10px 14px", marginBottom: 4, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: T.text, flex: 1 }}>{name2}</span>
+        <div key={i} style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 6, padding: "8px 12px", marginBottom: 3, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: T.text, flex: 1 }}>{name2}</span>
           <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", background: b.bg, color: b.color, border: `1px solid ${b.border}`, borderRadius: 4, padding: "2px 8px" }}>{b.label}</span>
-          <span style={{ fontSize: 12, color: T.secondary, minWidth: 80 }}>{time2 || ""}</span>
-          <span style={{ fontSize: 12, color: T.orange, fontWeight: 600, minWidth: 80, textAlign: "right" }}>{cost || ""}</span>
+          {timeField && <span style={{ fontSize: 11, color: T.secondary }}>{timeField}</span>}
+          {costField && <span style={{ fontSize: 11, color: T.orange, fontWeight: 600, textAlign: "right" }}>{costField}</span>}
         </div>
       );
       i++; continue;
@@ -597,7 +668,7 @@ function SectionLines({ lines, sectionName }) {
         i++;
         let rowIdx = 0;
         while (i < lines.length) {
-          const rt = lines[i].trim();
+          const rt = lines[i].trim().replace(/\*\*/g, "");
           if (!rt || rt.startsWith("##") || rt.startsWith("EXEMPTION:") || rt.startsWith("ENCROACHMENT") || rt.startsWith("GRADING:") || rt.startsWith("BASEMENT:") || rt.startsWith("FIRE SPRINKLERS:") || rt.startsWith("OFFSET PLAN") || rt.startsWith("SWIMMING POOL:") || rt.startsWith("PARKING STALLS:") || rt.startsWith("Analysis as of")) break;
           if (rt.includes("|") && rt.split("|").length >= 2) {
             const cells = rt.split("|").map(p => p.trim());
@@ -644,49 +715,39 @@ function SectionLines({ lines, sectionName }) {
       }
     }
 
-    // ── Development Opportunity metrics ──
+    // ── Development Opportunity — skip all content (rendered deterministically from parcel data) ──
     if (sec.includes("opportunity")) {
-      if (t.startsWith("USES PERMITTED:")) {
-        els.push(<div key={i} style={{ background: T.warmGray, border: `1px solid ${T.border}`, borderRadius: 6, padding: "10px 14px", marginBottom: 8, marginTop: 8 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: T.orange, letterSpacing: "0.1em", marginBottom: 4 }}>USES PERMITTED</div>
-          <div style={{ fontSize: 13, color: T.text, lineHeight: 1.6 }}>{renderInline(t.slice(15).trim())}</div>
-        </div>);
-        i++; continue;
-      }
-      for (const prefix of ["DENSITY MATH:", "BUILDABLE AREA:", "MAX FLOOR AREA:", "MAX BUILDOUT:", "TOC BONUS:", "ADU:", "EXISTING STRUCTURE:"]) {
-        if (t.startsWith(prefix)) {
-          const val = t.slice(prefix.length).trim();
-          const isHighlight = prefix === "DENSITY MATH:" || prefix === "MAX BUILDOUT:";
-          const color = isHighlight ? T.green : T.text;
-          els.push(<div key={i} style={{ background: isHighlight ? T.green + "10" : T.warmGray, border: `1px solid ${isHighlight ? T.green + "40" : T.border}`, borderRadius: 6, padding: isHighlight ? "12px 14px" : "8px 12px", marginBottom: 6, display: "flex", gap: 8, alignItems: isHighlight ? "flex-start" : "center", flexDirection: isHighlight ? "column" : "row" }}>
-            <span style={{ fontSize: 9, fontWeight: 700, color: isHighlight ? T.green : T.secondary, letterSpacing: "0.1em" }}>{prefix.slice(0, -1)}</span>
-            <span style={{ fontSize: isHighlight ? 18 : 13, fontWeight: isHighlight ? 700 : 400, color, fontFamily: isHighlight ? "'Georgia',serif" : "inherit" }}>{val}</span>
-          </div>);
-          i++; break;
-        }
-      }
-      if (i < lines.length && lines[i].trim() === t) { /* didn't match any prefix, fall through */ } else continue;
+      i++; continue;
     }
 
     // ── Fee summary ──
-    if (inSec("fee") && t.includes("|")) {
-      const pts = t.split("|").map(p => p.trim());
-      const isTotal = (pts[0] || "").toUpperCase().includes("TOTAL");
-      if (isTotal) {
-        els.push(<div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0 4px", marginTop: 4, borderTop: `2px solid ${T.orange}` }}>
+    if (inSec("fee")) {
+      if (/^TOTAL FEES/i.test(t)) {
+        const amt = t.includes("|") ? t.split("|").map(p=>p.trim()).slice(1).join(" ") : t.replace(/^TOTAL FEES:?\s*/i, "").trim();
+        els.push(<div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0 4px", marginTop: 4 }}>
           <span style={{ fontSize: 13, fontWeight: 800, color: T.textHead }}>TOTAL FEES</span>
-          <span style={{ fontSize: 18, fontWeight: 800, color: T.orange, fontFamily: "'Georgia',serif" }}>{pts[1] || ""} {pts[2] || ""}</span>
+          <span style={{ fontSize: 18, fontWeight: 800, color: T.orange, fontFamily: "'Georgia',serif" }}>{amt}</span>
         </div>);
-      } else {
-        els.push(<div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${T.border}`, gap: 8 }}>
+        i++; continue;
+      }
+      if (/^EXCLUDES?:/i.test(t)) {
+        els.push(<div key={i} style={{ fontSize: 10, color: T.secondary, fontStyle: "italic", marginTop: 6 }}>{t.replace(/^EXCLUDES?:\s*/i, "Excludes ")}</div>);
+        i++; continue;
+      }
+      if (/^fee estimate/i.test(t) || /^view current/i.test(t)) {
+        i++; continue; // Skip — this info is in the footer
+      }
+      if (t.includes("|")) {
+        const pts = t.split("|").map(p => p.trim());
+        els.push(<div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.border}`, gap: 8 }}>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{pts[0]}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: T.textHead }}>{pts[0]}</div>
             {pts[1] && <div style={{ fontSize: 11, color: T.secondary }}>{pts[1]}</div>}
           </div>
-          <span style={{ fontSize: 13, fontWeight: 700, color: T.orange, whiteSpace: "nowrap" }}>{pts[2] || pts[1] || ""}</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: T.orange, whiteSpace: "nowrap" }}>{pts[2] || pts[1] || ""}</span>
         </div>);
+        i++; continue;
       }
-      i++; continue;
     }
 
     // ── Timeline — Gantt bars ──
@@ -696,7 +757,7 @@ function SectionLines({ lines, sectionName }) {
         const ganttItems = [];
         let worstWeek = 0;
         while (i < lines.length) {
-          const gl = lines[i].trim();
+          const gl = lines[i].trim().replace(/\*\*/g, "");
           const gm = gl.match(/^Weeks?\s([\d]+)\s*[-–]\s*([\d]+)\s*:\s*(.+)$/i);
           if (gm) {
             const start = parseInt(gm[1]), end = parseInt(gm[2]);
@@ -742,25 +803,34 @@ function SectionLines({ lines, sectionName }) {
         </div>);
         i++; continue;
       }
+      // Skip boilerplate lines
+      if (/^(timeline estimate|view current|fee and timeline)/i.test(t)) { i++; continue; }
     }
 
     // ── Documents ──
     if (inSec("document")) {
+      // Document section headers
+      if (/^(DEMO|BUILDING|TECHNICAL)/i.test(t) && !t.includes("|")) {
+        els.push(<div key={i} style={{ fontSize: 10, fontWeight: 700, color: T.orange, letterSpacing: "0.06em", marginTop: 10, marginBottom: 2 }}>{t}</div>);
+        i++; continue;
+      }
       if (t.includes("|") && t.split("|").length >= 2) {
         const [dn, dw, ds] = t.split("|").map(p => p.trim());
         const isHeader = /^(DEMO|BUILDING|TECHNICAL)/.test(dn);
-        const req = ds && ds.includes("REQ") && !ds.includes("NOT REQ");
         if (isHeader) {
-          els.push(<div key={i} style={{ fontSize: 11, fontWeight: 700, color: T.orange, letterSpacing: "0.06em", marginTop: 12, marginBottom: 4 }}>{dn}</div>);
+          els.push(<div key={i} style={{ fontSize: 10, fontWeight: 700, color: T.orange, letterSpacing: "0.06em", marginTop: 10, marginBottom: 2 }}>{dn}</div>);
         } else {
-          els.push(<div key={i} style={{ display: "flex", gap: 8, padding: "5px 0", borderBottom: `1px solid ${T.border}`, alignItems: "center", fontSize: 12 }}>
+          const stampYes = ds && (/YES/i.test(ds) || (/REQ/i.test(ds) && !/NOT REQ/i.test(ds)));
+          els.push(<div key={i} style={{ display: "flex", gap: 6, padding: "3px 0", borderBottom: `1px solid ${T.border}`, alignItems: "center", fontSize: 11 }}>
             <span style={{ flex: 1, color: T.text }}>{dn}</span>
-            <span style={{ color: T.secondary, minWidth: 120 }}>{dw}</span>
-            <span style={{ fontSize: 9, fontWeight: 700, color: T.white, background: req ? T.red : T.green, borderRadius: 3, padding: "1px 6px" }}>STAMP: {req ? "REQ" : "NOT REQ"}</span>
+            <span style={{ color: T.secondary, fontSize: 10 }}>{dw}</span>
+            <span style={{ fontSize: 8, fontWeight: 700, color: T.white, background: stampYes ? T.orange : T.green, borderRadius: 3, padding: "1px 5px", whiteSpace: "nowrap" }}>{stampYes ? "STAMP" : "NO STAMP"}</span>
           </div>);
         }
         i++; continue;
       }
+      // Standalone text in document section (like "Stamp requirements per...")
+      if (/stamp req/i.test(t)) { i++; continue; } // skip boilerplate
     }
 
     // ── Definitions ──
@@ -828,8 +898,9 @@ function SectionLines({ lines, sectionName }) {
     }
 
     // ── Standalone bold ──
-    if (t.startsWith("**") && t.endsWith("**") && t.length > 4) {
-      els.push(<p key={i} style={{ fontSize: 14, fontWeight: 700, color: T.text, marginTop: 10, marginBottom: 4 }}>{t.slice(2, -2)}</p>);
+    const rawTrim = line.trim();
+    if (rawTrim.startsWith("**") && rawTrim.endsWith("**") && rawTrim.length > 4) {
+      els.push(<p key={i} style={{ fontSize: 13, fontWeight: 700, color: T.textHead, marginTop: 10, marginBottom: 4 }}>{rawTrim.slice(2, -2)}</p>);
       i++; continue;
     }
 
@@ -1213,7 +1284,7 @@ function ReportHero({ address, parcel, projectType, jurisdiction, resultText }) 
       {/* Verdict bar */}
       {kpis.verdict && (
         <div style={{ background: vc + "18", borderTop: `1px solid ${vc}33`, padding: "12px 28px", display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 11, fontWeight: 800, color: T.white, background: vc, borderRadius: 5, padding: "3px 12px", letterSpacing: "0.06em" }}>{kpis.verdict}</span>
+          <span style={{ fontSize: 11, fontWeight: 800, color: T.white, background: vc, borderRadius: 5, padding: "3px 12px", letterSpacing: "0.06em" }}>{kpis.verdict === "CAUTION" ? "NOTE" : kpis.verdict}</span>
           <span style={{ fontSize: 13, color: "#E7E5E4", lineHeight: 1.4, flex: 1 }}>{kpis.verdictDesc}</span>
         </div>
       )}
@@ -1224,7 +1295,7 @@ function ReportHero({ address, parcel, projectType, jurisdiction, resultText }) 
           { label: "MAX BUILDOUT", value: maxBuildout, sub: buildoutSub, color: T.gold },
           { label: "EST. FEES", value: kpis.fees || "—", sub: "Permit + geotech + trade", color: T.gold },
           { label: "TIMELINE", value: (kpis.timeline || "—").replace("week critical path", "wks").replace("weeks", "wks"), sub: "From submittal", color: T.white },
-          { label: "ALERTS", value: `${rc} required`, sub: `${fc} factors · ${bc} benefits`, color: parseInt(rc) > 0 ? T.red : T.green },
+          { label: "ZONES", value: `${rc} required`, sub: `${fc} factors · ${bc} benefits`, color: parseInt(rc) > 0 ? T.yellow : T.green },
         ].map((kpi, ki) => (
           <div key={ki} style={{ padding: "14px 18px", borderRight: ki < 3 ? "1px solid #ffffff08" : "none" }}>
             <div style={{ fontSize: 9, color: T.secondary, letterSpacing: "0.1em", marginBottom: 5 }}>{kpi.label}</div>
@@ -1247,14 +1318,28 @@ function SectionNav() {
     { id: "sec-permitting", label: "Permits" },
     { id: "sec-parcel-survey", label: "Survey" },
   ];
+  const [active, setActive] = useState(navSections[0].id);
+  useEffect(() => {
+    const onScroll = () => {
+      let current = navSections[0].id;
+      for (const s of navSections) {
+        const el = document.getElementById(s.id);
+        if (el && el.getBoundingClientRect().top <= 80) current = s.id;
+      }
+      setActive(current);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   return (
     <div style={{ position: "sticky", top: 0, zIndex: 100, background: T.cream, padding: "8px 16px" }} className="no-print">
       <div className="section-nav-bar" style={{ display: "flex", gap: 4, background: T.white, borderRadius: 10, padding: 4, border: `1px solid ${T.border}` }}>
         {navSections.map(s => (
           <a key={s.id} href={"#" + s.id}
-            style={{ flex: 1, padding: "8px 4px", border: "none", borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: "pointer", textDecoration: "none", textAlign: "center", background: "transparent", color: T.secondary, transition: "all 0.2s", fontFamily: "'DM Sans',sans-serif" }}
-            onMouseEnter={e => { e.target.style.background = T.orange; e.target.style.color = T.white }}
-            onMouseLeave={e => { e.target.style.background = "transparent"; e.target.style.color = T.secondary }}>
+            style={{ flex: 1, padding: "8px 4px", border: "none", borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: "pointer", textDecoration: "none", textAlign: "center",
+              background: active === s.id ? T.orange : "transparent",
+              color: active === s.id ? T.white : T.secondary,
+              transition: "all 0.2s", fontFamily: "'DM Sans',sans-serif" }}>
             {s.label}
           </a>
         ))}
