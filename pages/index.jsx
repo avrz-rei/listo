@@ -1164,12 +1164,14 @@ function ReportHero({ address, parcel, projectType, jurisdiction, resultText }) 
   // Max buildout from parcel
   const z = (parcel?.zoning || "").toUpperCase();
   let maxBuildout = "—";
+  let buildoutSub = "";
   if (parcel?.lotSizeSf > 0) {
     const base = /^R1|^RS|^RE/.test(z) ? 1 : /^RD/.test(z) ? 2 : /^R4/.test(z) ? Math.floor(parcel.lotSizeSf / 400) : Math.floor(parcel.lotSizeSf / 800);
     const tocMulti = parcel.toc === "Tier 4" ? 1.80 : parcel.toc === "Tier 3" ? 1.70 : parcel.toc === "Tier 2" ? 1.50 : parcel.toc === "Tier 1" ? 1.35 : 1;
     const primary = Math.max(base, Math.floor(base * tocMulti));
     const adus = /^R[2-5]|^RD/.test(z) ? 2 : 1;
     maxBuildout = `${primary + adus + 1} units`;
+    buildoutSub = `${primary} primary + ${adus} ADU + 1 JADU`;
   }
 
   // Parse alert counts
@@ -1219,7 +1221,7 @@ function ReportHero({ address, parcel, projectType, jurisdiction, resultText }) 
       {/* KPI strip — integrated into hero */}
       <div className="hero-kpi-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", borderTop: "1px solid #ffffff12" }}>
         {[
-          { label: "MAX BUILDOUT", value: maxBuildout, sub: parcel?.lotSizeSf > 0 ? `${Math.max(base, Math.floor(base * tocMulti))} primary + ${adus} ADU + 1 JADU` : "", color: T.gold },
+          { label: "MAX BUILDOUT", value: maxBuildout, sub: buildoutSub, color: T.gold },
           { label: "EST. FEES", value: kpis.fees || "—", sub: "Permit + geotech + trade", color: T.gold },
           { label: "TIMELINE", value: (kpis.timeline || "—").replace("week critical path", "wks").replace("weeks", "wks"), sub: "From submittal", color: T.white },
           { label: "ALERTS", value: `${rc} required`, sub: `${fc} factors · ${bc} benefits`, color: parseInt(rc) > 0 ? T.red : T.green },
