@@ -232,7 +232,7 @@ function Flag({ level, title, meta, children }) {
 function ScoreCard({ label, value, sub, color }) {
   return (
     <div style={{ background:T.white, padding:"20px 24px", borderRight:`1px solid ${T.border}` }}>
-      <div style={{ fontSize:9, color:T.secondary, fontFamily:"monospace",
+      <div style={{ fontSize:9, color:T.secondary,
         letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:6 }}>{label}</div>
       <div style={{ fontSize:22, fontWeight:700, color: color||T.text,
         fontFamily:"'Georgia',serif", marginBottom:4 }}>{value}</div>
@@ -267,7 +267,7 @@ function JurisdictionBadge({ jurisdiction }) {
 }
 
 // ── Parcel Survey Cards — visual parcel data display ─────────────────────
-function ParcelSurveyCards({ parcel, onManualEntry }) {
+function ParcelSurveyCards({ parcel }) {
   if (!parcel) return null;
 
   const Badge = ({ yes, value, flagged }) => {
@@ -308,29 +308,21 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
 
   const Card = ({ title, color, children }) => (
     <div style={{ background:"white", border:"1px solid #E5E7EB", borderRadius:10,
-      borderLeft:`4px solid ${color}`, marginBottom:12, overflow:"hidden" }}>
+      borderLeft:`4px solid ${color}`, overflow:"hidden" }}>
       <div style={{ padding:"10px 16px", background:"#FAFAFA", borderBottom:"1px solid #F3F4F6" }}>
         <span style={{ fontSize:11, fontWeight:700, color, textTransform:"uppercase",
-          letterSpacing:"0.08em", fontFamily:"monospace" }}>{title}</span>
+          letterSpacing:"0.08em" }}>{title}</span>
       </div>
       <div style={{ padding:"8px 16px" }}>{children}</div>
     </div>
   );
 
-  const HazardGrid = ({ items }) => (
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"0 16px" }}>
-      {items.map(([label, val, flag]) => (
-        <Row key={label} label={label} value={val} flagged={flag} />
-      ))}
-    </div>
-  );
-
   return (
-    <div style={{ marginTop:4 }}>
-      {/* Address mismatch warning */}
+    <>
+      {/* Address mismatch warning — spans grid */}
       {parcel.addressMismatch && (
-        <div style={{ background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:10,
-          padding:"12px 16px", marginBottom:12, display:"flex", gap:10, alignItems:"flex-start" }}>
+        <div style={{ gridColumn:"1/-1", background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:10,
+          padding:"12px 16px", display:"flex", gap:10, alignItems:"flex-start" }}>
           <span style={{ fontSize:16 }}>⚠️</span>
           <div>
             <div style={{ fontSize:12, fontWeight:700, color:"#991B1B", marginBottom:2 }}>Address Mismatch</div>
@@ -339,7 +331,7 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
         </div>
       )}
 
-      {/* Key Identification — hero card */}
+      {/* Parcel Identification */}
       <Card title="Parcel Identification" color={T.orange}>
         <Row label="Address" value={parcel.situsAddr || parcel.address || null} bold />
         <Row label="APN" value={parcel.apn || null} bold />
@@ -354,57 +346,9 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
         <Row label="Use Code" value={parcel.useDescription || parcel.useCode || null} />
       </Card>
 
-      {/* Density — zone-aware calculation */}
-      {parcel.lotSizeSf > 0 && (() => {
-        const z = (parcel.zoning || "").toUpperCase();
-        let densityText, unitCount;
-        if (/^R1|^RS|^RE/.test(z)) {
-          unitCount = 1;
-          densityText = "1 unit per lot (R1 zone) + ADU/JADU";
-        } else if (/^RD/.test(z)) {
-          unitCount = 2;
-          densityText = "2 units per lot (RD zone)";
-        } else if (/^R4/.test(z)) {
-          unitCount = Math.floor(parcel.lotSizeSf / 400);
-          densityText = parcel.lotSizeSf.toLocaleString() + " sf ÷ 400 = " + unitCount + " units by-right";
-        } else if (/^R5/.test(z)) {
-          unitCount = null;
-          densityText = "No density limit (R5 zone — FAR controls)";
-        } else {
-          // R2, R3, C zones default to 800 sf
-          unitCount = Math.floor(parcel.lotSizeSf / 800);
-          densityText = parcel.lotSizeSf.toLocaleString() + " sf ÷ 800 = " + unitCount + " units by-right";
-        }
-        return (
-        <div style={{ background:T.warmGray, borderRadius:10, padding:"14px 18px", marginBottom:12,
-          display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8,
-          border:`2px solid ${T.orange}30` }}>
-          <div>
-            <div style={{ fontSize:10, color:T.orange, letterSpacing:"0.1em" }}>DENSITY</div>
-            <div style={{ fontSize:16, fontWeight:700, color:T.textHead, fontFamily:"Georgia,serif", marginTop:2 }}>
-              {densityText}
-            </div>
-          </div>
-          {parcel.toc && parcel.toc !== "None" && (
-            <div style={{ background:T.orange+"20", border:`1px solid ${T.orange}40`, borderRadius:6, padding:"4px 12px" }}>
-              <div style={{ fontSize:9, color:T.orange, fontFamily:"monospace" }}>TOC</div>
-              <div style={{ fontSize:14, fontWeight:700, color:T.orange }}>{parcel.toc}</div>
-            </div>
-          )}
-        </div>);
-      })()}
-
-      {/* Housing */}
-      <Card title="Housing" color={T.orange}>
-        <Row label="RSO (Rent Stabilization)" value={parcel.rso !== undefined ? (parcel.rso ? "Yes" : "No") : null} />
-        <Row label="TOC (Transit Oriented Communities)" value={parcel.toc || null} />
-        <Row label="HE Replacement Required" value={parcel.heReplacement !== undefined ? (parcel.heReplacement ? "Yes" : "No") : null} flagged={parcel.heReplacement === true} />
-        <Row label="Just Cause Eviction (JCO)" value={parcel.jco !== undefined ? (parcel.jco ? "Yes" : "No") : null} />
-      </Card>
-
       {/* Hazards & Environmental */}
       <Card title="Hazards & Environmental" color="#B91C1C">
-        <HazardGrid items={[
+        {[
           ["Coastal Zone", parcel.coastalZone === "Yes" ? parcel.coastalZoneType || "Yes" : parcel.coastalZone === "No" ? false : null, parcel.coastalZone === "Yes"],
           ["Very High Fire Hazard Zone", parcel.fireHazard, false],
           ["Liquefaction (CGS)", parcel.liquefaction, parcel.liquefaction === true],
@@ -418,50 +362,45 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
           ["Flood Zone", parcel.floodZone ? parcel.floodZone : parcel.floodZone === undefined ? null : false, false],
           ["Methane Hazard", parcel.methane === false ? false : parcel.methane || null, !!parcel.methane && parcel.methane !== false],
           ["Airport Hazard", parcel.airportHazard === false ? false : parcel.airportHazard || null, !!parcel.airportHazard && parcel.airportHazard !== false],
-        ]} />
+        ].map(([label, val, flag]) => (
+          <Row key={label} label={label} value={val} flagged={flag} />
+        ))}
       </Card>
 
-      {/* Planning & Zoning Overlays */}
-      <Card title="Planning & Zoning Overlays" color={T.secondary}>
-        <Row label="Specific Plan" value={parcel.specificPlan || null} />
-        <Row label="HPOZ (Historic Preservation)" value={parcel.hpoz === true ? "Yes" : parcel.hpoz === false ? "No" : null} />
-        <Row label="CDO (Community Design Overlay)" value={parcel.cdo === true ? "Yes" : parcel.cdo === false ? "No" : null} />
-        <Row label="General Plan Land Use" value={parcel.generalPlanLandUse || null} />
+      {/* Planning & Zoning */}
+      <Card title="Planning & Zoning" color="#2563eb">
+        <Row label="General Plan" value={parcel.generalPlanLandUse || null} />
         <Row label="Community Plan" value={parcel.communityPlan || null} />
+        <Row label="Specific Plan" value={parcel.specificPlan || null} />
+        <Row label="HPOZ" value={parcel.hpoz === true ? "Yes" : parcel.hpoz === false ? "No" : null} />
+        <Row label="CDO" value={parcel.cdo === true ? "Yes" : parcel.cdo === false ? "No" : null} />
         {parcel.ziCodes?.length > 0 && (
           <div style={{ marginTop:8 }}>
-            <div style={{ fontSize:10, color:T.secondary, fontFamily:"monospace", marginBottom:4,
-              letterSpacing:"0.08em" }}>ZONING INFORMATION ({parcel.ziCodes.length})</div>
+            <div style={{ fontSize:10, color:T.secondary, letterSpacing:"0.08em", marginBottom:4 }}>ZI CODES ({parcel.ziCodes.length})</div>
             <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
-              {parcel.ziCodes.map((zi,i) => (
-                <span key={i} style={{ fontSize:10, background:T.orange+"10", color:T.orange,
-                  border:`1px solid ${T.orange}40`, borderRadius:4, padding:"3px 8px" }}>
+              {parcel.ziCodes.map((zi,idx) => (
+                <span key={idx} style={{ fontSize:10, background:T.orange+"10", color:T.orange,
+                  border:`1px solid ${T.orange}40`, borderRadius:4, padding:"3px 8px", fontFamily:"monospace" }}>
                   {zi}
                 </span>
               ))}
             </div>
           </div>
         )}
-        {parcel.overlayLayers?.length > 0 && (
-          <div style={{ marginTop:8 }}>
-            <div style={{ fontSize:10, color:T.secondary, fontFamily:"monospace", marginBottom:4,
-              letterSpacing:"0.08em" }}>ALL DETECTED OVERLAYS ({parcel.overlayLayers.length})</div>
-            <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
-              {parcel.overlayLayers.map((o,i) => (
-                <span key={i} style={{ fontSize:10, background:T.orange+"10", color:T.orange,
-                  border:`1px solid ${T.orange}40`, borderRadius:4, padding:"2px 6px" }}>
-                  {o.layerName}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
       </Card>
 
-      {/* ZIMAS address mismatch warning — data was discarded for safety */}
+      {/* Housing */}
+      <Card title="Housing" color="#7C3AED">
+        <Row label="RSO (Rent Stabilization)" value={parcel.rso !== undefined ? (parcel.rso ? "Yes" : "No") : null} />
+        <Row label="TOC (Transit Oriented)" value={parcel.toc || null} />
+        <Row label="HE Replacement Required" value={parcel.heReplacement !== undefined ? (parcel.heReplacement ? "Yes" : "No") : null} flagged={parcel.heReplacement === true} />
+        <Row label="Just Cause Eviction (JCO)" value={parcel.jco !== undefined ? (parcel.jco ? "Yes" : "No") : null} />
+      </Card>
+
+      {/* ZIMAS address mismatch warning — spans grid */}
       {parcel.zimasAddressMismatch && (
-        <div style={{ background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:10,
-          padding:"14px 18px", marginBottom:12 }}>
+        <div style={{ gridColumn:"1/-1", background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:10,
+          padding:"14px 18px" }}>
           <div style={{ fontSize:11, fontWeight:700, color:"#991B1B", marginBottom:4 }}>
             ⚠ ZIMAS returned a different address — data discarded
           </div>
@@ -476,10 +415,10 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
         </div>
       )}
 
-      {/* Manual entry prompt — only show if ZIMAS proxy didn't fill in the data */}
+      {/* Manual entry prompt — spans grid */}
       {(!parcel.yearBuilt && !parcel.existingUnits && parcel.toc === undefined) && (
-        <div style={{ background:"#FFFBEB", border:"1px solid #FDE68A", borderRadius:10,
-          padding:"14px 18px", marginBottom:12 }}>
+        <div style={{ gridColumn:"1/-1", background:"#FFFBEB", border:"1px solid #FDE68A", borderRadius:10,
+          padding:"14px 18px" }}>
           <div style={{ fontSize:11, fontWeight:700, color:"#92400E", marginBottom:4 }}>
             Some parcel data unavailable — ZIMAS may be slow
           </div>
@@ -492,119 +431,11 @@ function ParcelSurveyCards({ parcel, onManualEntry }) {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
-// ── Project Summary — deterministic overview from parcel data ─────────────
-function ProjectSummary({ parcel, projectType, scoreCards }) {
-  if (!parcel) return null;
-  const label = getLabel(projectType);
-  const z = (parcel.zoning || "").toUpperCase();
 
-  // FAR lookup
-  const farMap = { "R1":0.50, "RS":0.50, "RE":0.50, "R2":3.00, "RD":3.00, "R3":3.00, "R4":3.00, "R5":6.00, "C1":1.50, "C2":1.50, "C4":1.50, "C5":6.00, "CR":6.00 };
-  const zoneBase = z.match(/^(R[1-5]|RD|RS|RE|C[1-5]|CR|CM|M[1-2])/)?.[1] || "";
-  const far = farMap[zoneBase] || null;
-
-  // Height lookup
-  const htMap = { "R1":"28-33 ft (BMO)", "RS":"28-33 ft", "RE":"28-33 ft", "R2":"45 ft", "RD":"45 ft", "R3":"45 ft", "R4":"No limit (HD1)", "R5":"No limit (HD1)" };
-  const maxHeight = htMap[zoneBase] || null;
-
-  // State law eligibility checks
-  const hasAB2097 = parcel.ab2097 === true;
-  const hasTransitProxy = hasAB2097 || parcel.ziCodes?.some(z => z.includes("2452"));
-  const isMultifamily = /^R[2-5]|^RD/.test(z);
-  const isSingleFamily = /^R1|^RS|^RE/.test(z);
-  const isCommercial = /^C[1-5]|^CR/.test(z);
-  const lotAcres = parcel.lotSizeSf ? parcel.lotSizeSf / 43560 : 0;
-  const notFireHazard = parcel.fireHazard !== true;
-  const sb684Eligible = isMultifamily && lotAcres <= 5;
-  const sb1123Eligible = isSingleFamily && lotAcres <= 1.5 && !parcel.yearBuilt;
-  const sb79Proxy = hasTransitProxy && /^R[1-5]|^RD|^C[1-5]|^CR/.test(z) && notFireHazard;
-  const sb9Eligible = isSingleFamily && parcel.hpoz !== true;
-  const sb35Eligible = isMultifamily && parcel.ziCodes?.some(z => z.includes("2512"));
-  const ab2011Eligible = isCommercial;
-  const sdblEligible = isMultifamily || (parcel.toc && parcel.toc !== "None");
-  const isCoastal = parcel.coastalZone === "Yes";
-  const hasStateLaws = sb79Proxy || sb684Eligible || sb1123Eligible || hasAB2097 || sb9Eligible || sb35Eligible || ab2011Eligible;
-
-  const SRow = ({ label: l, value: v, highlight, small }) => (
-    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start",
-      padding: small ? "4px 0" : "6px 0", borderBottom:`1px solid ${T.border}`, gap:8 }}>
-      <span style={{ fontSize:11, color:T.secondary, fontFamily:"monospace", letterSpacing:"0.04em",
-        flexShrink:0, paddingTop:1 }}>{l}</span>
-      <span style={{ fontSize:12, color: highlight ? T.orange : T.text, fontWeight: highlight ? 700 : 400,
-        textAlign:"right", lineHeight:1.4 }}>{v || "—"}</span>
-    </div>
-  );
-
-  const StateLawBadge = ({ name, status, color }) => (
-    <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 0",
-      borderBottom:`1px solid ${T.border}` }}>
-      <span style={{ fontSize:8, fontWeight:700, color:"#fff", background:color,
-        borderRadius:3, padding:"1px 6px", fontFamily:"monospace", whiteSpace:"nowrap" }}>{status}</span>
-      <span style={{ fontSize:11, color:T.text }}>{name}</span>
-    </div>
-  );
-
-  return (
-    <div style={{ background:T.white, borderRadius:12, border:`1px solid ${T.border}`,
-      overflow:"hidden" }}>
-      {/* Header */}
-      <div style={{ background:T.orange, padding:"12px 16px", display:"flex",
-        justifyContent:"space-between", alignItems:"center" }}>
-        <div style={{ fontSize:11, fontWeight:700, color:T.white, letterSpacing:"0.06em",
-          fontFamily:"monospace" }}>PROJECT SUMMARY</div>
-        <span style={{ fontSize:12, fontWeight:700, color:T.white,
-          fontFamily:"'Georgia',serif" }}>{label}</span>
-      </div>
-
-      <div style={{ padding:"12px 16px" }}>
-        {/* Key Metrics */}
-        <SRow label="ZONING" value={parcel.zoning || "—"} />
-        <SRow label="DENSITY" value={parcel.densityCalc || "—"} highlight />
-        {far && <SRow label="FAR" value={far + "× buildable area"} />}
-        {maxHeight && <SRow label="MAX HEIGHT" value={maxHeight} />}
-        <SRow label="TOC" value={parcel.toc === "None" ? "None" : parcel.toc || "Not verified"} />
-        {parcel.lotSizeSf && <SRow label="LOT" value={parcel.lotSizeSf.toLocaleString() + " sf"} />}
-
-        {/* State Law Eligibility */}
-        {hasStateLaws && (
-          <div style={{ marginTop:10 }}>
-            <div style={{ fontSize:9, color:T.orange, fontFamily:"monospace",
-              letterSpacing:"0.1em", marginBottom:6 }}>STATE LAW ELIGIBILITY</div>
-            {sb79Proxy && <StateLawBadge name="SB 79 — Transit upzoning (eff. July 2026)" status="LIKELY" color={T.yellow} />}
-            {sb35Eligible && <StateLawBadge name="SB 35/423 — Streamlined ministerial" status="LIKELY" color={T.yellow} />}
-            {sb684Eligible && <StateLawBadge name="SB 684 — Ministerial ≤10 units" status="ELIGIBLE" color="#15803d" />}
-            {sb1123Eligible && <StateLawBadge name="SB 1123 — Starter homes (vacant SF lot)" status="LIKELY" color={T.yellow} />}
-            {sb9Eligible && <StateLawBadge name="SB 9 — Duplex + lot split" status="ELIGIBLE" color="#15803d" />}
-            {ab2011Eligible && <StateLawBadge name="AB 2011 — Housing on commercial" status="CHECK" color="#d97706" />}
-            {hasAB2097 && <StateLawBadge name="AB 2097 — No parking minimum" status="YES" color="#15803d" />}
-            {isCoastal && <StateLawBadge name="SB 1077 — Coastal ADU streamlining (eff. July 2026)" status="PENDING" color="#6366f1" />}
-          </div>
-        )}
-
-        {/* Permit Estimates from Score Cards */}
-        {scoreCards && (scoreCards.fees || scoreCards.timeline) && (
-          <div style={{ marginTop:10 }}>
-            <div style={{ fontSize:9, color:T.orange, fontFamily:"monospace",
-              letterSpacing:"0.1em", marginBottom:6 }}>PERMIT ESTIMATES</div>
-            {scoreCards.fees && <SRow label="EST. FEES" value={scoreCards.fees} small />}
-            {scoreCards.timeline && <SRow label="TIMELINE" value={scoreCards.timeline} small />}
-          </div>
-        )}
-
-        {/* Data Source */}
-        <div style={{ marginTop:10, fontSize:10, color:T.secondary, textAlign:"center",
-          padding:"6px 0", borderTop:`1px solid ${T.border}` }}>
-          {parcel.source === "ZIMAS" ? "✓ ZIMAS verified" : "Estimated from ZIP"}
-          {" · "}State law data as of April 2026
-        </div>
-      </div>
-    </div>
-  );
-}
 
 
 
@@ -696,6 +527,8 @@ function SectionLines({ lines, sectionName }) {
         : { bg: "#F0FDF4", border: "#BBF7D0", color: T.green };
       const iconPath = level === "green"
         ? <path d="M4 8.5L7 11.5L12 5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        : level === "yellow"
+        ? <><path d="M8 3L1 14h14L8 3z" stroke="#fff" strokeWidth="1.5" fill="none"/><path d="M8 7v3" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/><path d="M8 12v.5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/></>
         : <><path d="M8 4v5" stroke="#fff" strokeWidth="2" strokeLinecap="round" /><path d="M8 11v1" stroke="#fff" strokeWidth="2" strokeLinecap="round" /></>;
       let desc = "";
       if (i + 1 < lines.length && !lines[i + 1].trim().includes("|") && lines[i + 1].trim()) {
@@ -708,18 +541,18 @@ function SectionLines({ lines, sectionName }) {
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-              <div>
-                <div style={{ fontSize: 9, color: cfg.color, letterSpacing: "0.1em", marginBottom: 2 }}>{displayLabel}</div>
-                {name && <div style={{ fontSize: 14, fontWeight: 600, color: T.textHead }}>{name}</div>}
-              </div>
+              {name && <div style={{ fontSize: 14, fontWeight: 600, color: T.textHead }}>{name}</div>}
               {dollar && dollar !== "Variable" && dollar !== "Benefit" && dollar !== "None" && (
                 <span style={{ fontSize: 13, fontWeight: 700, color: cfg.color, whiteSpace: "nowrap" }}>{dollar}</span>
               )}
             </div>
-            <div style={{ fontSize: 13, color: T.text, lineHeight: 1.6, marginTop: 2 }}>{desc}</div>
-            {(dollar || time) && <div style={{ fontSize: 11, color: T.secondary, marginTop: 4 }}>
-              {dollar && dollar !== "Variable" && dollar !== "Benefit" ? dollar : ""}{time && time !== "—" && time !== "Variable" ? (dollar && dollar !== "Variable" && dollar !== "Benefit" ? " · " : "") + "+" + time : ""}
-            </div>}
+            {desc && <div style={{ fontSize: 13, color: T.text, lineHeight: 1.6, marginTop: 4 }}>{desc}</div>}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 9, fontWeight: 800, color: T.white, background: cfg.color, borderRadius: 4, padding: "3px 10px", letterSpacing: "0.06em" }}>{displayLabel}</span>
+              {time && time !== "—" && time !== "Variable" && (
+                <span style={{ fontSize: 11, color: T.secondary }}>+{time}</span>
+              )}
+            </div>
           </div>
         </div>
       </div>);
@@ -729,19 +562,18 @@ function SectionLines({ lines, sectionName }) {
     // ── Permit roadmap cards ──
     if ((inSec("roadmap") || inSec("road map") || inSec("permit")) && t.includes("|") && t.split("|").length >= 3) {
       const [name2, type, agency, time2, cost] = t.split("|").map(p => p.trim());
-      const isOTC = (type || "").toUpperCase() === "OTC";
-      const b = isOTC
+      const typeUpper = (type || "").toUpperCase();
+      const b = typeUpper === "OTC"
         ? { bg: T.green + "20", color: T.green, border: T.green + "40", label: "OTC" }
+        : typeUpper === "SPECIAL"
+        ? { bg: "#FFF8F0", color: T.orange, border: T.orange + "40", label: "SPECIAL" }
         : { bg: T.warmGray, color: T.secondary, border: T.border, label: "PLAN CHECK" };
       els.push(
         <div key={i} style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 8, padding: "10px 14px", marginBottom: 4, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: T.text, flex: 1 }}>{name2}</span>
-          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", background: b.bg, color: b.color, border: `1px solid ${b.border}`, borderRadius: 3, padding: "2px 8px" }}>{b.label}</span>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 12, color: T.secondary }}>
-            {agency && <span>{agency}</span>}
-            {time2 && <span>{time2}</span>}
-            {cost && <span style={{ color: T.orange, fontWeight: 600 }}>{cost}</span>}
-          </div>
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", background: b.bg, color: b.color, border: `1px solid ${b.border}`, borderRadius: 4, padding: "2px 8px" }}>{b.label}</span>
+          <span style={{ fontSize: 12, color: T.secondary, minWidth: 80 }}>{time2 || ""}</span>
+          <span style={{ fontSize: 12, color: T.orange, fontWeight: 600, minWidth: 80, textAlign: "right" }}>{cost || ""}</span>
         </div>
       );
       i++; continue;
@@ -755,9 +587,10 @@ function SectionLines({ lines, sectionName }) {
         </div>);
         i++; continue;
       }
-      if (t === "STANDARD | MAX ALLOWED | PROPOSED/TYPICAL | LAMC REF" || t === "STANDARD | MAX ALLOWED | PROPOSED | LAMC REF") {
-        els.push(<div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1.8fr 1.5fr 1.2fr", background: T.black, marginBottom: 1, borderRadius: "6px 6px 0 0" }}>
-          {["STANDARD", "MAX ALLOWED", "PROPOSED", "LAMC REF"].map((h, hi) => (
+      if (t === "STANDARD | MAX ALLOWED | LAMC REF" || t === "STANDARD | MAX ALLOWED | PROPOSED/TYPICAL | LAMC REF" || t === "STANDARD | MAX ALLOWED | PROPOSED | LAMC REF") {
+        const is3col = t === "STANDARD | MAX ALLOWED | LAMC REF";
+        els.push(<div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 2.5fr 1.5fr", background: T.black, marginBottom: 1, borderRadius: "6px 6px 0 0" }}>
+          {["STANDARD", "MAX ALLOWED", "LAMC REF"].map((h, hi) => (
             <div key={hi} style={{ padding: "7px 10px", fontSize: 9, fontWeight: 700, color: T.orange, letterSpacing: "0.08em" }}>{h}</div>
           ))}
         </div>);
@@ -768,11 +601,12 @@ function SectionLines({ lines, sectionName }) {
           if (!rt || rt.startsWith("##") || rt.startsWith("EXEMPTION:") || rt.startsWith("ENCROACHMENT") || rt.startsWith("GRADING:") || rt.startsWith("BASEMENT:") || rt.startsWith("FIRE SPRINKLERS:") || rt.startsWith("OFFSET PLAN") || rt.startsWith("SWIMMING POOL:") || rt.startsWith("PARKING STALLS:") || rt.startsWith("Analysis as of")) break;
           if (rt.includes("|") && rt.split("|").length >= 2) {
             const cells = rt.split("|").map(p => p.trim());
-            const [std, maxA, prop, lamc] = cells;
-            els.push(<div key={"dsr" + i} style={{ display: "grid", gridTemplateColumns: "2fr 1.8fr 1.5fr 1.2fr", background: rowIdx % 2 === 0 ? T.white : T.warmGray, borderBottom: `1px solid ${T.border}` }}>
+            const std = cells[0];
+            const maxA = cells[1];
+            const lamc = is3col ? cells[2] : cells[3] || cells[2];
+            els.push(<div key={"dsr" + i} style={{ display: "grid", gridTemplateColumns: "2fr 2.5fr 1.5fr", background: rowIdx % 2 === 0 ? T.white : T.warmGray, borderBottom: `1px solid ${T.border}` }}>
               <div style={{ padding: "8px 10px", fontSize: 12, fontWeight: 600, color: T.text }}>{renderInline(std)}</div>
               <div style={{ padding: "8px 10px", fontSize: 12, color: T.green, fontWeight: 500 }}>{renderInline(maxA || "")}</div>
-              <div style={{ padding: "8px 10px", fontSize: 12, color: T.secondary }}>{renderInline(prop || "")}</div>
               <div style={{ padding: "8px 10px", fontSize: 11, color: T.secondary, fontFamily: "monospace" }}>{lamc || ""}</div>
             </div>);
             rowIdx++;
@@ -799,7 +633,7 @@ function SectionLines({ lines, sectionName }) {
         const lbl = t.slice(0, colonIdx);
         const val = t.slice(colonIdx + 1).trim();
         els.push(<div key={i} style={{ display: "flex", gap: 10, padding: "6px 0", borderBottom: `1px solid ${T.border}`, alignItems: "flex-start" }}>
-          <span style={{ fontSize: 9, fontWeight: 700, color: T.secondary, fontFamily: "monospace", minWidth: 110, flexShrink: 0, paddingTop: 2 }}>{lbl}</span>
+          <span style={{ fontSize: 9, fontWeight: 700, color: T.secondary, minWidth: 110, flexShrink: 0, paddingTop: 2 }}>{lbl}</span>
           <span style={{ fontSize: 12, color: T.text, lineHeight: 1.6 }}>{renderInline(val)}</span>
         </div>);
         i++; continue;
@@ -882,7 +716,7 @@ function SectionLines({ lines, sectionName }) {
         if (ganttItems.length > 0) {
           els.push(
             <div key={"gantt" + i} style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, paddingLeft: 100, fontSize: 10, color: T.secondary, fontFamily: "monospace" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, paddingLeft: 100, fontSize: 10, color: T.secondary }}>
                 {[0, Math.round(worstWeek / 4), Math.round(worstWeek / 2), Math.round(worstWeek * 3 / 4), worstWeek].map((w, wi) => <span key={wi}>{w}</span>)}
               </div>
               {ganttItems.map((bar, bi) => (
@@ -1126,10 +960,53 @@ function ReportBody({ text, parcel, projectType, jurisdiction }) {
 
         // ── DEVELOPMENT OPPORTUNITY ──
         if (sn.includes("opportunity")) {
+          // State law eligibility checks (moved from ProjectSummary)
+          const hasAB2097 = parcel?.ab2097 === true;
+          const hasTransitProxy = hasAB2097 || parcel?.ziCodes?.some(z2 => z2.includes("2452"));
+          const isMultifamily = /^R[2-5]|^RD/.test(z);
+          const isSingleFamily = /^R1|^RS|^RE/.test(z);
+          const isCommercial = /^C[1-5]|^CR/.test(z);
+          const lotAcres = parcel?.lotSizeSf ? parcel.lotSizeSf / 43560 : 0;
+          const notFireHazard = parcel?.fireHazard !== true;
+          const sb684Eligible = isMultifamily && lotAcres <= 5;
+          const sb1123Eligible = isSingleFamily && lotAcres <= 1.5 && !parcel?.yearBuilt;
+          const sb79Proxy = hasTransitProxy && /^R[1-5]|^RD|^C[1-5]|^CR/.test(z) && notFireHazard;
+          const sb9Eligible = isSingleFamily && parcel?.hpoz !== true;
+          const sb35Eligible = isMultifamily && parcel?.ziCodes?.some(z2 => z2.includes("2512"));
+          const ab2011Eligible = isCommercial;
+          const sdblEligible = isMultifamily || (parcel?.toc && parcel.toc !== "None");
+          const isCoastal = parcel?.coastalZone === "Yes";
+          const hasStateLaws = sb79Proxy || sb684Eligible || sb1123Eligible || hasAB2097 || sb9Eligible || sb35Eligible || ab2011Eligible;
+
+          // FAR + height lookup
+          const farMap = { "R1":0.50, "RS":0.50, "RE":0.50, "R2":3.00, "RD":3.00, "R3":3.00, "R4":3.00, "R5":6.00, "C1":1.50, "C2":1.50, "C4":1.50, "C5":6.00, "CR":6.00 };
+          const zoneBase = z.match(/^(R[1-5]|RD|RS|RE|C[1-5]|CR|CM|M[1-2])/)?.[1] || "";
+          const far = farMap[zoneBase] || null;
+          const htMap = { "R1":"28-33 ft (BMO)", "RS":"28-33 ft", "RE":"28-33 ft", "R2":"45 ft", "RD":"45 ft", "R3":"45 ft", "R4":"No limit (HD1)", "R5":"No limit (HD1)" };
+          const maxHeight = htMap[zoneBase] || null;
+
           return (
             <div key={si} style={{ marginBottom: 24 }}>
               <SectionHeader2 title={section.name} id={section.id} />
               <SectionCard>
+                {/* Density math callout */}
+                {parcel?.lotSizeSf > 0 && (
+                  <div style={{ background: T.warmGray, border: `2px solid ${T.orange}30`, borderRadius: 10, padding: "14px 18px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: T.orange, letterSpacing: "0.1em" }}>DENSITY</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: T.textHead, fontFamily: "'Georgia',serif", marginTop: 2 }}>
+                        {parcel.lotSizeSf.toLocaleString()} sf / 800 = {base} units by-right
+                      </div>
+                    </div>
+                    {hasToc && (
+                      <div style={{ background: T.orange + "15", border: `1px solid ${T.orange}40`, borderRadius: 8, padding: "6px 14px", textAlign: "center" }}>
+                        <div style={{ fontSize: 9, color: T.orange }}>TOC</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: T.orange }}>{parcel.toc}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Density scenarios */}
                 {parcel?.lotSizeSf > 0 && (
                   <div className="scenario-cards" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
@@ -1138,7 +1015,7 @@ function ReportBody({ text, parcel, projectType, jurisdiction }) {
                       ...(hasToc ? [{ label: `WITH ${parcel.toc.toUpperCase()}`, units: tocUnits, sub: `${Math.round((tocMulti - 1) * 100)}% density bonus`, badge: "TOC" }] : []),
                       { label: "MAX BUILDOUT", units: maxTotal, sub: `${Math.max(base, tocUnits)} primary + ${adus} ADU + 1 JADU`, highlight: true, badge: "BEST CASE" },
                     ].map((card, ci) => (
-                      <div key={ci} style={{ flex: "1 1 200px", background: card.highlight ? T.orange + "08" : T.white, border: `1px solid ${card.highlight ? T.gold + "80" : T.border}`, borderLeft: card.highlight ? `4px solid ${T.gold}` : undefined, borderRadius: card.highlight ? 0 : 10, padding: "16px 18px" }}>
+                      <div key={ci} style={{ flex: "1 1 200px", background: card.highlight ? T.gold + "08" : T.white, border: `1px solid ${card.highlight ? T.gold + "80" : T.border}`, borderLeft: card.highlight ? `4px solid ${T.gold}` : undefined, borderRadius: card.highlight ? 0 : 10, padding: "16px 18px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                           <div style={{ fontSize: 10, fontWeight: 700, color: card.highlight ? T.orange : T.secondary, letterSpacing: "0.06em" }}>{card.label}</div>
                           {card.badge && <span style={{ fontSize: 9, fontWeight: 700, background: T.orange, color: T.white, borderRadius: 4, padding: "2px 8px" }}>{card.badge}</span>}
@@ -1152,8 +1029,61 @@ function ReportBody({ text, parcel, projectType, jurisdiction }) {
                     ))}
                   </div>
                 )}
+
                 {/* Claude's analysis for this section */}
                 <SectionLines lines={section.lines} sectionName={section.name} />
+
+                {/* State housing law eligibility */}
+                {hasStateLaws && (
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: T.text, marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ width: 3, height: 16, background: T.orange, borderRadius: 2 }} />
+                      State housing law eligibility
+                    </div>
+                    <div className="state-law-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      {[
+                        sb79Proxy && { name: "SB 79 — Transit upzoning (eff. July 2026)", status: "LIKELY", color: T.yellow, benefit: "Could allow up to 55–75 ft height and increased density" },
+                        sb35Eligible && { name: "SB 35/423 — Streamlined ministerial", status: "LIKELY", color: T.yellow, benefit: "90–180 day approval, bypasses discretionary review" },
+                        sdblEligible && { name: "State Density Bonus Law", status: "ELIGIBLE", color: T.green, benefit: "20–80% density bonus with affordability requirements" },
+                        sb684Eligible && { name: "SB 684 — Ministerial ≤10 units", status: "ELIGIBLE", color: T.green, benefit: "By-right approval for small multifamily" },
+                        sb1123Eligible && { name: "SB 1123 — Starter homes (vacant SF lot)", status: "LIKELY", color: T.yellow, benefit: "Starter home development on vacant single-family lot" },
+                        sb9Eligible && { name: "SB 9 — Duplex + lot split", status: "ELIGIBLE", color: T.green, benefit: "Up to 4 units on single-family lot" },
+                        hasAB2097 && { name: "AB 2097 — No parking minimum", status: "YES", color: T.green, benefit: "City cannot impose minimum parking requirements" },
+                        ab2011Eligible && { name: "AB 2011 — Housing on commercial", status: "CHECK", color: T.yellow, benefit: "Housing development on commercial-zoned lot" },
+                        isCoastal && { name: "SB 1077 — Coastal ADU streamlining", status: "PENDING", color: "#6366f1", benefit: "Streamlined ADU permits in Coastal Zone (eff. July 2026)" },
+                      ].filter(Boolean).map((law, li) => (
+                        <div key={li} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: T.white, border: `1px solid ${T.border}`, borderRadius: 8 }}>
+                          <span style={{ fontSize: 9, fontWeight: 800, color: T.white, background: law.color, borderRadius: 4, padding: "2px 8px", letterSpacing: "0.06em", whiteSpace: "nowrap", flexShrink: 0 }}>{law.status}</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{law.name}</div>
+                            <div style={{ fontSize: 11, color: T.secondary, lineHeight: 1.4 }}>{law.benefit}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 10, color: T.secondary, fontStyle: "italic", marginTop: 8 }}>
+                      State housing law data current as of April 2026. Eligibility is preliminary — verify with planning consultant.
+                    </div>
+                  </div>
+                )}
+
+                {/* Development envelope */}
+                {(far || maxHeight) && (
+                  <div style={{ background: T.warmGray, borderRadius: 10, padding: "14px 18px", marginTop: 16 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: T.orange, letterSpacing: "0.1em", marginBottom: 8 }}>DEVELOPMENT ENVELOPE</div>
+                    {[
+                      far && ["FAR", `${far} × Buildable Area`, T.text],
+                      maxHeight && ["Max Height", maxHeight, T.text],
+                      ["ADU Potential", /^R[2-5]|^RD/.test(z) ? "2 ADUs + 1 JADU on R2+ lot" : "1 ADU + 1 JADU", T.orange],
+                      hasAB2097 && ["Parking", "AB 2097 may override parking minimums", T.text],
+                    ].filter(Boolean).map(([label2, value2, color], ri) => (
+                      <div key={ri} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: ri < 3 ? `1px solid ${T.border}` : "none", gap: 12 }}>
+                        <span style={{ fontSize: 11, color: T.secondary, flexShrink: 0 }}>{label2}</span>
+                        <span style={{ fontSize: 12, color, fontWeight: color === T.orange ? 600 : 400, textAlign: "right" }}>{value2}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </SectionCard>
             </div>
           );
@@ -1184,14 +1114,13 @@ function ReportBody({ text, parcel, projectType, jurisdiction }) {
           );
         }
 
-        // ── PARCEL SURVEY — uses existing visual cards ──
+        // ── PARCEL SURVEY — 2×2 grid layout ──
         if (sn.includes("parcel survey")) {
           return (
             <div key={si} style={{ marginBottom: 24 }}>
               <SectionHeader2 title={section.name} id={section.id} />
               <div className="survey-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "flex-start" }}>
-                <div><ParcelSurveyCards parcel={parcel} /></div>
-                <div><ProjectSummary parcel={parcel} projectType={projectType} scoreCards={extractKPIs(text)} /></div>
+                <ParcelSurveyCards parcel={parcel} />
               </div>
             </div>
           );
@@ -1211,7 +1140,7 @@ function ReportBody({ text, parcel, projectType, jurisdiction }) {
   );
 }
 
-// ── Report Hero — dark card ──────────────────────────────────────────────
+// ── Report Hero — dark card with integrated KPI strip ────────────────────
 function ReportHero({ address, parcel, projectType, jurisdiction, resultText }) {
   const kpis = extractKPIs(resultText);
   const vc = kpis.verdict === "GO" ? T.green : kpis.verdict === "COMPLEX" ? T.red : T.yellow;
@@ -1272,41 +1201,22 @@ function ReportHero({ address, parcel, projectType, jurisdiction, resultText }) 
           <span style={{ fontSize: 13, color: "#E7E5E4", lineHeight: 1.4, flex: 1 }}>{kpis.verdictDesc}</span>
         </div>
       )}
-    </div>
-  );
-}
 
-// ── KPI Strip — light background, below hero ─────────────────────────────
-function KPIStrip({ parcel, resultText }) {
-  const kpis = extractKPIs(resultText);
-  const z = (parcel?.zoning || "").toUpperCase();
-  let maxBuildout = "—";
-  if (parcel?.lotSizeSf > 0) {
-    const base = /^R1|^RS|^RE/.test(z) ? 1 : /^RD/.test(z) ? 2 : /^R4/.test(z) ? Math.floor(parcel.lotSizeSf / 400) : Math.floor(parcel.lotSizeSf / 800);
-    const tocMulti = parcel.toc === "Tier 4" ? 1.80 : parcel.toc === "Tier 3" ? 1.70 : parcel.toc === "Tier 2" ? 1.50 : parcel.toc === "Tier 1" ? 1.35 : 1;
-    const primary = Math.max(base, Math.floor(base * tocMulti));
-    const adus = /^R[2-5]|^RD/.test(z) ? 2 : 1;
-    maxBuildout = `${primary + adus + 1} units`;
-  }
-  const al = kpis.alerts || "";
-  const rc = (al.match(/(\d+)\s*(?:required|action)/i) || [0, "0"])[1];
-  const fc = (al.match(/(\d+)\s*(?:factor|caution)/i) || [0, "0"])[1];
-  const bc = (al.match(/(\d+)\s*(?:benefit|info|note)/i) || [0, "0"])[1];
-
-  return (
-    <div className="hero-kpi-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", background: T.warmGray, border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden", margin: "8px 0" }}>
-      {[
-        { label: "MAX BUILDOUT", value: maxBuildout, color: T.orange },
-        { label: "EST. FEES", value: kpis.fees || "—", color: T.textHead },
-        { label: "TIMELINE", value: (kpis.timeline || "—").replace("week critical path", "wks").replace("weeks", "wks"), color: T.textHead },
-        { label: "ALERTS", value: `${rc} required`, sub: `${fc} factors · ${bc} benefits`, color: parseInt(rc) > 0 ? T.red : T.green },
-      ].map((kpi, ki) => (
-        <div key={ki} style={{ padding: "14px 18px", borderRight: ki < 3 ? `1px solid ${T.border}` : "none", background: T.white }}>
-          <div style={{ fontSize: 9, color: T.secondary, letterSpacing: "0.1em", marginBottom: 5 }}>{kpi.label}</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: kpi.color, fontFamily: "'Georgia',serif", marginBottom: 1 }}>{kpi.value}</div>
-          {kpi.sub && <div style={{ fontSize: 10, color: T.secondary }}>{kpi.sub}</div>}
-        </div>
-      ))}
+      {/* KPI strip — integrated into hero */}
+      <div className="hero-kpi-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", borderTop: "1px solid #ffffff12" }}>
+        {[
+          { label: "MAX BUILDOUT", value: maxBuildout, color: T.gold },
+          { label: "EST. FEES", value: kpis.fees || "—", sub: "Permit + geotech + trade", color: T.gold },
+          { label: "TIMELINE", value: (kpis.timeline || "—").replace("week critical path", "wks").replace("weeks", "wks"), sub: "From submittal", color: T.white },
+          { label: "ALERTS", value: `${rc} required`, sub: `${fc} factors · ${bc} benefits`, color: parseInt(rc) > 0 ? T.red : T.green },
+        ].map((kpi, ki) => (
+          <div key={ki} style={{ padding: "14px 18px", borderRight: ki < 3 ? "1px solid #ffffff08" : "none" }}>
+            <div style={{ fontSize: 9, color: T.secondary, letterSpacing: "0.1em", marginBottom: 5 }}>{kpi.label}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: kpi.color, fontFamily: "'Georgia',serif", marginBottom: 1 }}>{kpi.value}</div>
+            {kpi.sub && <div style={{ fontSize: 10, color: T.secondary }}>{kpi.sub}</div>}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1717,7 +1627,7 @@ export default function Listo() {
 
       parcelHtml = `
         <div style="border:1px solid #E5E7EB;border-left:4px solid ${T.orange};border-radius:8px;margin:8px 0;overflow:hidden">
-          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:${T.orange};text-transform:uppercase;letter-spacing:0.08em;font-family:monospace">PARCEL IDENTIFICATION</div>
+          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:${T.orange};text-transform:uppercase;letter-spacing:0.08em">PARCEL IDENTIFICATION</div>
           <div style="padding:6px 14px">
             ${pRow("Address", parcel.situsAddr || null)}
             ${pRow("APN", parcel.apn || null)}
@@ -1729,12 +1639,12 @@ export default function Listo() {
             ${pRow("Use Code", parcel.useDescription || parcel.useCode || null)}
           </div>
         </div>
-        ${parcel.lotSizeSf > 0 ? `<div style="background:#1A1714;border-radius:8px;padding:10px 16px;margin:8px 0;display:flex;justify-content:space-between;align-items:center">
-          <div><div style="font-size:9px;color:${T.orange};font-family:monospace;letter-spacing:0.1em">DENSITY</div><div style="font-size:14px;font-weight:700;color:white;font-family:Georgia,serif">${parcel.lotSizeSf.toLocaleString()} sf ÷ 800 = ${Math.floor(parcel.lotSizeSf/800)} units by-right</div></div>
-          ${parcel.toc ? `<div style="background:${T.orange}20;border:1px solid ${T.orange}40;border-radius:4px;padding:3px 8px"><div style="font-size:8px;color:${T.orange};font-family:monospace">TOC</div><div style="font-size:12px;font-weight:700;color:${T.orange}">${parcel.toc}</div></div>` : ""}
+        ${parcel.lotSizeSf > 0 ? `<div style="background:#F0EBE3;border:2px solid #E8620A30;border-radius:8px;padding:10px 16px;margin:8px 0;display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:9px;color:${T.orange};letter-spacing:0.1em">DENSITY</div><div style="font-size:14px;font-weight:700;color:#1A1714;font-family:Georgia,serif">${parcel.lotSizeSf.toLocaleString()} sf / 800 = ${Math.floor(parcel.lotSizeSf/800)} units by-right</div></div>
+          ${parcel.toc ? `<div style="background:${T.orange}20;border:1px solid ${T.orange}40;border-radius:4px;padding:3px 8px"><div style="font-size:8px;color:${T.orange}">TOC</div><div style="font-size:12px;font-weight:700;color:${T.orange}">${parcel.toc}</div></div>` : ""}
         </div>` : ""}
         <div style="border:1px solid #E5E7EB;border-left:4px solid #B91C1C;border-radius:8px;margin:8px 0;overflow:hidden">
-          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#B91C1C;text-transform:uppercase;letter-spacing:0.08em;font-family:monospace">HAZARDS & ENVIRONMENTAL</div>
+          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#B91C1C;text-transform:uppercase;letter-spacing:0.08em">HAZARDS & ENVIRONMENTAL</div>
           <div style="padding:6px 14px;display:grid;grid-template-columns:1fr 1fr;gap:0 14px">
             ${hRow("Coastal Zone", parcel.coastalZone === "Yes" ? (parcel.coastalZoneType || "Yes") : parcel.coastalZone === "No" ? false : null, parcel.coastalZone === "Yes")}
             ${hRow("Fire Hazard Zone", parcel.fireHazard, false)}
@@ -1749,8 +1659,8 @@ export default function Listo() {
             ${hRow("Airport Hazard", parcel.airportHazard === false ? false : parcel.airportHazard || null, !!parcel.airportHazard && parcel.airportHazard !== false)}
           </div>
         </div>
-        <div style="border:1px solid #E5E7EB;border-left:4px solid #78716C;border-radius:8px;margin:8px 0;overflow:hidden">
-          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#78716C;text-transform:uppercase;letter-spacing:0.08em;font-family:monospace">PLANNING & ZONING</div>
+        <div style="border:1px solid #E5E7EB;border-left:4px solid #2563eb;border-radius:8px;margin:8px 0;overflow:hidden">
+          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:0.08em">PLANNING & ZONING</div>
           <div style="padding:6px 14px">
             ${pRow("Specific Plan", parcel.specificPlan || null)}
             ${pRow("HPOZ", parcel.hpoz === true ? "Yes" : parcel.hpoz === false ? "No" : null)}
@@ -1759,8 +1669,8 @@ export default function Listo() {
             ${parcel.ziCodes?.length ? '<div style="margin-top:6px"><div style="font-size:9px;color:#78716C;font-family:monospace;margin-bottom:3px">ZONING INFORMATION (' + parcel.ziCodes.length + ')</div>' + parcel.ziCodes.map(zi => '<div style="font-size:9px;color:#E8620A;background:#E8620A15;border:1px solid #E8620A40;border-radius:3px;padding:2px 6px;margin:2px 0">' + zi + '</div>').join('') + '</div>' : ''}
           </div>
         </div>
-        <div style="border:1px solid #E5E7EB;border-left:4px solid #E8620A;border-radius:8px;margin:8px 0;overflow:hidden">
-          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#E8620A;text-transform:uppercase;letter-spacing:0.08em;font-family:monospace">HOUSING</div>
+        <div style="border:1px solid #E5E7EB;border-left:4px solid #7C3AED;border-radius:8px;margin:8px 0;overflow:hidden">
+          <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:0.08em">HOUSING</div>
           <div style="padding:6px 14px">
             ${hRow("RSO", parcel.rso !== undefined ? (parcel.rso ? "Yes" : "No") : null, false)}
             ${hRow("TOC", parcel.toc || null, false)}
@@ -1819,13 +1729,14 @@ export default function Listo() {
         bodyHtml += `<div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="font-size:10px;font-weight:700;color:#78716C;text-transform:uppercase;letter-spacing:0.08em;min-width:70px;font-family:monospace">${kLabel}</span><span style="color:#44403C">${val}</span></div>`;
         continue;
       }
-      // Development Standards table rows — render as structured table
-      if (inPdfSec("development standard") && t.includes("|") && t.split("|").length >= 3) {
+      // Development Standards table rows — render as 3-col structured table
+      if (inPdfSec("development standard") && t.includes("|") && t.split("|").length >= 2) {
         const pts = t.split("|").map(p => p.trim());
         if (/standard|max allowed/i.test(pts[0])) {
-          bodyHtml += `<div style="display:flex;gap:4px;padding:6px 0;border-bottom:2px solid ${T.orange}30;font-size:9px;font-weight:700;color:#78716C;font-family:monospace;text-transform:uppercase;letter-spacing:0.05em"><span style="flex:2">${pts[0]}</span><span style="flex:2">${pts[1]||""}</span><span style="flex:1">${pts[2]||""}</span><span style="flex:1;text-align:right">${pts[3]||""}</span></div>`;
+          bodyHtml += `<div style="display:flex;gap:4px;padding:6px 0;border-bottom:2px solid ${T.orange}30;font-size:9px;font-weight:700;color:#78716C;text-transform:uppercase;letter-spacing:0.05em"><span style="flex:2">${pts[0]}</span><span style="flex:2.5">${pts[1]||""}</span><span style="flex:1.5;text-align:right">LAMC REF</span></div>`;
         } else {
-          bodyHtml += `<div style="display:flex;gap:4px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="flex:2;font-weight:600;color:#1A1714">${pts[0]}</span><span style="flex:2;color:#44403C">${pts[1]||""}</span><span style="flex:1;color:#78716C">${pts[2]||""}</span><span style="flex:1;color:#78716C;text-align:right;font-size:11px">${pts[3]||""}</span></div>`;
+          const std = pts[0], maxA = pts[1] || "", lamc = pts.length >= 4 ? (pts[3] || "") : (pts[2] || "");
+          bodyHtml += `<div style="display:flex;gap:4px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="flex:2;font-weight:600;color:#1A1714">${std}</span><span style="flex:2.5;color:#15803D">${maxA}</span><span style="flex:1.5;color:#78716C;text-align:right;font-size:11px;font-family:monospace">${lamc}</span></div>`;
         }
         continue;
       }
@@ -1982,6 +1893,7 @@ ${bodyHtml}
           .scenario-cards{flex-direction:column!important}
           .survey-grid{grid-template-columns:1fr!important}
           .section-nav-bar{overflow-x:auto;-webkit-overflow-scrolling:touch}
+          .state-law-grid{grid-template-columns:1fr!important}
         }
       `}</style>
 
@@ -2326,13 +2238,8 @@ ${bodyHtml}
 
             {result && (
               <div>
-                {/* Hero Card */}
+                {/* Hero Card (KPI strip integrated) */}
                 <ReportHero address={editStreet || address} parcel={parcel} projectType={projectType} jurisdiction={jurisdiction} resultText={result} />
-
-                {/* KPI Strip — light background */}
-                <div style={{ padding: "0 16px" }}>
-                  <KPIStrip parcel={parcel} resultText={result} />
-                </div>
 
                 {/* Sticky Nav */}
                 <SectionNav />
@@ -2345,6 +2252,7 @@ ${bodyHtml}
                   <div style={{ margin: "0 16px", background: T.black, borderRadius: 12, padding: "20px 24px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 14 }} className="no-print">
                       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <Logo size={20} light />
                         <div style={{ position: "relative" }}>
                           <button onClick={handleShare}
                             style={{ display: "flex", alignItems: "center", gap: 8, background: T.gold, color: T.black, border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
