@@ -349,7 +349,6 @@ function ParcelSurveyCards({ parcel }) {
       {/* Hazards & Environmental */}
       <Card title="Hazards & Environmental" color="#B91C1C">
         {[
-          ["Coastal Zone", parcel.coastalZone === "Yes" ? parcel.coastalZoneType || "Yes" : parcel.coastalZone === "No" ? false : null, parcel.coastalZone === "Yes"],
           ["Very High Fire Hazard Zone", parcel.fireHazard, false],
           ["Liquefaction (CGS)", parcel.liquefaction, parcel.liquefaction === true],
           ["Landslide (CGS)", parcel.landslide, parcel.landslide === true],
@@ -372,15 +371,17 @@ function ParcelSurveyCards({ parcel }) {
         <Row label="General Plan" value={parcel.generalPlanLandUse || null} />
         <Row label="Community Plan" value={parcel.communityPlan || null} />
         <Row label="Specific Plan" value={parcel.specificPlan || null} />
+        <Row label="Coastal Zone" value={parcel.coastalZone === "Yes" ? parcel.coastalZoneType || "Yes" : parcel.coastalZone === "No" ? "No" : null} flagged={parcel.coastalZone === "Yes"} />
+        <Row label="TOC" value={parcel.toc || null} />
         <Row label="HPOZ" value={parcel.hpoz === true ? "Yes" : parcel.hpoz === false ? "No" : null} />
         <Row label="CDO" value={parcel.cdo === true ? "Yes" : parcel.cdo === false ? "No" : null} />
         {parcel.ziCodes?.length > 0 && (
           <div style={{ marginTop:8 }}>
             <div style={{ fontSize:10, color:T.secondary, letterSpacing:"0.08em", marginBottom:4 }}>ZI CODES ({parcel.ziCodes.length})</div>
-            <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:3 }}>
               {parcel.ziCodes.map((zi,idx) => (
-                <span key={idx} style={{ fontSize:10, background:T.orange+"10", color:T.orange,
-                  border:`1px solid ${T.orange}40`, borderRadius:4, padding:"3px 8px", fontFamily:"monospace" }}>
+                <span key={idx} style={{ fontSize:9, background:T.orange+"10", color:T.orange,
+                  border:`1px solid ${T.orange}40`, borderRadius:3, padding:"2px 6px", fontFamily:"monospace" }}>
                   {zi}
                 </span>
               ))}
@@ -392,7 +393,6 @@ function ParcelSurveyCards({ parcel }) {
       {/* Housing */}
       <Card title="Housing" color="#7C3AED">
         <Row label="RSO (Rent Stabilization)" value={parcel.rso !== undefined ? (parcel.rso ? "Yes" : "No") : null} />
-        <Row label="TOC (Transit Oriented)" value={parcel.toc || null} />
         <Row label="HE Replacement Required" value={parcel.heReplacement !== undefined ? (parcel.heReplacement ? "Yes" : "No") : null} flagged={parcel.heReplacement === true} />
         <Row label="Just Cause Eviction (JCO)" value={parcel.jco !== undefined ? (parcel.jco ? "Yes" : "No") : null} />
       </Card>
@@ -517,25 +517,25 @@ function SectionLines({ lines, sectionName }) {
     if (sec.includes("alert") && t.includes("|") && t.split("|").length >= 2) {
       const pts = t.split("|").map(p => p.trim());
       const [sev, name, dollar, time] = pts;
-      const levelMap = { "REQUIRED": "red", "ACTION REQUIRED": "red", "CRITICAL": "red", "FACTOR": "yellow", "CAUTION": "yellow", "BENEFIT": "green", "NOTE": "green", "INFO": "green", "CLEAR": "green" };
+      const levelMap = { "REQUIRED": "amber", "ACTION REQUIRED": "amber", "CRITICAL": "amber", "FACTOR": "blue", "CAUTION": "blue", "BENEFIT": "green", "NOTE": "green", "INFO": "green", "CLEAR": "green" };
       const level = levelMap[sev] || "green";
-      const displayLabel = level === "red" ? "REQUIRED" : level === "yellow" ? "FACTOR" : "BENEFIT";
-      const cfg = level === "red"
-        ? { bg: "#FEF2F2", border: "#FECACA", color: T.red }
-        : level === "yellow"
+      const displayLabel = level === "amber" ? "REQUIRED" : level === "blue" ? "FACTOR" : "BENEFIT";
+      const cfg = level === "amber"
         ? { bg: "#FFFBEB", border: "#FDE68A", color: T.yellow }
+        : level === "blue"
+        ? { bg: "#EFF6FF", border: "#BFDBFE", color: "#2563eb" }
         : { bg: "#F0FDF4", border: "#BBF7D0", color: T.green };
       const iconPath = level === "green"
         ? <path d="M4 8.5L7 11.5L12 5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        : level === "yellow"
-        ? <><path d="M8 3L1 14h14L8 3z" stroke="#fff" strokeWidth="1.5" fill="none"/><path d="M8 7v3" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/><path d="M8 12v.5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/></>
+        : level === "blue"
+        ? <><path d="M8 4v5" stroke="#fff" strokeWidth="2" strokeLinecap="round" /><path d="M8 11v1" stroke="#fff" strokeWidth="2" strokeLinecap="round" /></>
         : <><path d="M8 4v5" stroke="#fff" strokeWidth="2" strokeLinecap="round" /><path d="M8 11v1" stroke="#fff" strokeWidth="2" strokeLinecap="round" /></>;
       let desc = "";
       if (i + 1 < lines.length && !lines[i + 1].trim().includes("|") && lines[i + 1].trim()) {
         desc = lines[i + 1].trim(); i++;
       }
-      els.push(<div key={i} style={{ marginBottom: 8 }}>
-        <div style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 10, padding: "14px 16px", display: "flex", gap: 14, alignItems: "flex-start" }}>
+      els.push(<div key={i} style={{ marginBottom: 4 }}>
+        <div style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 8, padding: "10px 14px", display: "flex", gap: 12, alignItems: "flex-start" }}>
           <div style={{ width: 24, height: 24, borderRadius: 6, background: cfg.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
             <svg width={12} height={12} viewBox="0 0 16 16" fill="none">{iconPath}</svg>
           </div>
@@ -566,8 +566,8 @@ function SectionLines({ lines, sectionName }) {
       const b = typeUpper === "OTC"
         ? { bg: T.green + "20", color: T.green, border: T.green + "40", label: "OTC" }
         : typeUpper === "SPECIAL"
-        ? { bg: "#FFF8F0", color: T.orange, border: T.orange + "40", label: "SPECIAL" }
-        : { bg: T.warmGray, color: T.secondary, border: T.border, label: "PLAN CHECK" };
+        ? { bg: "#FFFBEB", color: T.yellow, border: "#FDE68A", label: "SPECIAL" }
+        : { bg: "#EFF6FF", color: "#2563eb", border: "#BFDBFE", label: "PLAN CHECK" };
       els.push(
         <div key={i} style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 8, padding: "10px 14px", marginBottom: 4, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: T.text, flex: 1 }}>{name2}</span>
@@ -716,12 +716,12 @@ function SectionLines({ lines, sectionName }) {
         if (ganttItems.length > 0) {
           els.push(
             <div key={"gantt" + i} style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, paddingLeft: 100, fontSize: 10, color: T.secondary }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, paddingLeft: 138, fontSize: 10, color: T.secondary }}>
                 {[0, Math.round(worstWeek / 4), Math.round(worstWeek / 2), Math.round(worstWeek * 3 / 4), worstWeek].map((w, wi) => <span key={wi}>{w}</span>)}
               </div>
               {ganttItems.map((bar, bi) => (
                 <div key={"gb" + bi} style={{ display: "flex", alignItems: "center", marginBottom: 3, height: 24 }}>
-                  <div style={{ width: 96, fontSize: 10, color: T.secondary, textAlign: "right", paddingRight: 8, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bar.label.length > 16 ? bar.label.slice(0, 16) + "…" : bar.label}</div>
+                  <div style={{ width: 130, fontSize: 10, color: T.secondary, textAlign: "right", paddingRight: 8, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bar.label.length > 22 ? bar.label.slice(0, 22) + "…" : bar.label}</div>
                   <div style={{ flex: 1, position: "relative", height: 20 }}>
                     <div style={{ position: "absolute", left: `${(bar.start / worstWeek) * 100}%`, width: `${Math.max(((bar.end - bar.start) / worstWeek) * 100, 3)}%`, height: "100%", background: T.orange + "25", borderRadius: 4, border: `1px solid ${T.orange}50`, display: "flex", alignItems: "center", paddingLeft: 6 }}>
                       <span style={{ fontSize: 9, color: T.orange, fontWeight: 600, whiteSpace: "nowrap" }}>{bar.end - bar.start} wks</span>
@@ -916,7 +916,7 @@ function ReportBody({ text, parcel, projectType, jurisdiction }) {
     <div style={{ padding: "16px 16px 0" }}>
       {/* Reorder sections to match prototype: Overview → Opportunity → Alerts → Standards → Permits → Survey → rest */}
       {(() => {
-        const order = ["project overview","development opportunity","zone alert","regulation","development standard","permitting","permit road","parcel survey","hazard","housing","definition","terms","legal"];
+        const order = ["project overview","development opportunity","zone alert","development standard","regulation","permitting","permit road","parcel survey","definition","terms","legal"];
         const sorted = [];
         for (const target of order) {
           const found = sections.find(s => s.name.toLowerCase().includes(target) && !sorted.includes(s));
@@ -1072,14 +1072,23 @@ function ReportBody({ text, parcel, projectType, jurisdiction }) {
                   <div style={{ background: T.warmGray, borderRadius: 10, padding: "14px 18px", marginTop: 16 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: T.orange, letterSpacing: "0.1em", marginBottom: 8 }}>DEVELOPMENT ENVELOPE</div>
                     {[
-                      far && ["FAR", `${far} × Buildable Area`, T.text],
-                      maxHeight && ["Max Height", maxHeight, T.text],
-                      ["ADU Potential", /^R[2-5]|^RD/.test(z) ? "2 ADUs + 1 JADU on R2+ lot" : "1 ADU + 1 JADU", T.orange],
-                      hasAB2097 && ["Parking", "AB 2097 may override parking minimums", T.text],
-                    ].filter(Boolean).map(([label2, value2, color], ri) => (
-                      <div key={ri} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: ri < 3 ? `1px solid ${T.border}` : "none", gap: 12 }}>
+                      [
+                        "Uses Permitted",
+                        /^R1|^RS|^RE/.test(z) ? "One-family dwelling" : /^RD/.test(z) ? "Two-family dwelling" : /^R2/.test(z) ? "Two-family dwelling or multiple dwellings" : /^R3/.test(z) ? "Multiple dwellings, boarding houses" : /^R4/.test(z) ? "Multiple dwellings, hotels" : /^R5/.test(z) ? "Multiple dwellings (unlimited)" : /^C/.test(z) ? "Commercial + residential" : "See LAMC",
+                        /^R1/.test(z) ? "LAMC 12.07" : /^RD/.test(z) ? "LAMC 12.09.1" : /^R2/.test(z) ? "LAMC 12.09" : /^R3/.test(z) ? "LAMC 12.10" : /^R4/.test(z) ? "LAMC 12.11" : /^R5/.test(z) ? "LAMC 12.12" : "",
+                        T.text
+                      ],
+                      far && ["FAR", `${far} × Buildable Area`, "LAMC 12.21.1(a)", T.text],
+                      maxHeight && ["Max Height", maxHeight, "LAMC 12.21.1 B", T.text],
+                      ["ADU Potential", /^R[2-5]|^RD/.test(z) ? "2 ADUs + 1 JADU on R2+ lot" : "1 ADU + 1 JADU", "State ADU Law", T.orange],
+                      ["Parking", hasAB2097 ? "AB 2097 may eliminate parking minimums" : "2 covered spaces per dwelling unit", "LAMC 12.21 A.4", T.text],
+                    ].filter(Boolean).map(([label2, value2, ref, color], ri, arr) => (
+                      <div key={ri} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: ri < arr.length - 1 ? `1px solid ${T.border}` : "none", gap: 12 }}>
                         <span style={{ fontSize: 11, color: T.secondary, flexShrink: 0 }}>{label2}</span>
-                        <span style={{ fontSize: 12, color, fontWeight: color === T.orange ? 600 : 400, textAlign: "right" }}>{value2}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 12, color, fontWeight: color === T.orange ? 600 : 400, textAlign: "right" }}>{value2}</span>
+                          {ref && <span style={{ fontSize: 10, color: T.muted, fontFamily: "monospace", whiteSpace: "nowrap" }}>{ref}</span>}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1098,8 +1107,8 @@ function ReportBody({ text, parcel, projectType, jurisdiction }) {
                 {/* Summary bar */}
                 <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
                   {[
-                    { label: "Required", count: reqCount, color: T.red, bg: "#FEF2F2" },
-                    { label: "Factors", count: facCount, color: T.yellow, bg: "#FFFBEB" },
+                    { label: "Required", count: reqCount, color: T.yellow, bg: "#FFFBEB" },
+                    { label: "Factors", count: facCount, color: "#2563eb", bg: "#EFF6FF" },
                     { label: "Benefits", count: benCount, color: T.green, bg: "#F0FDF4" },
                   ].map((g, gi) => (
                     <div key={gi} style={{ flex: 1, background: g.bg, borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
@@ -1119,11 +1128,16 @@ function ReportBody({ text, parcel, projectType, jurisdiction }) {
           return (
             <div key={si} style={{ marginBottom: 24 }}>
               <SectionHeader2 title={section.name} id={section.id} />
-              <div className="survey-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "flex-start" }}>
+              <div className="survey-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "stretch" }}>
                 <ParcelSurveyCards parcel={parcel} />
               </div>
             </div>
           );
+        }
+
+        // ── SKIP redundant sections (data shown in Survey cards or footer) ──
+        if (sn.includes("hazard") || sn.includes("housing") || sn.includes("legal notice")) {
+          return null;
         }
 
         // ── ALL OTHER SECTIONS — generic white card ──
@@ -1143,7 +1157,7 @@ function ReportBody({ text, parcel, projectType, jurisdiction }) {
 // ── Report Hero — dark card with integrated KPI strip ────────────────────
 function ReportHero({ address, parcel, projectType, jurisdiction, resultText }) {
   const kpis = extractKPIs(resultText);
-  const vc = kpis.verdict === "GO" ? T.green : kpis.verdict === "COMPLEX" ? T.red : T.yellow;
+  const vc = kpis.verdict === "GO" ? T.green : kpis.verdict === "HIGH" ? T.red : T.yellow;
   const label = getLabel(projectType);
   const d = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 
@@ -1205,7 +1219,7 @@ function ReportHero({ address, parcel, projectType, jurisdiction, resultText }) 
       {/* KPI strip — integrated into hero */}
       <div className="hero-kpi-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", borderTop: "1px solid #ffffff12" }}>
         {[
-          { label: "MAX BUILDOUT", value: maxBuildout, color: T.gold },
+          { label: "MAX BUILDOUT", value: maxBuildout, sub: parcel?.lotSizeSf > 0 ? `${Math.max(base, Math.floor(base * tocMulti))} primary + ${adus} ADU + 1 JADU` : "", color: T.gold },
           { label: "EST. FEES", value: kpis.fees || "—", sub: "Permit + geotech + trade", color: T.gold },
           { label: "TIMELINE", value: (kpis.timeline || "—").replace("week critical path", "wks").replace("weeks", "wks"), sub: "From submittal", color: T.white },
           { label: "ALERTS", value: `${rc} required`, sub: `${fc} factors · ${bc} benefits`, color: parseInt(rc) > 0 ? T.red : T.green },
@@ -1227,12 +1241,12 @@ function SectionNav() {
     { id: "sec-project-overview", label: "Overview" },
     { id: "sec-development-opportunity", label: "Opportunity" },
     { id: "sec-zone-alerts", label: "Alerts" },
-    { id: "sec-regulations", label: "Standards" },
+    { id: "sec-development-standards", label: "Standards" },
     { id: "sec-permitting", label: "Permits" },
     { id: "sec-parcel-survey", label: "Survey" },
   ];
   return (
-    <div style={{ position: "sticky", top: 0, zIndex: 100, background: T.cream, padding: "8px 0" }} className="no-print">
+    <div style={{ position: "sticky", top: 0, zIndex: 100, background: T.cream, padding: "8px 16px" }} className="no-print">
       <div className="section-nav-bar" style={{ display: "flex", gap: 4, background: T.white, borderRadius: 10, padding: 4, border: `1px solid ${T.border}` }}>
         {navSections.map(s => (
           <a key={s.id} href={"#" + s.id}
@@ -1646,7 +1660,6 @@ export default function Listo() {
         <div style="border:1px solid #E5E7EB;border-left:4px solid #B91C1C;border-radius:8px;margin:8px 0;overflow:hidden">
           <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#B91C1C;text-transform:uppercase;letter-spacing:0.08em">HAZARDS & ENVIRONMENTAL</div>
           <div style="padding:6px 14px;display:grid;grid-template-columns:1fr 1fr;gap:0 14px">
-            ${hRow("Coastal Zone", parcel.coastalZone === "Yes" ? (parcel.coastalZoneType || "Yes") : parcel.coastalZone === "No" ? false : null, parcel.coastalZone === "Yes")}
             ${hRow("Fire Hazard Zone", parcel.fireHazard, false)}
             ${hRow("Liquefaction", parcel.liquefaction, parcel.liquefaction === true)}
             ${hRow("Landslide", parcel.landslide, parcel.landslide === true)}
@@ -1662,18 +1675,19 @@ export default function Listo() {
         <div style="border:1px solid #E5E7EB;border-left:4px solid #2563eb;border-radius:8px;margin:8px 0;overflow:hidden">
           <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:0.08em">PLANNING & ZONING</div>
           <div style="padding:6px 14px">
-            ${pRow("Specific Plan", parcel.specificPlan || null)}
-            ${pRow("HPOZ", parcel.hpoz === true ? "Yes" : parcel.hpoz === false ? "No" : null)}
             ${pRow("General Plan", parcel.generalPlanLandUse || null)}
             ${pRow("Community Plan", parcel.communityPlan || null)}
-            ${parcel.ziCodes?.length ? '<div style="margin-top:6px"><div style="font-size:9px;color:#78716C;font-family:monospace;margin-bottom:3px">ZONING INFORMATION (' + parcel.ziCodes.length + ')</div>' + parcel.ziCodes.map(zi => '<div style="font-size:9px;color:#E8620A;background:#E8620A15;border:1px solid #E8620A40;border-radius:3px;padding:2px 6px;margin:2px 0">' + zi + '</div>').join('') + '</div>' : ''}
+            ${pRow("Specific Plan", parcel.specificPlan || null)}
+            ${hRow("Coastal Zone", parcel.coastalZone === "Yes" ? (parcel.coastalZoneType || "Yes") : parcel.coastalZone === "No" ? false : null, parcel.coastalZone === "Yes")}
+            ${pRow("TOC", parcel.toc || null)}
+            ${pRow("HPOZ", parcel.hpoz === true ? "Yes" : parcel.hpoz === false ? "No" : null)}
+            ${parcel.ziCodes?.length ? '<div style="margin-top:6px"><div style="font-size:9px;color:#78716C;margin-bottom:3px">ZI CODES (' + parcel.ziCodes.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px">' + parcel.ziCodes.map(zi => '<span style="font-size:8px;color:#E8620A;background:#E8620A15;border:1px solid #E8620A40;border-radius:3px;padding:1px 5px;font-family:monospace">' + zi + '</span>').join('') + '</div></div>' : ''}
           </div>
         </div>
         <div style="border:1px solid #E5E7EB;border-left:4px solid #7C3AED;border-radius:8px;margin:8px 0;overflow:hidden">
           <div style="padding:8px 14px;background:#FAFAFA;border-bottom:1px solid #F3F4F6;font-size:10px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:0.08em">HOUSING</div>
           <div style="padding:6px 14px">
             ${hRow("RSO", parcel.rso !== undefined ? (parcel.rso ? "Yes" : "No") : null, false)}
-            ${hRow("TOC", parcel.toc || null, false)}
             ${hRow("HE Replacement Required", parcel.heReplacement !== undefined ? (parcel.heReplacement ? "Yes" : "No") : null, parcel.heReplacement === true)}
             ${hRow("Just Cause Eviction (JCO)", parcel.jco !== undefined ? (parcel.jco ? "Yes" : "No") : null, false)}
           </div>
@@ -1700,25 +1714,27 @@ export default function Listo() {
       }
       // Skip Claude's parcel survey text (replaced by cards above)
       if (pdfSec.includes("parcel survey")) continue;
+      // Skip sections that are redundant (shown in Survey cards or footer)
+      if (pdfSec.includes("hazard") || pdfSec.includes("housing") || pdfSec.includes("legal notice")) continue;
       if (t.startsWith("### ")) { pdfSubsec = t.slice(4).toLowerCase(); bodyHtml += `<h3>${t.slice(4)}</h3>`; continue; }
       if (t.startsWith("#### ")) { bodyHtml += `<div style="font-size:10px;font-weight:700;color:${T.orange};text-transform:uppercase;letter-spacing:0.05em;margin:10px 0 4px;font-family:monospace">${t.slice(5)}</div>`; continue; }
       if (t.startsWith("VERDICT:")) {
         const pts = t.slice(8).trim().split("|");
         const w=(pts[0]||"").trim(), d=(pts[1]||"").trim();
-        const c=w==="GO"?T.green:w==="COMPLEX"?T.red:T.yellow;
+        const c=w==="GO"?T.green:w==="HIGH"?T.red:T.yellow;
         bodyHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:${c}15;border:2px solid ${c};border-radius:8px;margin:8px 0"><span style="font-size:10px;font-weight:800;color:#fff;background:${c};border-radius:4px;padding:2px 10px">${w}</span><span style="font-size:12px;color:#44403C">${d}</span></div>`;
         continue;
       }
-      // Zone Alerts with ACTION REQUIRED/CAUTION/NOTE
+      // Zone Alerts with REQUIRED/FACTOR/BENEFIT
       if (t.includes("|") && /^(REQUIRED|ACTION REQUIRED|CRITICAL|FACTOR|CAUTION|BENEFIT|NOTE|INFO|CLEAR)\s*\|/.test(t)) {
         const pts=t.split("|").map(p=>p.trim());
         const [sev,name2,dollar,time]=pts;
-        const levelMap2={"REQUIRED":"red","ACTION REQUIRED":"red","CRITICAL":"red","FACTOR":"yellow","CAUTION":"yellow","BENEFIT":"green","NOTE":"green","INFO":"green","CLEAR":"green"};
+        const levelMap2={"REQUIRED":"amber","ACTION REQUIRED":"amber","CRITICAL":"amber","FACTOR":"blue","CAUTION":"blue","BENEFIT":"green","NOTE":"green","INFO":"green","CLEAR":"green"};
         const lv=levelMap2[sev]||"green";
-        const displayLabel = lv === "red" ? "REQUIRED" : lv === "yellow" ? "FACTOR" : "BENEFIT";
-        const cs={"REQUIRED":["#FEF2F2","#b91c1c"],"ACTION REQUIRED":["#FEF2F2","#b91c1c"],CRITICAL:["#FEF2F2","#b91c1c"],"FACTOR":["#FFFBEB","#b45309"],CAUTION:["#FFFBEB","#b45309"],"BENEFIT":["#F0FDF4","#15803d"],NOTE:["#F0FDF4","#15803d"],INFO:["#F0FDF4","#15803d"],CLEAR:["#F0FDF4","#15803d"]};
+        const displayLabel = lv === "amber" ? "REQUIRED" : lv === "blue" ? "FACTOR" : "BENEFIT";
+        const cs={"REQUIRED":["#FFFBEB","#b45309"],"ACTION REQUIRED":["#FFFBEB","#b45309"],CRITICAL:["#FFFBEB","#b45309"],"FACTOR":["#EFF6FF","#2563eb"],CAUTION:["#EFF6FF","#2563eb"],"BENEFIT":["#F0FDF4","#15803d"],NOTE:["#F0FDF4","#15803d"],INFO:["#F0FDF4","#15803d"],CLEAR:["#F0FDF4","#15803d"]};
         const [bg,bc]=cs[sev]||["#F9FAFB","#78716C"];
-        bodyHtml += `<div style="padding:8px 12px;margin:6px 0;border-radius:6px;border-left:3px solid ${bc};background:${bg}"><span style="font-size:9px;font-weight:800;color:#fff;background:${bc};border-radius:3px;padding:1px 6px;margin-right:8px">${displayLabel}</span><strong>${name2||""}</strong>${dollar?` <span style="color:#78716C;font-size:11px">· ${dollar}</span>`:""}${time?` <span style="color:#78716C;font-size:11px">· ${time}</span>`:""}</div>`;
+        bodyHtml += `<div style="padding:8px 12px;margin:4px 0;border-radius:6px;border-left:3px solid ${bc};background:${bg}"><span style="font-size:9px;font-weight:800;color:#fff;background:${bc};border-radius:3px;padding:1px 6px;margin-right:8px">${displayLabel}</span><strong>${name2||""}</strong>${dollar?` <span style="color:#78716C;font-size:11px">· ${dollar}</span>`:""}${time?` <span style="color:#78716C;font-size:11px">· ${time}</span>`:""}</div>`;
         continue;
       }
       // KPI lines
@@ -2249,13 +2265,13 @@ ${bodyHtml}
                   <ReportBody text={result} parcel={parcel} projectType={projectType} jurisdiction={jurisdiction} />
 
                   {/* Footer */}
-                  <div style={{ margin: "0 16px", background: T.black, borderRadius: 12, padding: "20px 24px" }}>
+                  <div style={{ margin: "0 16px", background: T.warmGray, border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 14 }} className="no-print">
                       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        <Logo size={20} light />
+                        <Logo size={20} />
                         <div style={{ position: "relative" }}>
                           <button onClick={handleShare}
-                            style={{ display: "flex", alignItems: "center", gap: 8, background: T.gold, color: T.black, border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
+                            style={{ display: "flex", alignItems: "center", gap: 8, background: T.orange, color: T.white, border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
                             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" /></svg>
                             Share Report
                           </button>
@@ -2266,7 +2282,7 @@ ${bodyHtml}
                           )}
                         </div>
                         <button onClick={handlePrint}
-                          style={{ display: "flex", alignItems: "center", gap: 8, background: "transparent", color: "#D6D3D1", border: "1px solid #ffffff20", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
+                          style={{ display: "flex", alignItems: "center", gap: 8, background: "transparent", color: T.secondary, border: `1px solid ${T.border}`, borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}>
                           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                           Export PDF
                         </button>
@@ -2276,10 +2292,10 @@ ${bodyHtml}
                         Apply at {jurisdiction?.agency || "LADBS"} →
                       </button>
                     </div>
-                    <div style={{ fontSize: 10, color: T.secondary, lineHeight: 1.6 }}>
-                      AI-generated guidance based on publicly available LA permit data. Always verify with your jurisdiction before submitting. This is not legal advice.
+                    <div style={{ fontSize: 10, color: T.secondary, lineHeight: 1.8 }}>
+                      AI-generated guidance based on publicly available LA permit data. Always verify with your jurisdiction before submitting. This is not legal advice. Listo makes no warranties regarding accuracy or completeness. Data provided "as is" per ZIMAS terms.
                     </div>
-                    <div style={{ fontSize: 10, color: T.secondary, marginTop: 6 }}>
+                    <div style={{ fontSize: 10, color: T.muted, marginTop: 6 }}>
                       listo.zone · Not affiliated with the City of Los Angeles, Santa Monica, Beverly Hills, Malibu, or LADBS
                     </div>
                   </div>
