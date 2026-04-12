@@ -392,27 +392,32 @@ function ParcelSurveyCards({ parcel }) {
           );
           return (
             <>
-              {fields.map((f, fi) => (
-                <div key={fi} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #F3F4F6", gap: 6 }}>
-                  <span style={{ fontSize: 12, color: "#374151" }}>{f.label}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                    {typeof f.value === "string" || typeof f.value === "number" ? (
-                      <>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>{f.value}</span>
-                        <span style={{ fontSize: 9, fontWeight: 600, padding: "2px 6px", borderRadius: 3, background: T.green + "18", color: T.green, display: "flex", alignItems: "center", gap: 3 }}>
-                          <svg width={9} height={9} viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke={T.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                          ZIMAS
-                        </span>
-                      </>
-                    ) : f.value !== undefined && f.value !== null ? (
-                      <Badge yes={f.value} value={f.value} flagged={f.flagged} />
-                    ) : (
-                      <Badge />
-                    )}
-                    {f.zi.map((zi, ri) => <ZiPill key={ri} code={zi} />)}
+              {fields.map((f, fi) => {
+                const isString = typeof f.value === "string" || typeof f.value === "number";
+                const valStr = isString ? String(f.value) : "";
+                const isLong = valStr.length > 30;
+                return (
+                  <div key={fi} style={{ display: "flex", flexDirection: isLong ? "column" : "row", justifyContent: "space-between", alignItems: isLong ? "stretch" : "center", padding: "5px 0", borderBottom: "1px solid #F3F4F6", gap: isLong ? 3 : 6 }}>
+                    <span style={{ fontSize: 12, color: "#374151" }}>{f.label}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", justifyContent: isLong ? "flex-start" : "flex-end" }}>
+                      {isString ? (
+                        <>
+                          <span style={{ fontSize: isLong ? 10 : 12, fontWeight: 600, color: "#374151", lineHeight: 1.4, wordBreak: "break-word" }}>{f.value}</span>
+                          <span style={{ fontSize: 9, fontWeight: 600, padding: "2px 6px", borderRadius: 3, background: T.green + "18", color: T.green, display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
+                            <svg width={9} height={9} viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke={T.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            ZIMAS
+                          </span>
+                        </>
+                      ) : f.value !== undefined && f.value !== null ? (
+                        <Badge yes={f.value} value={f.value} flagged={f.flagged} />
+                      ) : (
+                        <Badge />
+                      )}
+                      {f.zi.map((zi, ri) => <ZiPill key={ri} code={zi} />)}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {remainingZi.length > 0 && (
                 <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 3, paddingTop: 4 }}>
                   {remainingZi.map((zi, idx) => <ZiPill key={idx} code={zi} />)}
@@ -532,12 +537,58 @@ function SectionLines({ lines, sectionName }) {
     // Subsection headers
     if (t.startsWith("### ")) {
       subsec = t.slice(4).toLowerCase();
-      // Fee Summary gets orange label style
+      // Fee Summary gets entire-subsection warm-gray card
       if (subsec.includes("fee")) {
-        els.push(<div key={i} style={{ fontSize: 10, fontWeight: 700, color: T.orange, letterSpacing: "0.1em", marginTop: 16, marginBottom: 8 }}>
-          {t.slice(4).toUpperCase()}
-        </div>);
-        i++; continue;
+        // Collect all lines until next ### or ## or end
+        const feeLines = [];
+        i++;
+        while (i < lines.length) {
+          const fl = lines[i].trim().replace(/\*\*/g, "");
+          if (fl.startsWith("### ") || fl.startsWith("## ")) break;
+          if (fl) feeLines.push(fl);
+          i++;
+        }
+        // Parse fee lines
+        const feeRows = [];
+        let totalLine = null;
+        let excludeLine = null;
+        for (const fl of feeLines) {
+          if (/^TOTAL FEES/i.test(fl)) {
+            const amt = fl.includes("|") ? fl.split("|").map(p=>p.trim()).slice(1).join(" ") : fl.replace(/^TOTAL FEES:?\s*/i, "").trim();
+            totalLine = amt;
+          } else if (/^EXCLUDES?:/i.test(fl)) {
+            excludeLine = fl.replace(/^EXCLUDES?:\s*/i, "Excludes ");
+          } else if (/^fee estimate|^view current/i.test(fl)) {
+            // skip boilerplate
+          } else if (fl.includes("|")) {
+            const pts = fl.split("|").map(p => p.trim());
+            feeRows.push({ name: pts[0], basis: pts[1], cost: pts[2] || pts[1] });
+          }
+        }
+        els.push(
+          <div key={"feecard" + i} style={{ background: T.warmGray, borderRadius: 10, padding: "16px 20px", marginTop: 12, marginBottom: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: T.orange, letterSpacing: "0.1em", marginBottom: 10 }}>FEE SUMMARY</div>
+            {feeRows.map((row, ri) => (
+              <div key={ri} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: ri < feeRows.length - 1 || totalLine ? `1px solid ${T.border}` : "none", gap: 8, alignItems: "flex-start" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.textHead }}>{row.name}</div>
+                  {row.basis && row.basis !== row.cost && <div style={{ fontSize: 11, color: T.secondary, marginTop: 1 }}>{row.basis}</div>}
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: T.orange, whiteSpace: "nowrap" }}>{row.cost}</span>
+              </div>
+            ))}
+            {totalLine && (
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0 0", marginTop: 4, alignItems: "center" }}>
+                <span style={{ fontSize: 14, fontWeight: 800, color: T.textHead }}>TOTAL FEES</span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: T.orange, fontFamily: "'Georgia',serif" }}>{totalLine}</span>
+              </div>
+            )}
+            {excludeLine && (
+              <div style={{ fontSize: 10, color: T.secondary, fontStyle: "italic", marginTop: 8 }}>{excludeLine}</div>
+            )}
+          </div>
+        );
+        continue;
       }
       els.push(<h3 key={i} style={{ fontSize: 12, fontWeight: 700, color: T.textHead,
         margin: "12px 0 6px", display: "flex", alignItems: "center", gap: 8 }}>
@@ -606,9 +657,16 @@ function SectionLines({ lines, sectionName }) {
             {descText && <div style={{ fontSize: 12, color: T.text, lineHeight: 1.5, marginTop: 2 }}>{descText}</div>}
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
               <span style={{ fontSize: 9, fontWeight: 800, color: T.white, background: cfg.color, borderRadius: 4, padding: "2px 8px", letterSpacing: "0.06em" }}>{displayLabel}</span>
-              {time && time !== "—" && time !== "Variable" && (
-                <span style={{ fontSize: 11, color: T.secondary }}>+{time}</span>
-              )}
+              {time && time !== "—" && time !== "Variable" && (() => {
+                const isDuration = /\d+\s*(week|wk|day|month|mo)/i.test(time);
+                if (isDuration) {
+                  return <span style={{ fontSize: 11, color: T.secondary, display: "flex", alignItems: "center", gap: 3 }}>
+                    <svg width={10} height={10} viewBox="0 0 16 16" fill="none" stroke={T.secondary} strokeWidth="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1.5"/></svg>
+                    {time}
+                  </span>;
+                }
+                return <span style={{ fontSize: 10, color: T.secondary, fontStyle: "italic" }}>{time}</span>;
+              })()}
               {source && (
                 <span style={{ fontSize: 9, fontWeight: 600, padding: "2px 6px", borderRadius: 3,
                   background: isVerified ? T.green + "18" : "#FEF3C7", color: isVerified ? T.green : "#92400E",
@@ -687,27 +745,60 @@ function SectionLines({ lines, sectionName }) {
         continue;
       }
       if (t.startsWith("EXEMPTION:")) {
-        const rest = t.slice(10).trim();
-        const parts = rest.split("|").map(p => p.trim());
-        const [desc, amount, lamc] = parts;
-        els.push(<div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "7px 10px", background: "#FFF8F0", border: `1px solid ${T.orange}30`, borderRadius: 5, marginBottom: 4 }}>
-          <span style={{ fontSize: 9, fontWeight: 700, color: T.orange, letterSpacing: "0.08em", minWidth: 70, marginTop: 1, flexShrink: 0 }}>EXEMPT</span>
-          <span style={{ fontSize: 12, color: T.text, flex: 1, lineHeight: 1.5 }}>{renderInline(desc)}</span>
-          {amount && <span style={{ fontSize: 11, color: T.orange, fontWeight: 600, whiteSpace: "nowrap" }}>{amount}</span>}
-          {lamc && <span style={{ fontSize: 10, color: T.secondary, fontFamily: "monospace", whiteSpace: "nowrap" }}>{lamc}</span>}
-        </div>);
-        i++; continue;
+        // Collect all exemptions in a row
+        const exemptions = [];
+        while (i < lines.length) {
+          const el2 = lines[i].trim().replace(/\*\*/g, "");
+          if (!el2.startsWith("EXEMPTION:")) break;
+          const rest = el2.slice(10).trim();
+          const parts = rest.split("|").map(p => p.trim());
+          exemptions.push({ desc: parts[0], amount: parts[1], lamc: parts[2] });
+          i++;
+        }
+        els.push(
+          <div key={"exemp" + i} style={{ marginTop: 16, marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div style={{ width: 3, height: 14, background: T.orange, borderRadius: 2 }} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: T.textHead }}>FAR exemptions</span>
+            </div>
+            {exemptions.map((ex, ei) => (
+              <div key={ei} style={{ display: "flex", gap: 8, alignItems: "center", padding: "9px 14px", background: "#FFF8F0", border: `1px solid ${T.orange}30`, borderRadius: 5, marginBottom: 4 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: T.orange, letterSpacing: "0.08em", flexShrink: 0 }}>EXEMPT</span>
+                <span style={{ fontSize: 12, color: T.text, flex: 1, lineHeight: 1.4 }}>{renderInline(ex.desc)}</span>
+                {ex.amount && <span style={{ fontSize: 12, color: T.orange, fontWeight: 700, whiteSpace: "nowrap" }}>{ex.amount}</span>}
+                {ex.lamc && <span style={{ fontSize: 10, color: T.secondary, fontFamily: "monospace", whiteSpace: "nowrap" }}>{ex.lamc}</span>}
+              </div>
+            ))}
+          </div>
+        );
+        continue;
       }
-      // Technical spec rows
+      // Technical spec rows — collect into warm-gray card
       if (/^(ENCROACHMENT PLANE:|GRADING:|BASEMENT:|FIRE SPRINKLERS:|OFFSET PLAN BREAK:|SWIMMING POOL:|PARKING STALLS:)/i.test(t)) {
-        const colonIdx = t.indexOf(":");
-        const lbl = t.slice(0, colonIdx);
-        const val = t.slice(colonIdx + 1).trim();
-        els.push(<div key={i} style={{ display: "flex", gap: 10, padding: "6px 0", borderBottom: `1px solid ${T.border}`, alignItems: "flex-start" }}>
-          <span style={{ fontSize: 9, fontWeight: 700, color: T.secondary, minWidth: 110, flexShrink: 0, paddingTop: 2 }}>{lbl}</span>
-          <span style={{ fontSize: 12, color: T.text, lineHeight: 1.6 }}>{renderInline(val)}</span>
-        </div>);
-        i++; continue;
+        const specs = [];
+        while (i < lines.length) {
+          const sl = lines[i].trim().replace(/\*\*/g, "");
+          if (!/^(ENCROACHMENT PLANE:|GRADING:|BASEMENT:|FIRE SPRINKLERS:|OFFSET PLAN BREAK:|SWIMMING POOL:|PARKING STALLS:)/i.test(sl)) break;
+          const colonIdx = sl.indexOf(":");
+          let lbl = sl.slice(0, colonIdx);
+          // Shorten "ENCROACHMENT PLANE" → "ENCROACHMENT" etc to match screenshot
+          lbl = lbl.replace(/ PLANE$/, "").replace(/^OFFSET PLAN BREAK$/, "OFFSET PLAN");
+          const val = sl.slice(colonIdx + 1).trim();
+          specs.push({ lbl, val });
+          i++;
+        }
+        els.push(
+          <div key={"techspec" + i} style={{ background: T.warmGray, borderRadius: 10, padding: "16px 20px", marginTop: 12 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: T.secondary, letterSpacing: "0.1em", marginBottom: 10 }}>TECHNICAL SPECIFICATIONS</div>
+            {specs.map((s, si2) => (
+              <div key={si2} style={{ display: "flex", gap: 12, padding: "7px 0", borderBottom: si2 < specs.length - 1 ? `1px solid ${T.border}` : "none", alignItems: "flex-start" }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: T.secondary, minWidth: 110, flexShrink: 0, paddingTop: 2, letterSpacing: "0.06em" }}>{s.lbl}</span>
+                <span style={{ fontSize: 12, color: T.text, lineHeight: 1.5 }}>{renderInline(s.val)}</span>
+              </div>
+            ))}
+          </div>
+        );
+        continue;
       }
       if (t.toLowerCase().startsWith("analysis as of") || t.toLowerCase().startsWith("lamc standards")) {
         els.push(<div key={i} style={{ fontSize: 11, color: T.secondary, fontStyle: "italic", padding: "8px 0", marginTop: 4 }}>{renderInline(t)}</div>);
@@ -720,35 +811,7 @@ function SectionLines({ lines, sectionName }) {
       i++; continue;
     }
 
-    // ── Fee summary ──
-    if (inSec("fee")) {
-      if (/^TOTAL FEES/i.test(t)) {
-        const amt = t.includes("|") ? t.split("|").map(p=>p.trim()).slice(1).join(" ") : t.replace(/^TOTAL FEES:?\s*/i, "").trim();
-        els.push(<div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0 4px", marginTop: 4 }}>
-          <span style={{ fontSize: 13, fontWeight: 800, color: T.textHead }}>TOTAL FEES</span>
-          <span style={{ fontSize: 18, fontWeight: 800, color: T.orange, fontFamily: "'Georgia',serif" }}>{amt}</span>
-        </div>);
-        i++; continue;
-      }
-      if (/^EXCLUDES?:/i.test(t)) {
-        els.push(<div key={i} style={{ fontSize: 10, color: T.secondary, fontStyle: "italic", marginTop: 6 }}>{t.replace(/^EXCLUDES?:\s*/i, "Excludes ")}</div>);
-        i++; continue;
-      }
-      if (/^fee estimate/i.test(t) || /^view current/i.test(t)) {
-        i++; continue; // Skip — this info is in the footer
-      }
-      if (t.includes("|")) {
-        const pts = t.split("|").map(p => p.trim());
-        els.push(<div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.border}`, gap: 8 }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: T.textHead }}>{pts[0]}</div>
-            {pts[1] && <div style={{ fontSize: 11, color: T.secondary }}>{pts[1]}</div>}
-          </div>
-          <span style={{ fontSize: 14, fontWeight: 700, color: T.orange, whiteSpace: "nowrap" }}>{pts[2] || pts[1] || ""}</span>
-        </div>);
-        i++; continue;
-      }
-    }
+    // ── Fee summary handled in subsection processing above ──
 
     // ── Timeline — Gantt bars ──
     if (inSec("timeline")) {
@@ -777,12 +840,12 @@ function SectionLines({ lines, sectionName }) {
         if (ganttItems.length > 0) {
           els.push(
             <div key={"gantt" + i} style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, paddingLeft: 138, fontSize: 10, color: T.secondary }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, paddingLeft: 190, fontSize: 10, color: T.secondary }}>
                 {[0, Math.round(worstWeek / 4), Math.round(worstWeek / 2), Math.round(worstWeek * 3 / 4), worstWeek].map((w, wi) => <span key={wi}>{w}</span>)}
               </div>
               {ganttItems.map((bar, bi) => (
-                <div key={"gb" + bi} style={{ display: "flex", alignItems: "center", marginBottom: 3, height: 24 }}>
-                  <div style={{ width: 130, fontSize: 10, color: T.secondary, textAlign: "right", paddingRight: 8, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bar.label.length > 22 ? bar.label.slice(0, 22) + "…" : bar.label}</div>
+                <div key={"gb" + bi} style={{ display: "flex", alignItems: "center", marginBottom: 4, minHeight: 24 }}>
+                  <div style={{ width: 180, fontSize: 10, color: T.text, textAlign: "right", paddingRight: 10, flexShrink: 0, lineHeight: 1.3, wordBreak: "break-word" }}>{bar.label}</div>
                   <div style={{ flex: 1, position: "relative", height: 20 }}>
                     <div style={{ position: "absolute", left: `${(bar.start / worstWeek) * 100}%`, width: `${Math.max(((bar.end - bar.start) / worstWeek) * 100, 3)}%`, height: "100%", background: T.orange + "25", borderRadius: 4, border: `1px solid ${T.orange}50`, display: "flex", alignItems: "center", paddingLeft: 6 }}>
                       <span style={{ fontSize: 9, color: T.orange, fontWeight: 600, whiteSpace: "nowrap" }}>{bar.end - bar.start} wks</span>
@@ -824,7 +887,7 @@ function SectionLines({ lines, sectionName }) {
           els.push(<div key={i} style={{ display: "flex", gap: 6, padding: "3px 0", borderBottom: `1px solid ${T.border}`, alignItems: "center", fontSize: 11 }}>
             <span style={{ flex: 1, color: T.text }}>{dn}</span>
             <span style={{ color: T.secondary, fontSize: 10 }}>{dw}</span>
-            <span style={{ fontSize: 8, fontWeight: 700, color: T.white, background: stampYes ? T.orange : T.green, borderRadius: 3, padding: "1px 5px", whiteSpace: "nowrap" }}>{stampYes ? "STAMP" : "NO STAMP"}</span>
+            <span style={{ fontSize: 8, fontWeight: 700, color: T.white, background: stampYes ? T.orange : T.green, borderRadius: 3, padding: "1px 5px", whiteSpace: "nowrap" }}>{stampYes ? "STAMP: REQ" : "ADMIN FILING"}</span>
           </div>);
         }
         i++; continue;
@@ -1109,18 +1172,18 @@ function ReportBody({ text, parcel, projectType, jurisdiction }) {
                   <div style={{ marginTop: 16 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: T.text, marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ width: 3, height: 16, background: T.orange, borderRadius: 2 }} />
-                      State housing law eligibility
+                      State Housing Law Eligibility
                     </div>
                     <div className="state-law-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                       {[
-                        sb79Proxy && { name: "SB 79 — Transit upzoning (eff. July 2026)", status: "LIKELY", color: T.yellow, benefit: "Could allow up to 55–75 ft height and increased density" },
-                        sb35Eligible && { name: "SB 35/423 — Streamlined ministerial", status: "LIKELY", color: T.yellow, benefit: "90–180 day approval, bypasses discretionary review" },
+                        sb79Proxy && { name: "SB 79 — Transit upzoning (eff. July 2026)", status: "PENDING", color: "#6366f1", benefit: "Could allow up to 55–75 ft height and increased density" },
+                        sb35Eligible && { name: "SB 35/423 — Streamlined ministerial", status: "ELIGIBLE", color: T.green, benefit: "90–180 day approval, bypasses discretionary review" },
                         sdblEligible && { name: "State Density Bonus Law", status: "ELIGIBLE", color: T.green, benefit: "20–80% density bonus with affordability requirements" },
                         sb684Eligible && { name: "SB 684 — Ministerial ≤10 units", status: "ELIGIBLE", color: T.green, benefit: "By-right approval for small multifamily" },
-                        sb1123Eligible && { name: "SB 1123 — Starter homes (vacant SF lot)", status: "LIKELY", color: T.yellow, benefit: "Starter home development on vacant single-family lot" },
+                        sb1123Eligible && { name: "SB 1123 — Starter homes (vacant SF lot)", status: "ELIGIBLE", color: T.green, benefit: "Starter home development on vacant single-family lot" },
                         sb9Eligible && { name: "SB 9 — Duplex + lot split", status: "ELIGIBLE", color: T.green, benefit: "Up to 4 units on single-family lot" },
-                        hasAB2097 && { name: "AB 2097 — No parking minimum", status: "YES", color: T.green, benefit: "City cannot impose minimum parking requirements" },
-                        ab2011Eligible && { name: "AB 2011 — Housing on commercial", status: "CHECK", color: T.yellow, benefit: "Housing development on commercial-zoned lot" },
+                        hasAB2097 && { name: "AB 2097 — No parking minimum", status: "ACTIVE", color: T.green, benefit: "City cannot impose minimum parking requirements" },
+                        ab2011Eligible && { name: "AB 2011 — Housing on commercial", status: "LIKELY", color: T.yellow, benefit: "Housing development on commercial-zoned lot" },
                         isCoastal && { name: "SB 1077 — Coastal ADU streamlining", status: "PENDING", color: "#6366f1", benefit: "Streamlined ADU permits in Coastal Zone (eff. July 2026)" },
                       ].filter(Boolean).map((law, li) => (
                         <div key={li} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: T.white, border: `1px solid ${T.border}`, borderRadius: 8 }}>
@@ -1324,16 +1387,17 @@ function SectionNav() {
       let current = navSections[0].id;
       for (const s of navSections) {
         const el = document.getElementById(s.id);
-        if (el && el.getBoundingClientRect().top <= 80) current = s.id;
+        if (el && el.getBoundingClientRect().top <= 100) current = s.id;
       }
       setActive(current);
     };
+    onScroll(); // initialize
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
   return (
-    <div style={{ position: "sticky", top: 0, zIndex: 100, background: T.cream, padding: "8px 16px" }} className="no-print">
-      <div className="section-nav-bar" style={{ display: "flex", gap: 4, background: T.white, borderRadius: 10, padding: 4, border: `1px solid ${T.border}` }}>
+    <div style={{ position: "sticky", top: 0, zIndex: 100, background: T.cream, paddingTop: 8, paddingBottom: 8, marginTop: 0, boxShadow: `0 4px 12px ${T.cream}` }} className="no-print">
+      <div className="section-nav-bar" style={{ display: "flex", gap: 4, background: T.white, borderRadius: 10, padding: 4, border: `1px solid ${T.border}`, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
         {navSections.map(s => (
           <a key={s.id} href={"#" + s.id}
             style={{ flex: 1, padding: "8px 4px", border: "none", borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: "pointer", textDecoration: "none", textAlign: "center",
@@ -1866,7 +1930,7 @@ export default function Listo() {
         const isT=(dn||"").toUpperCase().includes("TOTAL");
         const req=ds&&ds.toUpperCase().includes("YES");
         if(ds&&(ds.toUpperCase().includes("YES")||ds.toUpperCase().includes("NO")||ds.toUpperCase().includes("REQ"))){
-          bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="color:#1A1714;flex:1">${dn}</span><span style="color:#78716C;min-width:120px">${dw}</span><span style="font-size:9px;font-weight:700;color:#fff;background:${req?"#b91c1c":"#15803d"};border-radius:3px;padding:1px 6px">STAMP:${req?" REQ":" NOT REQ"}</span></div>`;
+          bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #E2D9D0;font-size:12px"><span style="color:#1A1714;flex:1">${dn}</span><span style="color:#78716C;min-width:120px">${dw}</span><span style="font-size:9px;font-weight:700;color:#fff;background:${req?"#E8620A":"#15803d"};border-radius:3px;padding:1px 6px">${req?"STAMP: REQ":"ADMIN FILING"}</span></div>`;
         } else {
           bodyHtml+=`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid ${isT?T.orange:"#E2D9D0"};font-size:12px${isT?";font-weight:700;color:"+T.orange:""}"><span style="flex:1">${dn}</span>${dw&&!isT?`<span style="color:#78716C;min-width:100px">${dw}</span>`:""}<span>${ds||""}</span></div>`;
         }
